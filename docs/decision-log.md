@@ -183,4 +183,37 @@ reconstructions, and none has yet met contact with an actual environment.
 
 ---
 
-<!-- Next entry: D-008. Copy the template from CLAUDE.md. -->
+## D-008 — Develop against the local `arc-agi` engine; never commit environment files
+
+- **Date:** 2026-08-30
+- **Status:** accepted
+- **Context:** Question arose of whether to download competition data from Kaggle
+  into the repo. ARC-AGI-3 turns out not to be a static dataset — there are no
+  JSON task files as there were for ARC-AGI-1/2. The `arc-agi` PyPI package hosts
+  the same game engine the Kaggle gateway runs; games download on first run and
+  cache to `environment_files/`, after which everything is offline. See
+  `benchmark.md` § *Tooling*.
+- **Decision:** Develop against the local engine. Pin the `arc-agi` version.
+  `.gitignore` both `environment_files/` and `.env`. Clone
+  `arcprize/ARC-AGI-3-Agents` separately as reference rather than vendoring it.
+- **Options rejected:**
+  - *Commit `environment_files/` to the repo* — regenerable cache, unclear
+    redistribution position on the game files, and it would bloat the repo. The
+    engine fetches them deterministically anyway.
+  - *Develop against the hosted API (`ONLINE_ONLY=True`)* — adds latency and a
+    network dependency to every iteration for no benefit, since the local engine
+    is documented as identical to the Kaggle gateway.
+  - *Vendor the official harness into this repo* — we want our own architecture
+    (D-004); starting inside someone else's agent loop would bias it.
+- **Consequences:** Development rollouts become free and unlimited on the cached
+  public games, so perception work and the validation experiment cost only
+  wall-clock. **This is also a hazard:** RHAE punishes retries quadratically
+  while local development permits infinite retries. Mitigation, adopted now
+  rather than later — evaluate on **first attempt from a cold start**, and log
+  *actions consumed* as a first-class metric from day one.
+- **Revisit if:** the local engine is found to diverge from the Kaggle gateway in
+  any observable way, or competition rules change what may be redistributed.
+
+---
+
+<!-- Next entry: D-009. Copy the template from CLAUDE.md. -->

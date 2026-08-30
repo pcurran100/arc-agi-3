@@ -84,12 +84,29 @@ a real environment**. Full reasoning and rejected alternatives in
 | D-005 | Prune the click space (4,096 → ~5–20) by object segmentation | medium |
 | D-006 | Exact symbolic perception, no VLM at the primitive layer | high |
 | D-007 | Session 1 = perception layer only | accepted, with a noted cost |
+| D-008 | Develop against local `arc-agi` engine; never commit environment files | high |
 
 ---
 
 ## What is built
 
 Nothing. This is the scaffold only.
+
+**Setup not yet done** (first job of session 1):
+
+```bash
+pip install arc-agi            # pin the version
+export ARC_API_KEY=...         # from https://three.arcprize.org/
+```
+
+Games cache to `environment_files/` on first run, then run fully offline. The
+local engine is the same one the Kaggle gateway runs. `.gitignore`
+`environment_files/` and `.env` (D-008). Clone
+`arcprize/ARC-AGI-3-Agents` alongside as reference — do not vendor it.
+
+**Standing hazard from day one:** local development allows infinite retries;
+RHAE punishes them quadratically. Evaluate on first attempt from a cold start,
+and log *actions consumed* alongside every result.
 
 ---
 

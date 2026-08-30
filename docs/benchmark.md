@@ -136,6 +136,76 @@ gap is compute, not capability. We are not entering that track (see D-001).
 
 ---
 
+## Tooling: how you actually run environments
+
+**ARC-AGI-3 is not a static dataset.** There are no JSON task files to download
+the way there were for ARC-AGI-1 and ARC-AGI-2. It is a game engine, and you run
+against it.
+
+### The local runtime
+
+The `arc-agi` PyPI package **hosts the same game engine the Kaggle gateway
+runs**. The documented design promise is: *"If it works locally, it works on
+Kaggle."*
+
+```bash
+pip install arc-agi        # or: uv add arc-agi
+```
+
+```python
+import arc
+from arc import GameAction
+
+env = arc.make("ls20", render_mode="terminal")
+obs = env.step(GameAction.ACTION1, data={"x": 32, "y": 32})
+# returns frame data; game state includes WIN, GAME_OVER, etc.
+```
+
+Note the action signature: the cell-selection action is parameterised by (x, y)
+in `data`, confirming the 4,096-coordinate branching factor that D-005 addresses.
+
+### Environment discovery and caching
+
+The `Arcade` class discovers games from local directories and remote API
+endpoints, with three modes:
+
+| Mode | Behaviour |
+|---|---|
+| `NORMAL` | local + API |
+| `ONLINE` | API only |
+| `OFFLINE` | local only |
+
+Games download on **first run** and cache to `environments_dir` (default
+`environment_files/`). After that you are **fully offline**. An `ARC_API_KEY`
+from https://three.arcprize.org/ enables access to additional games.
+
+### Starter kit
+
+`github.com/arcprize/ARC-AGI-3-Agents` — the official agent harness. Includes a
+random-agent baseline. Defaults to local execution via `arc-agi`; set
+`ONLINE_ONLY=True` in `.env` to use the hosted API instead.
+
+```bash
+uv run main.py --agent=random --game=ls20
+make play-local    # runs your agent against every game in the dataset, locally
+```
+
+Kaggle then runs the same code a second time against **hidden** games for the
+official score.
+
+### Consequences for us
+
+1. **Development rollouts are free and unlimited** on the cached public games.
+   The perception work and the dynamics-induction validation experiment cost
+   nothing but wall-clock.
+2. **That is also a trap.** RHAE punishes retries quadratically, but local
+   development lets you retry infinitely. It is easy to build something that
+   works when you can re-run it and scores terribly under the real metric.
+   **Always evaluate on the first attempt from a cold start**, and log actions
+   consumed as a first-class metric from day one — not at the end.
+3. Pin the `arc-agi` version. Engine changes affect reproducibility of every
+   logged experiment.
+
 ## Sources
 
 - ARC-AGI-3 technical report — https://arxiv.org/html/2603.24621v1
@@ -145,3 +215,7 @@ gap is compute, not capability. We are not entering that track (see D-001).
 - ARC Prize 2026, ARC-AGI-2 competition — https://arcprize.org/competitions/2026/arc-agi-2
 - ARC Prize 2026 overview — https://arcprize.org/competitions/2026
 - Claude Opus 5 results — https://arcprize.org/results/anthropic-claude-opus-5
+- ARC Prize 2026 developer docs — https://docs.arcprize.org/arc-prize-2026
+- `arc-agi` package — https://pypi.org/project/arc-agi/
+- Official agent harness — https://github.com/arcprize/ARC-AGI-3-Agents
+- Kaggle competition — https://www.kaggle.com/competitions/arc-prize-2026-arc-agi-3

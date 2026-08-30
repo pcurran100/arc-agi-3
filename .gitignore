@@ -1,0 +1,28 @@
+# ARC-AGI-3 environment cache — regenerable by the arc-agi engine on first run.
+# Never commit (D-008): redistribution position unclear, and it bloats the repo.
+environment_files/
+
+# Secrets
+.env
+.env.local
+
+# Experiment output — logs are the record, but keep raw rollouts out of git.
+# Anything worth preserving gets summarised into docs/decision-log.md.
+runs/
+scorecards/
+*.replay
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

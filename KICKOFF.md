@@ -60,12 +60,22 @@ Four components, each with tests, working across the 25 public demo environments
 
 ### Start by
 
-Confirming the ARC-AGI-3 API surface and current Kaggle compute limits against
-the live docs, since `docs/benchmark.md` was compiled on 30 August 2026 and the
-competition is live. If anything there is now wrong, correct the file **and** log
-the correction — we may have reasoned from the stale fact.
+1. **Setting up the local engine.** `pip install arc-agi` (pin the version),
+   `ARC_API_KEY` from https://three.arcprize.org/, then run the random-agent
+   baseline to confirm environments download and cache. `.gitignore`
+   `environment_files/` and `.env`. See D-008 and `benchmark.md` § *Tooling*.
+2. **Verifying the docs against reality.** Confirm the API surface and current
+   Kaggle compute limits against the live documentation — `docs/benchmark.md`
+   was compiled on 30 August 2026 and the competition is live. If anything there
+   is wrong, correct the file **and** log the correction, since we may have
+   reasoned from the stale fact.
+3. **Proposing a module layout** before implementing anything. Let's agree it
+   first.
 
-Then propose a module layout before implementing, and let's agree it.
+**Adopt this from the first line of code:** local development allows unlimited
+retries, but RHAE punishes them quadratically. Log *actions consumed* as a
+first-class metric now, and evaluate on first attempt from a cold start. It is
+far harder to retrofit that discipline than to start with it.
 
 ## How to work
 
