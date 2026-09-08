@@ -124,7 +124,9 @@ in pixel space otherwise.
 the six, or scores them, or narrows the population as evidence accumulates. They
 are computed and handed onward. Downstream code names one by string and uses it.
 The population exists as raw material for a judgement that has not been written.
-See §3.4.
+See §3.4. D-018 makes the choice an explicit axis of the dynamics experiment,
+which is the first use that does not simply pick one and hope; it does not yet
+give the agent any way to choose at run time.
 
 ### 2.3 Difference — what changed?
 

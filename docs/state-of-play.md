@@ -131,6 +131,7 @@ alternatives in `decision-log.md`.
 | D-015 | Corrections to the perception claims after an independent audit | — |
 | D-016 | Object identity is not revisable; splits/merges out of scope for now | medium — a deliberate deferral, not a settled answer |
 | D-017 | Keep a standing essay-format architecture document | high |
+| D-018 | Dynamics experiment measures all six segmentations, not one | high |
 
 ---
 
@@ -219,8 +220,16 @@ come out of `Episode.transitions()` with the full animation attached, and
 tracking is measured. **It must not be quietly skipped because the architecture
 already assumes the answer.**
 
-Four things learned so far change how to run it. The first two are from session
-1; the last two are from session 2's audit and are new:
+Five things now shape how to run it. The first two are from session 1; the rest
+are from session 2:
+
+- **Treat the segmentation as an axis, not an input (D-018).** Run induction
+  under all six carvings and report the comparison. A rule is stated in terms of
+  objects, six candidate notions of object exist, and nothing selects among
+  them — so fixing one arbitrarily would make a *negative* result
+  uninterpretable: we could not tell "the bet is wrong" from "we carved wrong",
+  on precisely the decision the project turns on. Roughly 6× compute, so run the
+  full sweep on a subset and one carving on the rest.
 
 - Use the **intermediate animation frames**, not just endpoints. Up to 42
   sub-transitions per action is far more evidence than the thesis budgeted for,

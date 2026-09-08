@@ -754,4 +754,67 @@ reconstructions, and none has yet met contact with an actual environment.
 
 ---
 
-<!-- Next entry: D-018. Copy the template from CLAUDE.md. -->
+## D-018 — The dynamics experiment measures all six segmentations rather than fixing one
+
+- **Date:** 2026-09-08
+- **Status:** accepted
+- **Context:** A dynamics rule is stated in terms of objects, but six candidate
+  segmentations exist and they disagree sharply — bp35 yields 191 components
+  under `colour_8` and 7 under `colour_mass`. Nothing in the codebase selects
+  among them (`architecture.md` §3.4), so the choice would have been made by
+  whatever string someone typed into the experiment script — and the current
+  default is `foreground_8`, which D-014 explicitly disowns.
+
+  The decisive argument is about **interpretability of a negative result.** The
+  dynamics experiment is the go/no-go on D-002 and therefore on most of the
+  project. If induction fails under a single arbitrary carving, we cannot
+  distinguish *"the bet is wrong"* from *"we carved the objects wrong"*. That
+  ambiguity sits directly on the most consequential decision we will make, and
+  it is cheap to remove now and expensive to resolve afterwards.
+- **Decision:** Treat the segmentation as an **axis of the experiment, not an
+  input to it.** Run dynamics induction under all six carvings and report the
+  comparison. The headline result becomes a table over carvings rather than a
+  single number. Do **not** build a persistent per-game selector yet.
+- **Options rejected:**
+  - *Fix one segmentation (`colour_8`, per D-014)* — the cheapest option and the
+    one that would have happened by default. Rejected because it makes a
+    negative result uninterpretable on precisely the question the project turns
+    on. D-014's recommendation of `colour_8` was made on *identity switch rate*,
+    which is not the same objective as *rule inducibility*, and there is no
+    reason yet to think the two rank the carvings the same way.
+  - *Build a persistent per-game segmentation selector now* — this was the
+    original proposal and it is circular. To select a carving you must score it,
+    and the natural score is how well induced rules predict held-out transitions,
+    which is the experiment itself. It also commits to per-game state before we
+    know the best carving even varies by game.
+  - *Select by a perception-side proxy such as fragmentation or merge rate* —
+    those are measured against the oracle, which is test-only and may never
+    inform the agent's path (D-010). Worse, D-010 records that a sprite is not
+    always an object — bp35's whole board is one sprite — so lowest
+    fragmentation is not obviously the right objective. It would be optimising a
+    proxy we have already written down as unreliable.
+  - *Run all six on all 25 games unconditionally* — compute. One carving costs
+    824 ms/frame on bp35; six across tens of thousands of frames including
+    intermediate animation frames is plausibly hours. Run the full sweep on a
+    subset and a single carving on the rest, with the split decided by measured
+    cost rather than assumed.
+- **Consequences:** Roughly 6× compute on whichever games get the full sweep, so
+  the run must be sized before it is launched — this reinforces the existing
+  note in `state-of-play.md`. "Does dynamics induce?" no longer has a one-line
+  answer, which is a real cost in communicating the result and an acceptable one.
+  If one carving wins everywhere, the persistent selector deferred here may never
+  be needed at all. If the winner varies by game, then D-016's deferred ontology
+  work acquires its first concrete requirement *and* an objective to optimise
+  against, which is a better position than guessing at one now.
+
+  This partially answers `architecture.md` §3.4: the candidate population stops
+  being generated-and-ignored, at least inside the experiment. It does not yet
+  make the agent capable of choosing at run time.
+- **Revisit if:** compute sizing shows the six-way sweep is infeasible even on a
+  subset, in which case fall back to a principled two or three rather than one;
+  or the carvings turn out near-indistinguishable on induction quality, in which
+  case the axis is wasted effort and one should simply be fixed.
+
+---
+
+<!-- Next entry: D-019. Copy the template from CLAUDE.md. -->
