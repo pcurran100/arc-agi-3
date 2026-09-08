@@ -133,6 +133,7 @@ alternatives in `decision-log.md`.
 | D-017 | Keep a standing essay-format architecture document | high |
 | D-018 | Dynamics experiment measures all six segmentations, not one | high |
 | D-019 | Compute sizing and the chance baseline; success metric defined | high |
+| D-020 | Round-robin driving tested and **rejected**; random retained | high — negative result, measured |
 
 ---
 
@@ -151,9 +152,10 @@ src/arc3/
     diff.py         structural frame diff, and whole-animation diff
     segment.py      six candidate segmentations per frame
     track.py        object identity by global assignment              (D-014)
+  drive.py          corpus-generation policies: random, round_robin  (D-020)
   oracle/           TEST-ONLY ground truth from engine sprites        (D-010)
 scripts/            fetch_environments, record_fixtures, eval_geometry, eval_tracking,
-                    size_pipeline, eval_baseline
+                    size_pipeline, eval_baseline, eval_drivers
 fixtures/           5 recorded episodes, 68 KB gzipped
 tests/              102 tests, ~26 s
 docs/architecture.md  how it all actually works, and what it does not do (D-017)
@@ -243,11 +245,18 @@ are from session 2:
   that predicts the endpoint.
 - Hold out by **game**, not by transition. Transitions within one game are
   heavily correlated and a within-game split will flatter the result.
-- **Do not drive it with random play.** Every perception number we have is
-  measured on a distribution of small, low-diversity transitions — 1–58 changed
-  pixels of 4,096, dominated by recolouring, with few multi-object motions. A
-  dynamics experiment run on that data will be learning rules for trivia. Decide
-  the driving policy deliberately and write down what it was (D-019).
+- ~~**Do not drive it with random play.**~~ **Withdrawn by D-020.** This
+  instruction was never supported by measurement and is now contradicted by it.
+  Round-robin over the action mask, with clicks aimed at segmented objects, was
+  built and measured against random across all 25 games: it is indistinguishable
+  on no-op rate and changed-pixel size, and **worse** on event diversity (36.9
+  distinct events per game against random's 40.1). Random already reaches 99%
+  action coverage at 60 actions, so round-robin's guarantee buys ~1pp. **Drive
+  the experiment with random play**; the drivers live in `src/arc3/drive.py` if
+  a comparison is ever wanted again.
+- **Two click-only games are corpus-starved.** ft09 and lp85 run at ~90% no-ops
+  under *every* driver tested. Report their dynamics results separately: they
+  will have roughly a tenth of the evidence the other games do.
 - **Size the compute first.** At 824 ms/frame on bp35 for one segmentation,
   tens of thousands of frames across 25 games is not a run you want to discover
   the cost of halfway through. Measure on one game, extrapolate, then commit.

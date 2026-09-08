@@ -930,4 +930,110 @@ reconstructions, and none has yet met contact with an actual environment.
 
 ---
 
-<!-- Next entry: D-020. Copy the template from CLAUDE.md. -->
+## D-020 — Driving policy: round-robin tested and rejected; random retained
+
+- **Date:** 2026-09-08
+- **Status:** accepted
+- **Context:** `state-of-play.md` carried the instruction *"do not drive the
+  dynamics experiment with random play"*. That instruction rested on a
+  characterisation of the fixture corpus that D-019 had already partly corrected
+  — the claim that random play is "mostly no-ops" was wrong (14%, and 0% on four
+  of five fixtures). Round-robin over the published action mask was proposed as
+  the replacement, on two arguments: it *guarantees* action coverage where
+  sampling leaves it to luck, and clicks aimed at segmented objects should beat
+  clicks at random pixels.
+
+  Both arguments were plausible and neither had been tested. Three drivers were
+  implemented (`src/arc3/drive.py`) and measured against each other:
+  `random` (the session-1 incumbent), `round_robin` with object-targeted clicks,
+  and `lattice` — round-robin actions with clicks swept over a fixed 8-pixel grid,
+  included as the null hypothesis for whether perception-guided targeting earns
+  anything at all.
+
+### Experiment — what corpus does each policy actually produce?
+
+- **Setup:** all 25 games, 60 actions per game per driver, seed 0,
+  `scripts/eval_drivers.py`. Metrics: no-op rate; mean changed pixels on
+  transitions that changed; count of **distinct** changed-pixel signatures
+  (a corpus of 200 copies of one event teaches one rule); and the fraction of
+  legal actions tried at least once.
+- **Result:**
+
+  | driver | no-op % | mean changed px | distinct events/game | action coverage % |
+  |---|---|---|---|---|
+  | `random` | 20.3 | 51 | **40.1** | 99 |
+  | `round_robin` | **19.3** | 51 | 36.9 | **100** |
+  | `lattice` | 19.5 | **52** | 36.2 | **100** |
+
+- **Did it change our mind? Yes — it killed the premise.** Round-robin is
+  indistinguishable from random on every metric that matters, and is **worse on
+  the one that matters most**: random produces ~9% more distinct events per game.
+  Both of the arguments for it fail:
+
+  1. **The coverage guarantee is worth almost nothing.** Random already reaches
+     **99%** coverage at 60 actions, because most games publish only 4–7 legal
+     actions. Round-robin buys one percentage point and pays three distinct
+     events per game for it.
+  2. **Object-targeted clicks do not beat a dumb lattice sweep** in aggregate:
+     36.9 distinct events against 36.2, and 19.3% no-ops against 19.5%. D-005's
+     pruning is not earning anything as a *driving* heuristic, whatever it is
+     worth to a planner.
+
+  A likely mechanism for round-robin's diversity deficit, offered as a
+  hypothesis and not a finding: the engine is deterministic, so a fixed cyclic
+  policy can fall into a limit cycle and revisit the same states, whereas a
+  random walk breaks out of them. If true this is an argument against *any*
+  strictly periodic driver, which is worth knowing before the "better methods"
+  are designed.
+
+- **Two per-game results that the averages hide, and that matter more than the
+  averages:**
+  - **vc33 is decisive for object targeting**: 54 mean changed pixels under
+    object-targeted clicks against **1** for both random pixels and the lattice.
+    A 50× difference on one game, averaged into invisibility across 25. So
+    targeting is not useless — it is *game-dependent*, which is a different and
+    more interesting claim than "it doesn't work".
+  - **ft09 and lp85 are ~90% no-ops under every driver** (ft09 87–92%, lp85
+    93–98%). Both are click-only games. No driver tested does better than
+    wasting nine actions in ten on them, and this is where the corpus is
+    genuinely starved. Under RHAE this is also where a real agent would haemorrhage
+    score.
+
+- **Decision:** **Retain `random` as the default corpus-generation driver.** Keep
+  `round_robin` and `lattice` in the codebase as named, tested alternatives —
+  they cost nothing to keep and vc33 shows the targeting axis is real. Withdraw
+  the "do not drive with random play" instruction from `state-of-play.md`: it was
+  never supported by measurement and is now contradicted by it.
+- **Options rejected:**
+  - *Adopt round-robin anyway on the coverage argument* — this was the plan of
+    record and the tempting thing to do having built it. One percentage point of
+    coverage against a 9% loss in event diversity is a bad trade, and adopting it
+    would mean the measurement had been decorative.
+  - *Delete the losing drivers* — they are tested, cost nothing, and `lattice`
+    in particular is the only thing that made the object-targeting result
+    interpretable. Without a null hypothesis "object targeting works" would have
+    looked true on vc33 alone.
+  - *Conclude the driving policy does not matter* — too strong, and the per-game
+    spread contradicts it. It does not matter **in aggregate at 60 actions**. It
+    matters enormously on individual games, in both directions.
+  - *Design a smarter driver now* (novelty-seeking, or one that stops spending
+    actions on inputs already known to be inert) — the obvious next move and
+    deliberately not taken yet. The dynamics experiment is the go/no-go and does
+    not need an optimal corpus, only an adequate one, and we now have evidence
+    that random is adequate. Building an information-seeking driver before
+    dynamics exists would also mean building it with no model to seek information
+    *for*.
+- **Consequences:** The dynamics experiment proceeds on random-play corpora,
+  which means it can reuse the recording machinery and the existing fixtures
+  unchanged, and removes a blocker that turned out to be imaginary. The ~90%
+  no-op rate on click-only games is now a known, quantified hole in the corpus
+  and should be reported alongside any per-game dynamics result — those two games
+  will have roughly a tenth of the evidence the others do.
+- **Revisit if:** dynamics induction succeeds on most games but fails on the
+  click-only ones, which would point at corpus starvation rather than at the
+  method; or a driver is needed for *play* rather than for corpus generation, at
+  which point the objective changes completely and none of this transfers.
+
+---
+
+<!-- Next entry: D-021. Copy the template from CLAUDE.md. -->
