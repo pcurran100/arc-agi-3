@@ -216,4 +216,335 @@ reconstructions, and none has yet met contact with an actual environment.
 
 ---
 
-<!-- Next entry: D-009. Copy the template from CLAUDE.md. -->
+## D-009 — Corrections to `benchmark.md` after first contact with the engine
+
+- **Date:** 2026-08-30
+- **Status:** accepted
+- **Context:** `benchmark.md` was compiled from published prose on 2026-08-30
+  before any code existed. Session 1 opened by installing `arc-agi==0.9.9`,
+  downloading all 25 public demo environments, and measuring the API surface
+  directly. Several documented facts were wrong, and one of them is load-bearing
+  for `design-thesis.md` §8.
+- **Decision:** Correct `benchmark.md` in place, marking every directly measured
+  fact *[measured]*, and record the corrections here. Where a correction
+  undermines an argument elsewhere in the docs, annotate that argument rather
+  than quietly rewriting it.
+
+  The corrections, in descending order of how much they cost us:
+
+  1. **There is no Undo action.** `arcengine.GameAction` is `RESET` plus
+     `ACTION1`–`ACTION7`; `ARCBaseGame.perform_action` keeps no state history.
+     `ACTION7` is an ordinary game-specific action. `RESET` restarts the
+     *current level* once any action has been taken, without rewinding the
+     action count. **`design-thesis.md` §8 assumed a cheap two-action
+     probe-and-revert. That mechanism does not exist.**
+  2. **The 64×64 frame is often an upscaled small board.** ARCEngine renders at
+     the camera resolution, integer-upscales, letterboxes, then draws a 64×64 UI
+     on top. 12 of 25 public games have a camera smaller than 64×64 — bp35 and
+     lf52 are 8×8, i.e. **8× upscale**. Recovering the scale factor and the
+     playfield rectangle is therefore a mandatory perception primitive, and the
+     click space is much smaller than D-005 assumed.
+  3. **Legal actions are published.** Every frame carries `available_actions`.
+     Masks range from `[6]` (click-only; 5 of 25 games) to all seven. They did
+     not change across 60 random actions in any game.
+  4. **Human baselines are available offline**, per level, in
+     `EnvironmentInfo.baseline_actions`. We can compute true RHAE locally from
+     day one.
+  5. **Frames arrive in sequences of 0–N**, up to 42 observed. Zero frames means
+     the action was a no-op. Levels per game are 6–10 (183 total), not "at least
+     six" as an open-ended claim.
+  6. **The import path was wrong**: the package is `arc_agi`, and `make` is an
+     `Arcade` method, not a module-level function.
+  7. **Kaggle accelerators confirmed**: `cpu` / `t4` / `p100` / `rtx6000`, with
+     `rtx6000` reserved for this track. A secondary-source claim of a $10,000
+     runtime-cost allowance with third-party compute is inconsistent with the
+     no-internet rule and is recorded as **unverified, do not plan against it**.
+  8. **The engine is deterministic** under `seed=0`: identical action sequences
+     produced byte-identical frame sequences in all 25 games.
+- **Options rejected:**
+  - *Rewrite `design-thesis.md` §8 to remove the Undo argument* — the thesis is
+    the record of what we believed and why. Silently repairing it would hide
+    that we reasoned from a false premise for a day. Annotate in place instead
+    and re-derive the exploration argument deliberately, as its own decision.
+  - *Leave `benchmark.md` alone and note corrections only here* — the file is
+    described as the source of verified facts and will be read as such. A reader
+    six months from now would take the Undo claim at face value.
+  - *Re-verify by reading only the published docs* — the published prose is what
+    produced the errors. Measurement against the pinned engine is strictly
+    better evidence, so *[measured]* facts are marked as outranking prose.
+- **Consequences:** §8's value-of-information argument now has no cheap probe
+  mechanism and must be redone; irreversibility is a much bigger deal than the
+  thesis assumed, because mistakes are permanent within a level. D-005's
+  expected click-space reduction should be restated in terms of playfield cells
+  rather than 4,096. Perception gains a new required primitive (scale and
+  playfield geometry) that was not in the D-007 definition of done.
+- **Revisit if:** the semi-private or private environments turn out to expose a
+  different action set, or a future `arc-agi` release adds history/undo. Re-run
+  the measurement script against every pinned engine bump.
+
+---
+
+## D-010 — Use engine sprite introspection as a ground-truth oracle for perception, never as agent input
+
+- **Date:** 2026-08-30
+- **Status:** accepted
+- **Context:** Downloaded games are plain Python source in
+  `environment_files/<id>/<version>/`, and the running game object exposes
+  `game.current_level.get_sprites()` — every sprite's name, tags, x, y, width,
+  height, scale, layer, visibility and pixel data. `state-of-play.md` lists
+  "object identity may not track" as a top risk with the mitigation "hand-label
+  a few sequences and measure". Hand-labelling is unnecessary: the engine will
+  label them exactly, for every frame of every game, for free.
+
+  Sprite names are deliberately obfuscated random strings (`ihdgageizm`,
+  `eqatonpohu`), so there is no semantic leakage — but names are *type* labels
+  shared by many instances, not instance identities.
+- **Decision:** Build an oracle module that extracts pixel-perfect ground-truth
+  instance labels by re-running the camera render with sprite identities in
+  place of colours. Use it **only** to score segmentation and tracking in the
+  test suite. It is imported by tests and evaluation scripts and by nothing on
+  the agent's code path; the agent sees `FrameDataRaw` and nothing else. Enforce
+  this with an import-boundary test.
+- **Options rejected:**
+  - *Hand-label a few sequences* — the plan of record. Tiny sample, expensive,
+    and biased toward the cases a human finds easy to label. The oracle covers
+    all 25 games and every frame.
+  - *Let the agent read sprite data at development time as a shortcut* —
+    directly violates Guardrail 2 and would produce a system that cannot work on
+    the private set. The whole value of the oracle depends on it never crossing
+    into the agent.
+  - *Read the game source to design perception* — the same failure with extra
+    steps: it is exactly "enumerating the kinds of games there are". Reading
+    engine source (`arcengine`) is fine and is how the corrections in D-009 were
+    found; reading the 25 *game* sources to inform design is not.
+- **Consequences:** Object-identity quality becomes a number we can watch move,
+  computed over all 25 games, which is what makes D-007's two-week tarpit
+  condition actually checkable. Costs: the oracle must model occlusion and
+  layering to be honest, and it is only available on public games — so it can
+  measure perception but can never be a fallback at competition time. Note also
+  that the sprite decomposition is not always the target: bp35's entire 8×8
+  board is a **single** sprite, so components-per-sprite is many-to-one there.
+- **Revisit if:** the oracle and any reasonable segmentation disagree so
+  systematically that the oracle is measuring the wrong thing, or a future
+  engine version stops exposing level sprites.
+
+---
+
+## D-011 — Add frame geometry as a fifth perception component, built first
+
+- **Date:** 2026-08-30
+- **Status:** accepted (extends D-007's definition of done; does not supersede it)
+- **Context:** D-009 established that the 64×64 frame is frequently an integer
+  upscale of a smaller camera, letterboxed, with a 64×64 UI layer drawn on top —
+  12 of the 25 public games, down to an 8×8 camera at 8× on bp35 and lf52.
+  D-007's definition of done lists four components (client, diff, segmentation,
+  identity) and none of them recovers this.
+- **Decision:** Add `perception/geometry.py` as a fifth component and build it
+  **before** the other three perception components. It induces, from frames
+  alone: the upscale factor, the block-grid origin, the playfield rectangle, and
+  the UI regions outside it. Downstream components work in *cell* space where
+  geometry is confidently recovered, and fall back to pixel space where it is
+  not.
+- **Options rejected:**
+  - *Build it last, as a normalisation layer over the existing four* — the four
+    would then be developed and first measured against a representation known to
+    be wrong for 12 of 25 games. On bp35 every connected component would be 64×
+    its true area and every "cell" would be a rendering artefact, so the
+    headline object-identity number would be uninterpretable exactly where it
+    matters most.
+  - *Defer to a later session, holding D-007 as written* — preserves the
+    original scope shape at the cost of knowingly measuring the wrong thing.
+  - *Hard-code the camera size per game from `metadata.json`* — not available on
+    the private set, and it is precisely the hand-specified structure Guardrail 2
+    warns against. The scale is inducible from run-length structure, so induce it.
+- **Consequences:** Session 1 is now five components, not four, and D-007's
+  two-week tarpit clock effectively starts later. Segmentation and tracking gain
+  a dependency on geometry being right, so geometry needs its own accuracy
+  number against the oracle (D-010 gives us the true camera dimensions) before
+  anything is built on top of it. The click-space claim in D-005 should be
+  restated in playfield cells once this lands.
+- **Revisit if:** geometry cannot be recovered reliably on the 13 games where the
+  camera is already 64×64 and the induced scale is degenerate at 1, or if the
+  induced scale disagrees with the true camera scale on more than a couple of
+  games after a principled (not threshold-tuned) criterion.
+
+---
+
+## D-012 — The agent may consume `available_actions`, `tags` and `baseline_actions`, behind a provider that can withhold them
+
+- **Date:** 2026-08-30
+- **Status:** accepted
+- **Context:** The engine supplies three pieces of free information the design
+  thesis never accounted for: the per-frame `available_actions` mask, a per-game
+  modality `tags` field (keyboard / click / keyboard_click), and per-level
+  `baseline_actions` — the human baseline itself. The question is which of these
+  the agent is permitted to condition on at runtime, given we cannot verify what
+  the private environments expose.
+- **Decision:** All three. `available_actions` arrives inside every frame and is
+  unambiguously part of the observation. `tags` and `baseline_actions` are read
+  through a single `GameMetadata` provider, and **every consumer must behave
+  correctly when the provider returns `None` for them**, enforced by a test that
+  runs the agent path with metadata withheld. Knowing the level's baseline turns
+  RHAE into a live budget the planner can spend against, which is a real
+  advantage and worth taking.
+- **Options rejected:**
+  - *`available_actions` only* — the conservative boundary, and the one
+    initially recommended here. Rejected: it discards a genuine planning signal
+    on an assumption about the private set that is itself unverified in the
+    other direction. The withholding test buys the same safety without the loss.
+  - *Observation only, ignoring `available_actions` too* — would force us to
+    spend actions rediscovering the legal action set, which is the one thing
+    RHAE punishes hardest, to protect against a field that provably arrives in
+    every frame.
+  - *All three with direct access, no provider indirection* — cheaper now, but
+    the dependency would be scattered across the codebase and we would discover
+    at evaluation time whether it holds. The indirection is what makes the
+    assumption testable.
+- **Consequences:** We are betting that the private environments expose
+  `baseline_actions` before play. If they do not, the provider returns `None`
+  and the planner loses its cost model — so the fallback path is load-bearing
+  and must be exercised in CI, not written and forgotten. Any experiment result
+  that depended on baselines must record whether metadata was available, or it
+  will not be comparable to a private-set run.
+- **Revisit if:** we get any evidence about what the semi-private or private
+  environments return from `/api/games`, or if the withheld-metadata path is
+  found to have decayed. Re-check on every `arc-agi` version bump.
+
+---
+
+## D-013 — Geometry induction: propose by run-length GCD, verify by cell uniformity
+
+- **Date:** 2026-08-30
+- **Status:** accepted
+- **Context:** D-011 put frame geometry in scope and framed it as recovering
+  "the upscale factor". First contact with real frames showed that framing is
+  wrong. ARCEngine composites a scaled camera view with a UI layer drawn last at
+  full 64×64 resolution, and on bp35, lf52 and m0r0 the UI *is* most of what is
+  visible — bp35 has an 8×8 camera whose view is almost entirely empty
+  background, with the whole game painted by `RenderableUserDisplay` at 1:1.
+  A single global scale does not exist for those games.
+- **Decision:** Do not ask for the camera's scale. Ask **at what granularity
+  this game's content moves**, which is always well defined and is what
+  segmentation and click enumeration actually need. Induce it by:
+  1. **Propose** — the GCD of every interior colour run inside the mask of
+     pixels that change across observed frames. Interior runs only: a run
+     touching the frame edge is truncated, and feeding a truncated length to a
+     GCD wrongly collapses it toward 1.
+  2. **Verify** — every cell the proposal implies must hold exactly one colour
+     in every observed frame, judged only over cells lying entirely inside that
+     mask. On failure, walk down the proposal's divisors. Cell size 1 always
+     verifies, so the pipeline is total and its failure mode is "no structure
+     claimed", never "wrong structure claimed".
+- **Options rejected — all three were built and measured, not imagined:**
+  - *MDL over the largest block-uniform rectangle.* Tried first, because minimum
+    description length is the selection criterion the design thesis adopts for
+    dynamics. **Result: 6/23 scale agreement, and 18 of 25 games produced an
+    unsound grid** — a cell spanning two colours. It fails for a reason worth
+    remembering: **a solid region is compressible at every cell size**, so
+    letterboxing and flat backgrounds always win the MDL comparison while
+    carrying no information about the true scale. MDL selects between models of
+    the *same* region; it cannot also choose the region.
+  - *Verification over the changing region's bounding box.* Straightforward and
+    completely wrong: the box contains full-resolution UI detail, which vetoed
+    every candidate. **Result: cell size 1 on all 25 games** — the code claimed
+    nothing anywhere. Fixed by judging only cells wholly inside the change mask.
+  - *Proposing from the largest connected changing region rather than the whole
+    mask.* Motivated: a small animating UI element drags the global GCD to 1,
+    which is what costs us ar25, cn04 and vc33. It does rescue cn04 — but a
+    smaller region has fewer runs constraining the GCD, so the estimate drifts
+    upward, breaking ft09 (2 → 6) and sc25 (1 → 2). **Overestimating is the
+    dangerous direction**, because a too-coarse cell silently merges genuinely
+    distinct game cells, whereas underestimating falls back to exact pixel
+    space. Net 16/23 against 17/23, with twice the overestimates. Reverted.
+- **Result as accepted**, 40 random actions per game, seed 0, measured by
+  `scripts/eval_geometry.py` against the D-010 oracle:
+  - **17/23 exact agreement** with the true camera scale on camera-visible
+    games; **18/23 at 150 actions**.
+  - **0 unsound grids across all 25 games.** This is the property everything
+    downstream depends on and the one that must never regress.
+  - 1 overestimate (lp85, 2 → 4); 4 safe fallbacks to pixel space (ar25, cn04,
+    lf52, vc33); 2 games UI-dominated, of which m0r0 is still recovered exactly
+    at 5.
+  - **Accuracy improves monotonically with observed frames** — dc22's
+    overestimate resolves between 40 and 150 actions. Geometry gets better for
+    free as an episode proceeds, which is a reason to re-induce as evidence
+    accumulates rather than fixing it at reset.
+- **Consequences:** Roughly half the public demo games run in pixel space, so
+  the pixel path is not a neglectable fallback — it is the common case, and both
+  paths must stay correct. D-005's "4,096 → 5–20 candidates" is achieved, but by
+  segmentation more than by geometry: union click targets across all
+  segmentations come to 15–25 on most games. The single overestimate (lp85) is a
+  live risk to segmentation there and should be watched.
+- **Revisit if:** any game produces an unsound grid; a per-region geometry model
+  — different cell sizes in different parts of one frame, which is the honest
+  model of a composited frame — becomes worth its complexity; or the number of
+  games falling back to pixel space starts limiting search depth downstream.
+
+---
+
+## D-014 — Track objects by global assignment; measure identity against the oracle
+
+- **Date:** 2026-08-30
+- **Status:** accepted
+- **Context:** Cross-frame object identity is D-007's named tarpit and the
+  falsification condition for design-thesis §6's action-space pruning. It needed
+  both an implementation and, more importantly, a number.
+- **Decision:** Match components between consecutive frames by **minimum-cost
+  global assignment** (Hungarian / Jonker–Volgenant, written out rather than
+  taken from scipy, to keep the offline dependency set to what `arc-agi` already
+  installs). Pair cost is built from exact evidence in decreasing order of
+  weight: identical shape and colouring, identical silhouette after recolouring,
+  mask overlap and size ratio, then distance moved. A pairing is made only when
+  it costs less than the alternative explanation of one disappearance plus one
+  appearance, which sets the bar without a tuned similarity threshold. Unmatched
+  tracks **decay in confidence and are never deleted** (Guardrail 1, D-003), and
+  newly appeared components are offered to dormant tracks for reacquisition,
+  which is what makes occlusion survivable.
+- **Options rejected:**
+  - *Greedy nearest-component matching* — fails exactly where identity matters,
+    on two identical sprites passing each other. There is a regression test for
+    that case. With at most a few dozen components, optimal assignment is
+    affordable, and internal compute is free.
+  - *Deleting a track on a frame where its object is missing* — unsound given
+    hidden state (D-003), and it makes occlusion permanently destroy identity.
+  - *Committing to one segmentation and tracking only that* — the right notion
+    of object is environment-dependent, so the tracker is parameterised by
+    segmentation name and all candidates are produced.
+  - *Hand-labelling a few sequences to measure it* — the plan in
+    `state-of-play.md`, superseded by D-010's oracle, which labels every frame
+    of every game exactly.
+- **Result**, 40 random actions per game, seed 0, `scripts/eval_tracking.py`:
+
+  | segmentation | id switch rate | non-degenerate pairs | fragmentation | merge |
+  |---|---|---|---|---|
+  | `colour_8` | **0.8%** | 8,231 | 2.55 | 1.43 |
+  | `colour_4` | 1.6% | 8,532 | 3.23 | 1.40 |
+  | `foreground_8` | 0.2% | 2,149 | 1.33 | **3.65** |
+
+  `foreground_8`'s 0.2% is largely an artefact and is reported as one: it
+  over-merges at 3.65 sprites per component, and on several games collapses the
+  frame into one or two blobs, where identity trivially cannot switch. The
+  switch rate is therefore also computed over **exclusive** sprites only — those
+  whose covering component covers no other sprite — which removes that credit.
+  On that measure **`colour_8` is the working default at 0.8% over 8,231
+  pairs**, and it is what the tracker should be pointed at.
+- **A limitation stated plainly:** the oracle reads the engine's *current*
+  state, so ground truth exists only for resting frames — the last frame after
+  each action. The intermediate frames of an animation cannot be scored this
+  way, and they are precisely where tracking is hardest. **These numbers are an
+  optimistic bound on animated games.** Fixing it needs the oracle sampled
+  inside `perform_action`, via a renderer callback or an engine patch.
+- **Consequences:** D-007's tarpit condition has **not** been triggered —
+  identity works, on the evidence available, well inside the two-week mark. The
+  action-space pruning design-thesis §6 depends on is therefore viable.
+  Fragmentation of 2.55 is the weak spot: we split objects the engine considers
+  whole, which will show up downstream as several induced rules where one would
+  do.
+- **Revisit if:** the switch rate on exclusive sprites exceeds a few percent on
+  any new measurement; the resting-frames-only limitation is shown to be hiding
+  a real failure; or fragmentation starts blocking dynamics induction.
+
+---
+
+<!-- Next entry: D-015. Copy the template from CLAUDE.md. -->
+

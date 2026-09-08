@@ -1,0 +1,36 @@
+[project]
+name = "arc3"
+version = "0.1.0"
+description = "Model-based agent for ARC-AGI-3 (ARC Prize 2026)"
+requires-python = ">=3.12"
+dependencies = [
+    "arc-agi==0.9.9",
+    "numpy>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "engine: test requires the local arc-agi engine and downloaded environment_files",
+]
+
+[tool.ruff]
+line-length = 96
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+# Correctness and hygiene, not style opinions. Optional[X] is kept over X | None
+# deliberately: it reads better in the long typed signatures here.
+select = ["E", "F", "I", "B", "RUF"]
+ignore = ["E501", "RUF046"]

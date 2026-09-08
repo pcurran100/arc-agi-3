@@ -29,10 +29,48 @@ propose candidate goals.
 
 Current SOTA is 30.16% (Claude Opus 5). Humans complete 100%.
 
+## Layout
+
+```
+src/arc3/
+  types.py          Action, Observation (a frame *sequence*), Transition, Episode
+  client/           env (the only code that spends actions), replay, RHAE budget
+  perception/       geometry, diff, segmentation, object tracking
+  oracle/           TEST-ONLY ground truth from engine sprites (D-010)
+scripts/            fetch_environments, record_fixtures, eval_geometry, eval_tracking
+fixtures/           recorded episodes, so perception tests need no engine
+tests/
+```
+
+## Setup
+
+```bash
+python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev]"
+python scripts/fetch_environments.py     # anonymous key; no registration needed
+python -m pytest
+```
+
+`arc-agi` is pinned at 0.9.9. Games cache to `environment_files/`, which is
+gitignored and must stay that way (D-008). After the first fetch everything runs
+offline.
+
+Note the import package is `arc_agi`, not `arc`, and `make` is a method on an
+`Arcade` instance.
+
 ## Status
 
-Pre-code. Scaffold and reasoning only. Current focus is the perception layer
-(D-007).
+Perception layer built and measured against engine ground truth. No agent, no
+dynamics induction, no score yet.
+
+| What | Result |
+|---|---|
+| Geometry, cell-size agreement with the true camera scale | 18/23 |
+| Geometry soundness (no induced cell spans two colours) | 25/25 |
+| Cross-frame object identity, id switch rate | 0.8% |
+| Click-space pruning (D-005) | 4,096 → 15–25 |
+
+Next: the dynamics-induction validation experiment, which is the go/no-go on the
+central bet. See `docs/state-of-play.md`.
 
 ## Licence
 

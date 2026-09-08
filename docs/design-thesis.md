@@ -151,6 +151,10 @@ terminal, so you need to rank intermediate states. Available signals, best first
 3. **Irreversibility.** Undo exists, so actions can be cheaply classified as
    reversible or not. Irreversible state changes correlate with progress. Free
    heuristic, needs no goal knowledge.
+   *(Correction, session 1: Undo does not exist — D-009. The signal survives but
+   the mechanism does not: reversibility can no longer be tested by trying it,
+   only predicted from the induced dynamics model, which makes this heuristic a
+   consumer of §4 rather than an independent free signal.)*
 4. **Reachability frontier.** Prefer actions expanding the reachable state set.
 5. **Novelty / state-visitation.** Cheapest to implement, worst fit for RHAE
    because it burns actions. Tiebreak only.
@@ -171,6 +175,25 @@ problem and, as far as we can tell, nobody has posed it for this benchmark.
 Undo matters here: it lets you probe a risky action and revert without destroying
 your position, at a cost of two actions per probe. Undo is an action and it
 counts.
+
+> **Correction, 2026-08-30 (session 1) — the paragraph above is wrong.**
+> There is no Undo action. `arcengine` exposes `RESET` plus `ACTION1`–`ACTION7`
+> and keeps no state history; `RESET` restarts the *current level* and does not
+> rewind the action count. See `benchmark.md` § *Correction: there is no Undo
+> action*, logged as D-009. Left in place rather than edited away, because the
+> rest of this section was written on the assumption that cheap reversible
+> probing existed.
+>
+> The argument has to be re-derived without it, and the conclusion moves: with
+> no rollback, every probe is **permanent**, so the cost of an uninformative
+> action is not "two actions" but "two actions plus whatever state damage it
+> did". That pushes hard toward extracting information from *free* sources
+> before spending anything — the frame sequences returned by a single action
+> (up to 42 frames, §10), the published `available_actions` mask, and the
+> letterbox/UI geometry — and it makes §7's irreversibility heuristic more
+> important, not less, since irreversibility is now the default rather than an
+> occasional hazard. This re-derivation has not yet been done properly and is
+> owed its own decision-log entry.
 
 ## 9. Cross-level persistence is free score
 
