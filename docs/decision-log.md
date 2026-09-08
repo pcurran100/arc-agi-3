@@ -613,9 +613,17 @@ reconstructions, and none has yet met contact with an actual environment.
   5. **`segment.py`'s "roughly a half-and-half split" between cell space and
      pixel space is wrong.** It is 4/25. The pixel-space path does nearly all
      the work.
-  6. **Everything is measured under random play**, which is mostly no-ops and
-     wall-bumping: sb26 is 68% no-ops, and vc33 and sb26 average one changed
-     pixel per transition. Busy multi-mover scenes are absent from the evidence.
+  6. **Everything is measured under random play.** Transitions are small and
+     low-diversity — 1–58 changed pixels of 4,096, dominated by recolouring.
+     Busy multi-mover scenes are absent from the evidence.
+
+     *Second same-session correction.* This item first read "mostly no-ops and
+     wall-bumping", generalised from sb26 alone. Measured across all five
+     fixtures the no-op rate is **14% overall: 68% on sb26 and 0% on the other
+     four.** The criticism of random play stands but the mechanism is different —
+     the changes it produces are *tiny*, not *absent*. That is the second time
+     this entry over-generalised from a partial measurement; both are left
+     visible rather than tidied away.
   7. **The tracker is not run on animation frames at all** in evaluation, only
      on one resting frame per action. D-014 recorded that intermediate frames go
      *unscored*; they also go *unexecuted*, which is a different and larger gap,
@@ -817,4 +825,109 @@ reconstructions, and none has yet met contact with an actual environment.
 
 ---
 
-<!-- Next entry: D-019. Copy the template from CLAUDE.md. -->
+## D-019 — Compute sizing and the chance baseline, and what they settle
+
+- **Date:** 2026-09-08
+- **Status:** accepted
+- **Context:** D-018 left the six-carving sweep contingent on a compute sizing it
+  did not have, and guessed it might need to run on a subset of games. Separately,
+  the dynamics experiment's stated success criterion is "predicts held-out
+  transitions **better than chance**", and nobody had ever measured what chance
+  is. Both are cheap prerequisites and both were run before designing the
+  experiment, on the recorded fixtures, no engine required.
+
+### Experiment 1 — compute sizing
+
+- **Question:** is the six-carving sweep affordable, and where does the cost sit?
+- **Setup:** full pipeline (geometry, then all six segmentations, then a tracker
+  per carving) over the first 25 frames of each of the five fixtures. Seed 0,
+  deterministic, no engine.
+- **Result**, ms per frame for the complete six-carving pipeline:
+
+  | game | components (`colour_8`) | ms/frame, all six |
+  |---|---|---|
+  | sp80 | 7 | 50 |
+  | vc33 | 11 | 111 |
+  | ls20 | 19 | 116 |
+  | sb26 | 26 | 334 |
+  | **bp35** | **191** | **2,850** |
+
+  Mean 692 ms/frame, but the mean is meaningless — **bp35 alone is 10–50× every
+  other game**, and drives the average single-handedly. Cost tracks component
+  count, which tracks whether geometry found structure (§3.7 of
+  `architecture.md`). Two carvings are effectively free: `colour_mass` (2–7 ms,
+  it is O(colours) not O(components)) and `foreground_4/8` (0 ms on four of five
+  fixtures). The expensive three are `colour_4`, `colour_8` and `bbox`.
+
+  Mean frames per action across fixtures: **5.1**. Extrapolating to 25 games ×
+  100 actions ≈ 12,700 frames: **roughly 2–2.5 hours** for all six carvings,
+  assuming a handful of bp35-class games and the rest cheap.
+
+- **Did it change our mind? Yes.** D-018 assumed the sweep would need rationing
+  to a subset. It does not. Two and a half hours is a batch run, not a
+  constraint. **The full six-carving sweep goes on all 25 games**, superseding
+  D-018's "subset" mitigation while leaving its decision intact.
+- **A structural point that survives the good news:** because the recorded
+  episodes are replayed offline, the engine is stepped **once** and the sweep
+  runs against recordings. Re-running a carving, or adding a seventh later, costs
+  no actions and no engine time. Record once, analyse many times.
+
+### Experiment 2 — what is "chance"?
+
+- **Question:** what do trivial predictors score on the target "predict the exact
+  resting frame after an action", so that "better than chance" means something?
+- **Setup:** 120 transitions across the five fixtures. Two baselines. **B0
+  static:** predict nothing changes. **B1 per-action replay:** remember the exact
+  pixel delta last seen for this action id and replay it.
+- **Result:**
+
+  | | all 120 transitions | the 103 where something changed |
+  |---|---|---|
+  | B0 static | 14% | 0% |
+  | B1 per-action replay | 14% | **0%** |
+
+  No-op rate is **14% overall — 68% on sb26 and 0% on the other four fixtures.**
+
+- **Did it change our mind? Yes, twice.**
+  1. **The bar is on the floor, which is good news.** On transitions where
+     anything happens, both trivial predictors score exactly **zero**. Exact-frame
+     prediction is therefore a clean, unambiguous success criterion: any non-zero
+     rate is real signal, and there is no risk of a flattering baseline being
+     mistaken for induction working. B1 scoring 0% also confirms that pixel-level
+     deltas do not transfer between occurrences of the same action — which is
+     precisely the argument for representing dynamics over *objects* rather than
+     pixels, and is the first direct evidence for it rather than an assumption.
+  2. **It corrected a claim already written into three documents.** D-015 item 6,
+     `architecture.md` §4 and `state-of-play.md` all said random play is "mostly
+     no-ops", generalised from sb26. It is 14%. The criticism of random play
+     stands, but the mechanism is that its transitions are **tiny** (1–58 changed
+     pixels of 4,096, dominated by recolouring), not that they are absent. All
+     three documents are corrected in place with the error left visible.
+
+- **Decision:** Adopt **exact resting-frame match on changed transitions** as the
+  primary success metric, against a measured chance baseline of 0%. Report the
+  no-op fraction separately rather than letting it inflate the headline.
+- **Options rejected:**
+  - *A softer object-level metric as the primary* — "did we get the moving
+    object's displacement right" is more forgiving and more informative about
+    *why* a prediction failed, but it is scored in terms of a segmentation, and
+    D-018 makes the segmentation a variable. A metric that varies with the axis
+    you are sweeping cannot compare across that axis. Keep object-level scoring
+    as a **secondary diagnostic**, not the headline.
+  - *Including no-op transitions in the headline* — sb26 would score 68% for
+    predicting nothing, and a game-weighted average would look like partial
+    success where there is none.
+  - *A per-pixel accuracy metric* — 4,096 pixels of which ~20 change means
+    predicting "no change" scores 99.5%. Useless.
+- **Consequences:** the experiment now has a defined bar, a sized budget, and no
+  reason to run on a subset. What remains undecided is the **driving policy** —
+  how transitions are generated — and the **rule language**. Neither is settled
+  by this entry and both block the experiment proper.
+- **Revisit if:** the driving policy changes the no-op rate materially, which
+  would change what the headline metric is measured over; or exact-frame match
+  turns out to be so harsh that every carving scores zero, in which case the
+  secondary object-level diagnostic becomes the only signal and needs promoting.
+
+---
+
+<!-- Next entry: D-020. Copy the template from CLAUDE.md. -->

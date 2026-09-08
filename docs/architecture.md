@@ -435,11 +435,17 @@ with any quotation of them.
    use it will be fed whole 42-frame animations. That is a different matching
    regime and it has no number attached.
 3. **Everything is measured under random play.** Both eval scripts drive with
-   uniformly random legal actions and random click coordinates. That distribution
-   is mostly no-ops and wall-bumping — sb26 is 68% no-ops, and vc33 and sb26
-   average *one changed pixel* per transition. Busy multi-mover scenes are simply
-   not in this data. Geometry is especially exposed, since it induces from the
-   mask of changing pixels.
+   uniformly random legal actions and random click coordinates. The resulting
+   transitions are small and low-diversity — 1–58 changed pixels of 4,096,
+   heavily dominated by recolouring, with few multi-object motions. Busy
+   multi-mover scenes are simply not in this data. Geometry is especially
+   exposed, since it induces from the mask of changing pixels.
+
+   *A correction worth keeping:* an earlier draft of this section called the
+   distribution "mostly no-ops", generalising from sb26. Measured across all five
+   fixtures the no-op rate is **14%** — 68% on sb26 and **0% on the other four**.
+   The defect in random play is that the changes it produces are trivial, not
+   that it produces none.
 4. **Soundness is verified in-sample.** The soundness test induces geometry from
    a set of frames and then verifies cell uniformity on the *same* frames. The
    check cannot fail by construction. This is how dc22 can be both "sound" and

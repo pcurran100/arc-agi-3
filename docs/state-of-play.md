@@ -132,6 +132,7 @@ alternatives in `decision-log.md`.
 | D-016 | Object identity is not revisable; splits/merges out of scope for now | medium — a deliberate deferral, not a settled answer |
 | D-017 | Keep a standing essay-format architecture document | high |
 | D-018 | Dynamics experiment measures all six segmentations, not one | high |
+| D-019 | Compute sizing and the chance baseline; success metric defined | high |
 
 ---
 
@@ -151,7 +152,8 @@ src/arc3/
     segment.py      six candidate segmentations per frame
     track.py        object identity by global assignment              (D-014)
   oracle/           TEST-ONLY ground truth from engine sprites        (D-010)
-scripts/            fetch_environments, record_fixtures, eval_geometry, eval_tracking
+scripts/            fetch_environments, record_fixtures, eval_geometry, eval_tracking,
+                    size_pipeline, eval_baseline
 fixtures/           5 recorded episodes, 68 KB gzipped
 tests/              102 tests, ~26 s
 docs/architecture.md  how it all actually works, and what it does not do (D-017)
@@ -199,9 +201,13 @@ it works well inside the two-week reassessment window.
 2. The tracker is not merely unscored on animation frames, it is **not run on
    them**. Evaluation feeds one resting frame per action; deployment will feed
    whole 42-frame sequences. Different regime, no number attached.
-3. **Everything is measured under random play**, which is mostly no-ops and
-   wall-bumping — sb26 is 68% no-ops; vc33 and sb26 average *one changed pixel*
-   per transition. Busy multi-mover scenes are absent from the evidence.
+3. **Everything is measured under random play**, whose transitions are small and
+   low-diversity: 1–58 changed pixels of 4,096, dominated by recolouring, with
+   few multi-object motions. Busy multi-mover scenes are absent from the
+   evidence. (Corrected: an earlier draft called this distribution "mostly
+   no-ops". Measured, the no-op rate is **14% overall** — 68% on sb26 and 0% on
+   the other four fixtures. The problem is that changes are *tiny*, not that
+   they are *absent*.)
 4. Geometry soundness is verified **in-sample**. An out-of-sample check —
    induce on `frames[:n]`, verify on `frames[n:]` — does not exist and should.
 
@@ -238,10 +244,10 @@ are from session 2:
 - Hold out by **game**, not by transition. Transitions within one game are
   heavily correlated and a within-game split will flatter the result.
 - **Do not drive it with random play.** Every perception number we have is
-  measured on a distribution that is mostly no-ops — sb26 68%, and single-pixel
-  changes on vc33 and sb26. A dynamics experiment run on that data will be
-  learning rules for nothing happening. Decide the driving policy deliberately
-  and write down what it was.
+  measured on a distribution of small, low-diversity transitions — 1–58 changed
+  pixels of 4,096, dominated by recolouring, with few multi-object motions. A
+  dynamics experiment run on that data will be learning rules for trivia. Decide
+  the driving policy deliberately and write down what it was (D-019).
 - **Size the compute first.** At 824 ms/frame on bp35 for one segmentation,
   tens of thousands of frames across 25 games is not a run you want to discover
   the cost of halfway through. Measure on one game, extrapolate, then commit.
