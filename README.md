@@ -10,6 +10,7 @@ An agent for **ARC-AGI-3**, the interactive reasoning track of ARC Prize 2026.
 | `CLAUDE.md` | Project instructions, loaded automatically every session. Contains the documentation protocol. |
 | `docs/state-of-play.md` | **Current beliefs and current focus.** Read first, every time. |
 | `docs/decision-log.md` | Append-only record of every decision, including what was rejected. |
+| `docs/architecture.md` | **How the system is actually built.** Essay form, with worked examples and explicit non-goals. |
 | `docs/design-thesis.md` | The argument the project rests on, and what would falsify it. |
 | `docs/benchmark.md` | Verified benchmark mechanics, scoring, prize structure. Sourced. |
 | `docs/field-review.md` | Prior art: what has been tried and what it scored. Sourced. |
@@ -64,10 +65,16 @@ dynamics induction, no score yet.
 
 | What | Result |
 |---|---|
-| Geometry, cell-size agreement with the true camera scale | 18/23 |
-| Geometry soundness (no induced cell spans two colours) | 25/25 |
-| Cross-frame object identity, id switch rate | 0.8% |
-| Click-space pruning (D-005) | 4,096 → 15–25 |
+| Changed pixels explained by the objects we flag | 100% on 4 of 5 fixtures, 79% on the fifth |
+| Cross-frame object identity, id switch rate | 0.8% (resting frames only) |
+| Assignment algorithm, fuzzed against brute force | 4,000 cases, 0 suboptimal |
+| Click-space pruning (D-005) | 4,096 → 8–196 |
+| Geometry, games where any structure is found | 4 of 25 |
+| Geometry, cell-size agreement with the true camera scale | 18/23 — but 16 are the trivial `cell=1` case |
+
+Every figure is measured under **random play**, which is mostly no-ops, and the
+identity figure covers resting frames only. Read them with D-015's corrections
+alongside; `docs/architecture.md` §3–4 gives the full picture and the caveats.
 
 Next: the dynamics-induction validation experiment, which is the go/no-go on the
 central bet. See `docs/state-of-play.md`.

@@ -4,11 +4,11 @@
 currently doing.** Read this first every session. Update it before the session
 ends if anything below is stale.
 
-- **Last updated:** 2026-08-30, end of session 1
-- **Status:** perception layer built and measured against ground truth. No agent,
-  no dynamics, no score.
-- **Days to Milestone #2 (30 Sep):** ~31 — out of reach
-- **Days to final submission (2 Nov):** ~64 — the real target
+- **Last updated:** 2026-09-08, session 2
+- **Status:** perception layer built, measured, and now independently re-audited.
+  Still no agent, no dynamics, no score.
+- **Days to Milestone #2 (30 Sep):** ~22 — out of reach
+- **Days to final submission (2 Nov):** ~55 — the real target
 
 ---
 
@@ -109,7 +109,7 @@ Early actions go to **dynamics** disambiguation, never to goal probing.
 ## Decisions made so far
 
 D-001 to D-008 were backfilled from the design conversation. D-009 to D-014 come
-from session 1 and are backed by measurements. Full reasoning and rejected
+from session 1 and D-015 to D-017 from session 2; all are backed by measurements. Full reasoning and rejected
 alternatives in `decision-log.md`.
 
 | ID | Decision | Confidence |
@@ -118,7 +118,7 @@ alternatives in `decision-log.md`.
 | D-002 | Model-based: induce symbolic dynamics, plan internally | **medium — this is the bet, still untested** |
 | D-003 | Hypothesis population with soft down-weighting | high |
 | D-004 | Separate ontology / dynamics / goal subsystems | high |
-| D-005 | Prune the click space by object segmentation | **high — measured, 4,096 → 15–25** |
+| D-005 | Prune the click space by object segmentation | **high — measured, 4,096 → 8–196** |
 | D-006 | Exact symbolic perception, no VLM at the primitive layer | high |
 | D-007 | Session 1 = perception layer only | done |
 | D-008 | Develop against local `arc-agi` engine; never commit environment files | high |
@@ -128,6 +128,9 @@ alternatives in `decision-log.md`.
 | D-012 | Agent may use `available_actions`, `tags`, `baseline_actions` | medium — rests on an unverifiable assumption about the private set |
 | D-013 | Geometry: propose by run-length GCD, verify by cell uniformity | high |
 | D-014 | Tracking by global assignment, measured against the oracle | high |
+| D-015 | Corrections to the perception claims after an independent audit | — |
+| D-016 | Object identity is not revisable; splits/merges out of scope for now | medium — a deliberate deferral, not a settled answer |
+| D-017 | Keep a standing essay-format architecture document | high |
 
 ---
 
@@ -150,6 +153,7 @@ src/arc3/
 scripts/            fetch_environments, record_fixtures, eval_geometry, eval_tracking
 fixtures/           5 recorded episodes, 68 KB gzipped
 tests/              102 tests, ~26 s
+docs/architecture.md  how it all actually works, and what it does not do (D-017)
 ```
 
 **Setup**, from a clean clone:
@@ -166,22 +170,39 @@ wrong.
 
 ### Measured results
 
+Corrected in session 2 by D-015. Where a figure moved, the session-1 claim is
+given alongside, because the drift is itself the useful record.
+
 | What | Result |
 |---|---|
 | Oracle fidelity | reproduces the engine's render **byte-exactly on all 25 games** |
-| Geometry, scale agreement | 17/23 at 40 actions, **18/23 at 150** |
-| Geometry, soundness | **0 unsound cell grids on 25/25** — no cell ever spans two colours |
-| Tracking, id switch rate | **0.8%** over 8,231 non-degenerate sprite-frame pairs (`colour_8`) |
-| Fragmentation | 2.55 components per ground-truth sprite — the weak spot |
-| Click pruning (D-005) | 4,096 → **15–25** candidates on most games |
+| **Changed pixels explained** by the objects we flag as moved/recoloured/appeared | **100% on 4 of 5 fixtures, 79% on sp80** — the strongest evidence perception is not the weak link |
+| **Assignment algorithm** fuzzed against brute-force optimal | **4,000 cases, 0 suboptimal** — the largest silent-wrongness risk, retired |
+| Tracking, id switch rate | **0.8%** over 8,231 sprite-frame pairs (`colour_8`), resting frames only |
+| Fragmentation | 2.55 components per ground-truth sprite — still the weak spot |
+| **Geometry, games where any structure is found** | **4 of 25** (ft09, lp85, m0r0, sp80 at 150 actions) |
+| Geometry, scale agreement | 18/23 (reproduces D-013) — but **16 of the 18 are the trivial `cell=1` case**. Two non-trivial successes: ft09, sp80 |
+| Geometry, overestimates | **lp85: true 2, induced 4** at 150 actions (as D-013 recorded). The failing game **migrates with action count** — dc22 at 20, lp85 at 150 |
+| Geometry, soundness | 0 unsound grids on 25/25 — but **verified in-sample**, so the check cannot fail by construction |
+| Click pruning (D-005) | 4,096 → **8–196** candidates (sp80 8, vc33 16, ls20 29, sb26 31, bp35 196). *Was reported as 15–25.* |
+| Tracking cost | 20–145 ms/frame, **824 ms on bp35** (191 components, pixel space) |
 | Random-play baseline | **0 levels cleared** in 60 actions across all 25 games |
 
 **D-007's tarpit condition was not triggered.** Cross-frame identity works, and
 it works well inside the two-week reassessment window.
 
-**Caveat that must travel with the tracking number:** the oracle can only be
-read for resting frames, so animated intermediate frames — where tracking is
-hardest — are unscored. These are an optimistic bound. See D-014.
+**Caveats that must travel with every number above** (D-015, `architecture.md` §4):
+
+1. The oracle can only be read for resting frames, so animated intermediate
+   frames — where tracking is hardest — are unscored. Optimistic bound. (D-014)
+2. The tracker is not merely unscored on animation frames, it is **not run on
+   them**. Evaluation feeds one resting frame per action; deployment will feed
+   whole 42-frame sequences. Different regime, no number attached.
+3. **Everything is measured under random play**, which is mostly no-ops and
+   wall-bumping — sb26 is 68% no-ops; vc33 and sb26 average *one changed pixel*
+   per transition. Busy multi-mover scenes are absent from the evidence.
+4. Geometry soundness is verified **in-sample**. An out-of-sample check —
+   induce on `frames[:n]`, verify on `frames[n:]` — does not exist and should.
 
 ---
 
@@ -198,7 +219,8 @@ come out of `Episode.transitions()` with the full animation attached, and
 tracking is measured. **It must not be quietly skipped because the architecture
 already assumes the answer.**
 
-Two things learned in session 1 change how to run it:
+Four things learned so far change how to run it. The first two are from session
+1; the last two are from session 2's audit and are new:
 
 - Use the **intermediate animation frames**, not just endpoints. Up to 42
   sub-transitions per action is far more evidence than the thesis budgeted for,
@@ -206,6 +228,19 @@ Two things learned in session 1 change how to run it:
   that predicts the endpoint.
 - Hold out by **game**, not by transition. Transitions within one game are
   heavily correlated and a within-game split will flatter the result.
+- **Do not drive it with random play.** Every perception number we have is
+  measured on a distribution that is mostly no-ops — sb26 68%, and single-pixel
+  changes on vc33 and sb26. A dynamics experiment run on that data will be
+  learning rules for nothing happening. Decide the driving policy deliberately
+  and write down what it was.
+- **Size the compute first.** At 824 ms/frame on bp35 for one segmentation,
+  tens of thousands of frames across 25 games is not a run you want to discover
+  the cost of halfway through. Measure on one game, extrapolate, then commit.
+
+Two smaller fixes worth doing on the way in, both from D-015: point `Tracker`
+and `eval_tracking.py` at `colour_8` rather than the `foreground_8` default that
+D-014 disowns, and either enforce or delete the unread `segmentation_name`
+argument.
 
 ---
 
@@ -216,6 +251,10 @@ Two things learned in session 1 change how to run it:
 | **Dynamics may not induce** from observed transitions | kills D-002 and most of the thesis | **untested — this is the next job** |
 | Object identity may not track | kills D-005's pruning | **retired.** 0.8% switch rate (D-014) |
 | **Fragmentation at 2.55** | one object read as several means several rules where one would do | live; watch it during dynamics induction |
+| **Objecthood is not revisable** | segmentation is recomputed blind every frame; no evidence can ever change how a frame is carved, so fragmentation cannot self-correct | **open by choice** (D-016). The repair is a dynamics→segmentation feedback channel the code cannot currently receive |
+| **Splits and merges are unrepresentable** | one-to-one matching means "one object became two" has no type. A split silently creates an unrelated new track | **open by choice** (D-016) |
+| **Geometry earns its keep on 2 games** | D-011 built it to carry click pruning; segmentation carries that instead | accepted (D-015). Not a bug — it correctly declines on 21 games |
+| **Tracking cost on cluttered games** | 824 ms/frame on bp35; the dynamics run wants tens of thousands of frames | **size this before the dynamics run, not during it** |
 | **§8 has no probe mechanism** | with no Undo, every probe is permanent; exploration argument needs redoing | **open, owed a decision entry** |
 | Hidden state may dominate | symbolic deterministic model would be the wrong representation | untested. Engine *is* deterministic given the full state, so this is about observability, not stochasticity |
 | **The value function** | ranking intermediate states without knowing the goal | still the weakest link (design thesis §7). Now slightly better placed: UI and playfield are spatially separable, which is where a score region would live |

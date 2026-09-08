@@ -546,5 +546,212 @@ reconstructions, and none has yet met contact with an actual environment.
 
 ---
 
-<!-- Next entry: D-015. Copy the template from CLAUDE.md. -->
 
+## D-015 — Corrections to the perception claims after an independent audit
+
+- **Date:** 2026-09-08
+- **Status:** accepted
+- **Context:** Session 2 opened with a read-through and re-measurement of
+  everything session 1 built, rather than new work. The code held up better than
+  the headline numbers did. Several claims in `state-of-play.md`, `README.md` and
+  the module docstrings turned out to be true-but-flattering, and one was simply
+  wrong. Logged here because the numbers are quoted elsewhere and someone will
+  otherwise rely on them.
+- **Decision:** Restate the perception results as follows. All measured at
+  seed 0, `scripts/eval_geometry.py --actions 20`, and over the five recorded
+  fixtures. Full write-up in `architecture.md` §3.
+
+  1. **Geometry fires on 4 of 25 games**, not 18 of 23. Structured grids are
+     found only on four (ft09, lp85, m0r0, sp80 at 150 actions; dc22 in place of
+     lp85 at 20). The `18/23` scale agreement is real but **16 of the 18 matches
+     are `cell=1` correctly agreeing with a true scale of 1** — credit for
+     declining to guess where there is nothing to guess. Only ft09 and sp80 are
+     non-trivial successes.
+  2. ~~**dc22 is a false positive.**~~ **Withdrawn — see the correction below.**
+
+  **Correction, same session, before commit.** Items 1 and 2 above were first
+  measured at `--actions 20`. D-013's established protocol is 40, with a second
+  reading at 150, and D-013 had *already recorded* that dc22's overestimate
+  resolves between 40 and 150 actions. Re-run at 150:
+
+  - **18/23, exactly reproducing D-013.** dc22 resolves to `cell=1`, correct.
+    The overestimate at 150 actions is **lp85 (true 2, induced 4)** — which is
+    precisely what D-013 recorded, not a new finding.
+  - So the claim "dc22 is a false positive" is an artefact of an under-powered
+    run, and the implication that the overestimate was newly discovered was
+    wrong. D-013 stands unamended on both points.
+  - **The structural reframing survives**, and is slightly stronger at 150:
+    structure is still found on only **4 of 25 games** (the set shifts — dc22
+    drops out, lp85 comes in — leaving ft09, lp85, m0r0, sp80), and **16 of the
+    18 matches are the trivial `cell=1` case**. Two non-trivial successes,
+    ft09 and sp80, unchanged.
+  - **A finding that is genuinely new:** the answer is *action-count dependent*
+    and the overestimate **migrates between games** — dc22 at 20 actions, lp85
+    at 150. D-013 noted accuracy improves monotonically with frames; it did not
+    note that the identity of the failing game changes underneath it. Anything
+    that re-induces geometry during play (which D-013 recommends) is therefore
+    re-inducing a *different* wrong answer at different points in an episode,
+    not converging on one. That is worth knowing before segmentation is allowed
+    to depend on it mid-episode.
+
+  The lesson recorded plainly: this entry nearly wrote a false correction into
+  the permanent record because a measurement was run at a cheaper setting than
+  the protocol the original used. **Match the original's action count before
+  claiming a number moved.**
+  3. **"0 unsound cell grids on 25/25" is measured in-sample.** The soundness
+     test induces geometry from a set of frames and verifies uniformity on the
+     same frames, so it cannot fail by construction. This is precisely how dc22
+     is both "sound" and wrong. An out-of-sample check — induce on `frames[:n]`,
+     verify on `frames[n:]` — does not exist and should.
+  4. **Click pruning is 8–196 candidates, not 15–25.** Measured per fixture:
+     sp80 8, vc33 16, ls20 29, sb26 31, bp35 196. Still a 20×–500× reduction on
+     4,096, so D-005 stands, but the quoted range holds on one fixture of five.
+     Separately `Geometry.click_targets()` is **empty on four of five fixtures**
+     and returns 256 on the fifth where segmentation returns 8 — the pruning
+     that works comes from segmentation, not from the geometry layer D-011 built
+     for it.
+  5. **`segment.py`'s "roughly a half-and-half split" between cell space and
+     pixel space is wrong.** It is 4/25. The pixel-space path does nearly all
+     the work.
+  6. **Everything is measured under random play**, which is mostly no-ops and
+     wall-bumping: sb26 is 68% no-ops, and vc33 and sb26 average one changed
+     pixel per transition. Busy multi-mover scenes are absent from the evidence.
+  7. **The tracker is not run on animation frames at all** in evaluation, only
+     on one resting frame per action. D-014 recorded that intermediate frames go
+     *unscored*; they also go *unexecuted*, which is a different and larger gap,
+     because deployment will feed the tracker whole 42-frame sequences.
+
+- **Two findings in the other direction**, recorded with equal weight:
+  - **`_hungarian` is correct.** Fuzzed against brute-force optimal assignment
+    on 4,000 random rectangular cost matrices: zero suboptimal results. The
+    hand-rolled implementation was the largest silent-wrongness risk in the
+    layer and it is now retired as a concern.
+  - **The layer's output accounts for essentially the whole pixel delta.** Over
+    all non-trivial fixture transitions, the objects flagged as moved,
+    recoloured, appeared or vanished cover 100% of genuinely-changed pixels on
+    four of five games and 79% on sp80, with appearances and disappearances
+    averaging near zero. The symbolic story is not silently dropping change.
+    This is the strongest evidence to date that perception is not the weak link.
+
+- **Options rejected:**
+  - *Editing the original numbers in place* — forbidden by the documentation
+    protocol, and the drift between claim and measurement is itself the useful
+    record.
+  - *Treating the geometry finding as a bug to fix now* — it is not a bug. The
+    module correctly declines to claim structure on 21 games. The problem is
+    that the headline metric awards it credit for that. Reframing the metric is
+    the fix; rewriting the module is not.
+  - *Suppressing the dc22 false positive with a special case* — Guardrail 2. A
+    game-specific patch is exactly the hand-crafting we have committed against.
+    The honest response is an out-of-sample soundness check that would catch the
+    class.
+- **Consequences:** `README.md` and `state-of-play.md` status tables are updated
+  to the corrected figures. D-005 and D-013 stand; D-011's specific claim that
+  geometry would carry click pruning does not. Anyone quoting a perception number
+  should quote the random-play caveat with it.
+- **Revisit if:** an out-of-sample soundness check finds further unsound grids;
+  or measurement under non-random play moves any of these figures materially, in
+  either direction; or the migrating-overestimate effect turns out to matter once
+  geometry is re-induced during live play.
+
+---
+
+## D-016 — Object identity is not revisable; splits and merges stay out of scope for now
+
+- **Date:** 2026-09-08
+- **Status:** accepted
+- **Context:** Asked directly whether the layer forms an initial guess at what
+  the objects are and revises it with evidence, the answer turned out to be no,
+  in a stronger sense than anyone had written down. Segmentation is recomputed
+  from scratch every frame by a fixed rule; only *identity* persists, never
+  *objecthood*. `track.py` imports from `segment.py` and nothing goes the other
+  way, so no evidence gathered by tracking can ever change how a frame is carved.
+
+  Tested directly: a bar that splits in two yields one continuing track plus one
+  **brand new unrelated track**, with no record they were ever the same object.
+  Two objects merging yields one continuing track plus one that is marked
+  missing, decays to 0.6 confidence, and sits dormant forever, never reconciled
+  with what it merged into. Assignment is strictly one-to-one by construction,
+  so "one object became two" has no representation in the type system; the words
+  *split* and *merge* do not occur in `track.py`.
+- **Decision:** Accept this for now and do **not** patch the tracker. Record it
+  as a named, quantified limitation in `architecture.md` §3.2–3.3, and treat
+  revisable objecthood as work belonging to the **ontology** subsystem, to be
+  specified after the dynamics experiment reports.
+- **Options rejected:**
+  - *Extend matching to one-to-many now* — this is a real redesign, not a patch:
+    it needs split/merge events in the type system, a policy for confidence
+    across a split, and a new metric, since id-switch rate is not defined when
+    one object becomes two. Doing it before dynamics tells us whether
+    fragmentation actually blocks rule induction would be building machinery
+    against a guess. Guardrail 4's logic applies: spend evidence on the densely
+    testable thing first.
+  - *Make segmentation stateful and accumulate an appearance model per track* —
+    attractive, and probably right eventually, but it changes segmentation from a
+    pure function into the layer's second stateful component, and we would be
+    tuning it against random-play data that contains almost no interesting
+    transitions.
+  - *Reduce fragmentation by defaulting to a coarser segmentation* —
+    `foreground_8` fragments least, at 1.33, but merges most, at 3.65 sprites per
+    component. D-014 already rejected it for that reason. Trading fragmentation
+    for merging is not progress.
+  - *Doing nothing and not writing it down* — the limitation is invisible from
+    the outside; the tracker reports a confident, well-formed answer in both the
+    split and the merge case. It has to be recorded or it will be rediscovered
+    expensively.
+- **Consequences:** Dynamics induction will see one object as ~2.55 and will be
+  asked to learn several rules where one would do. We are choosing to find out
+  how much that costs rather than pre-emptively fixing it. If it does block
+  induction, the fix is a feedback channel from dynamics to segmentation — *these
+  pieces always move together, treat them as one* — which the current code has no
+  way to receive, so expect an interface change, not a local edit.
+- **Revisit if:** dynamics induction is measurably blocked by fragmentation; or
+  any game requires reasoning about an object that genuinely splits or combines
+  (a piece breaking apart, two pieces joining), which one-to-one matching cannot
+  express at all.
+
+---
+
+## D-017 — Keep a standing essay-format architecture document
+
+- **Date:** 2026-09-08
+- **Status:** accepted
+- **Context:** The documentation protocol had five documents covering *why*
+  (`design-thesis.md`), *environment facts* (`benchmark.md`), *prior art*
+  (`field-review.md`), *current status* (`state-of-play.md`) and *choices*
+  (`decision-log.md`). Nothing described **how the system is actually built**.
+  Answering that question in conversation surfaced three limitations — memoryless
+  segmentation, unrepresentable splits, unread `segmentation_name` — that were
+  true of the code, invisible in every existing document, and not obviously
+  wrong from the outside.
+- **Decision:** Add `docs/architecture.md`, maintained as continuous prose rather
+  than notes: descriptive, with worked examples drawn from real recorded data,
+  and with an explicit **"what this does not do"** treatment for every component
+  plus a standing section on what is deliberately not being built. Keep it
+  current as subsystems land. `CLAUDE.md` is amended to make this part of the
+  protocol.
+- **Options rejected:**
+  - *Expand `state-of-play.md`* — it is deliberately a short snapshot that gets
+    rewritten each session. Architecture description needs to accumulate and be
+    stable; mixing the two would destroy both.
+  - *Rely on module docstrings* — they are good here, but they are local by
+    nature. Every limitation found this session was a property of how components
+    *combine*, or of something absent, and no docstring is the natural home for
+    an absence.
+  - *Rely on the decision log* — it records choices at a point in time and is
+    append-only, so reconstructing current behaviour means reading fourteen
+    entries and mentally applying supersessions. That is the wrong artefact to
+    hand a newcomer.
+  - *Auto-generate from code* — would document what exists and is exactly silent
+    on what does not, which is the half that matters most.
+- **Consequences:** One more document to keep honest, and a real risk it drifts
+  out of date and becomes worse than nothing. Mitigated by requiring that every
+  quantitative claim in it names the script and seed that produced it, so staleness
+  is detectable by re-running rather than by judgement.
+- **Revisit if:** it goes two sessions without being updated while the code
+  changes, which would mean the protocol is not being followed and the document
+  should be cut rather than left misleading.
+
+---
+
+<!-- Next entry: D-018. Copy the template from CLAUDE.md. -->

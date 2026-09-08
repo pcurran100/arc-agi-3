@@ -38,7 +38,27 @@ secondary.
    we currently believe and what we are currently doing.
 2. Work.
 3. Before the session ends, update `docs/state-of-play.md` if anything in it is
-   now stale.
+   now stale, and `docs/architecture.md` if the system itself changed.
+
+### The architecture document
+
+`docs/architecture.md` describes **how the system is actually built** — the one
+question the other documents do not answer. It is maintained as continuous
+prose, not notes, and it is written for a competent stranger who needs to know
+what the code does without reading all of it. Rules (D-017):
+
+- **Descriptive, with worked examples.** Show real output on real recorded data,
+  not schematics. A reader should be able to see what a component emits.
+- **Every component gets a "What this does not do".** Absences and limitations
+  are the highest-value content in the document, because they are invisible from
+  the outside and expensive to rediscover.
+- **A standing section on what is deliberately not being built**, distinguishing
+  a *choice* we have made from a *limitation* we have hit, each with the
+  condition that would reopen it.
+- **Every quantitative claim names the script and seed that produced it**, so
+  staleness is detectable by re-running rather than by judgement.
+- Keep it current as subsystems land. If it goes two sessions stale while the
+  code moves, cut it rather than leave it misleading.
 
 ### Every non-trivial decision
 
