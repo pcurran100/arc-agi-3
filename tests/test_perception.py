@@ -318,7 +318,7 @@ def _frame_with_square(x, y, colour=3, size=4):
 
 def test_a_moving_object_keeps_its_identity():
     segs = [segment(_frame_with_square(x, 10))["foreground_8"] for x in (10, 14, 18)]
-    tracker = Tracker()
+    tracker = Tracker("foreground_8")
     for s in segs:
         tracker.update(s)
     assert len(tracker.active_tracks) == 1
@@ -335,7 +335,7 @@ def test_two_identical_objects_crossing_are_not_swapped():
         g[30:34, xb : xb + 4] = 3
         return freeze_grid(g)
 
-    tracker = Tracker()
+    tracker = Tracker("foreground_8")
     ids = []
     for xa, xb in ((10, 40), (14, 36), (18, 32)):
         tracker.update(segment(frame(xa, xb))["foreground_8"])
@@ -371,7 +371,7 @@ def test_occluded_object_is_reacquired_not_replaced():
     """Guardrail 1: down-weight on disconfirmation, never delete."""
     visible = segment(_frame_with_square(10, 10))["foreground_8"]
     hidden = segment(freeze_grid(np.zeros((64, 64), dtype=np.int8)))["foreground_8"]
-    tracker = Tracker()
+    tracker = Tracker("foreground_8")
     tracker.update(visible)
     original = tracker.active_tracks[0].track_id
     tracker.update(hidden)
@@ -384,7 +384,7 @@ def test_occluded_object_is_reacquired_not_replaced():
 
 def test_tracking_a_real_recording_is_stable(ls20):
     geo = induce_geometry(ls20.grids())
-    tracker = Tracker()
+    tracker = Tracker()  # colour_8, the default D-014 measured
     frames = [o.last for o in ls20.observations if o.last is not None]
     for f in frames:
         tracker.update(segment(f, geo)["colour_8"])

@@ -185,6 +185,16 @@ like, so that when something matching shows up later it can be revived rather
 than replaced. That is what makes occlusion survivable instead of
 identity-destroying.
 
+**The carving is declared and enforced.** A tracker is constructed for one named
+segmentation and refuses to be fed another: identity across a mixed carving is
+meaningless, and until session 3 that requirement was a docstring only —
+`segmentation_name` was stored and never read. Enforcing it in `Tracker.update`
+immediately failed three tests that had been building `foreground_8`
+segmentations and feeding them to a default-constructed tracker since session 1.
+The default is now `colour_8`, which is the carving D-014's 0.8% id-switch rate
+was actually measured on; it had been `foreground_8`, a mismatch D-015 spotted
+and session 3 closed.
+
 **What this does not do.** Three things, and they are the most consequential
 limitations in this document — §3.2, §3.3 and §3.5 treat them properly.
 
@@ -201,12 +211,52 @@ The union rather than any single segmentation's list, because D-005's stated
 failure mode is pruning away the winning action, and we do not yet know which
 notion of object is right for a given game.
 
+**Measured against ground truth (D-021, session 3).** Until session 3 this
+component's output was a *proposal* with no denominator: 8–196 candidates, and
+no measurement of how many distinct things a click can actually do.
+`scripts/eval_clickmap.py` now clicks all 4,096 pixels on each of the 19 games
+that publish `ACTION6`, `RESET`-ing between each, and hashes the resting frame.
+On sp80, seed 0:
+
+```
+game              live%  classes  largest  obj n  obj prec  obj cov  lat prec  lat cov
+sp80-589a99af     100.0        1     4096     10    100.0%   100.0%    100.0%   100.0%
+vc33-5430563c     100.0        3     4064     16    100.0%   100.0%    100.0%    33.3%
+ft09-0d8bbf25       7.0        8       36     71     12.7%   100.0%     12.5%   100.0%
+```
+
+Three things to read off. **sp80 has exactly one outcome class**: all 4,096
+pixels produce the identical frame, so `ACTION6` there is a button and its
+coordinate is decorative — the 10 proposals are 10× over-complete. **vc33 shows
+why the union is the right call**: object targets reach all 3 of its outcome
+classes, a 64-point lattice reaches 1. **ft09 shows precision is the wrong
+headline**: 12.7% of its proposals are live, and they still reach 100% of its
+distinct outcomes. A planner needs one pixel per outcome, not every live pixel.
+
+Across the 19 games the true branching factor is **1–11 on 13 of 15 live games**,
+against proposal sets of 10–196 — so the pruning is real and large but stops
+5–25× short of what is there. The two exceptions, r11l (3,096 outcomes) and su15
+(143), are genuinely position-rich and the object prior reaches 1.1% and 3.5% of
+their outcomes respectively.
+
+**What this does not do.** It does not merge outcome classes — the union is
+still emitted whole, and nothing collapses two targets that produce identical
+frames, although D-021 decides that it should. It does not re-check liveness:
+the map is computed at one state, and `scripts/eval_click_liveness.py` shows
+liveness is state-gated on 8 of 19 games (m0r0 is 0% live at the level start and
+100% five actions later), so a target set computed once and trusted will be
+wrong on those games. It does not know that four games (ar25, m0r0, sc25, sk48)
+publish `ACTION6` while no pixel responds at the start state at all. And neither
+script may ever be imported from the agent's code path: both reach ground truth
+by brute force that is free offline and permanent at evaluation, which puts them
+on the same footing as the sprite oracle (D-010).
+
 ---
 
 ## 3. What it measurably does, and does not
 
-All measurements below are from session 2 (2026-09-08), seed 0, reproducible by
-the commands in §4. Where a number contradicts an earlier claim in the
+All measurements below are from session 2 (2026-09-08) unless marked session 3
+(2026-09-17), seed 0, reproducible by the commands in §4. Where a number contradicts an earlier claim in the
 repository, the earlier claim is superseded and D-015 records the correction.
 
 ### 3.0 A worked example
@@ -382,6 +432,15 @@ Two supporting results:
   **empty on four of the five**, and on the fifth returns 256 where segmentation
   returns 8 — so in practice the pruning comes from segmentation, not from the
   geometry layer D-011 built for it.
+
+  **Session 3 supplies the denominator this paragraph lacked** (§2.5, D-021).
+  "Overstated" was the right instinct for the wrong reason: the proposal counts
+  are not too *large* relative to 4,096, they are too large relative to the
+  number of distinct outcomes a click actually has, which is **1–11 on 13 of the
+  15 games where clicking does anything**. bp35's 196 candidates cover 8 real
+  outcomes. Reproduce: `python scripts/eval_clickmap.py` (~4 min) and
+  `python scripts/eval_click_liveness.py` (~10 min), seed 0, live engine
+  required, no fixtures.
 
 ### 3.7 Cost
 

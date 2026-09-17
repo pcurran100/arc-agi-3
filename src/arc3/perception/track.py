@@ -308,10 +308,17 @@ class Tracker:
 
     Feed it one segmentation per frame, in order. The segmentation must be
     produced by the same rule each time - mixing ``colour_4`` and
-    ``foreground_8`` frame to frame would make identity meaningless.
+    ``foreground_8`` frame to frame would make identity meaningless. That
+    requirement used to be a docstring only: ``segmentation_name`` was stored
+    and never read, so the error it warns about was undetectable. It is now
+    checked in :meth:`update` (D-015).
+
+    The default is ``colour_8``, which is what D-014's 0.8% id-switch rate was
+    measured on. It was ``foreground_8`` until D-015 pointed out that the
+    measured carving and the default carving were not the same one.
     """
 
-    def __init__(self, segmentation_name: str = "foreground_8") -> None:
+    def __init__(self, segmentation_name: str = "colour_8") -> None:
         self.segmentation_name = segmentation_name
         self.tracks: dict[int, Track] = {}
         self._next_id = 0
@@ -330,6 +337,12 @@ class Tracker:
 
     def update(self, seg: Segmentation) -> FrameMatching:
         """Advance one frame. Returns the frame-to-frame matching."""
+        if seg.name != self.segmentation_name:
+            raise ValueError(
+                f"tracker is running on {self.segmentation_name!r} but was fed "
+                f"{seg.name!r} at frame {self._frame + 1}; identity across a "
+                "mixed carving is meaningless"
+            )
         self._frame += 1
         if self._prev is None:
             self._prev = seg
@@ -414,7 +427,7 @@ class Tracker:
 
 
 def track_sequence(
-    segmentations: Sequence[Segmentation], *, name: str = "foreground_8"
+    segmentations: Sequence[Segmentation], *, name: str = "colour_8"
 ) -> Tracker:
     """Run a tracker over a whole sequence of segmentations."""
     tracker = Tracker(segmentation_name=name)

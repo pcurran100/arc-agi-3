@@ -71,7 +71,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--actions", type=int, default=60)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--segmentation", default="foreground_8")
+    ap.add_argument("--segmentation", default="colour_8")
     args = ap.parse_args()
 
     hdr = (

@@ -194,6 +194,17 @@ counts.
 > important, not less, since irreversibility is now the default rather than an
 > occasional hazard. This re-derivation has not yet been done properly and is
 > owed its own decision-log entry.
+>
+> **Done, 2026-09-17: see D-022, which supersedes this section.** The
+> re-derivation moved the conclusion again, and in the opposite direction to the
+> paragraph above. `RESET` restores the level start *exactly* (measured, 19
+> games × 4,096 trials), so the level is a tree rooted at each level's start
+> rather than a one-way corridor: reverting from depth *k* costs *k*+1 actions,
+> not "two actions plus state damage". §8's probe-and-revert is therefore real
+> but exists only at the root, which is an argument for front-loading
+> exploration rather than for abandoning it. Read D-022 instead of this
+> section; it is kept in place because the record of two successive wrong
+> estimates is worth more than a clean page.
 
 ## 9. Cross-level persistence is free score
 

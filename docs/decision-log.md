@@ -933,7 +933,10 @@ reconstructions, and none has yet met contact with an actual environment.
 ## D-020 — Driving policy: round-robin tested and rejected; random retained
 
 - **Date:** 2026-09-08
-- **Status:** accepted
+- **Status:** accepted — the driving decision stands; the *targeting* sub-claim
+  ("object targeting does not beat a dumb lattice sweep") is **withdrawn by
+  D-021**, which measured it against ground truth rather than against a proxy.
+  The reasoning below is left exactly as written.
 - **Context:** `state-of-play.md` carried the instruction *"do not drive the
   dynamics experiment with random play"*. That instruction rested on a
   characterisation of the fixture corpus that D-019 had already partly corrected
@@ -1036,4 +1039,458 @@ reconstructions, and none has yet met contact with an actual environment.
 
 ---
 
-<!-- Next entry: D-021. Copy the template from CLAUDE.md. -->
+## D-021 — The ground-truth click map, and what it says about where to click
+
+- **Date:** 2026-09-17
+- **Status:** accepted
+- **Context:** Two questions had been circling since D-005 and had never been
+  answered against ground truth, only against proxies.
+
+  The first is **where it is effective to click**. D-005 prunes the 4,096-pixel
+  click space to 8–196 candidates by proposing one target per segmented object.
+  That is a *proposal* count. Nobody had ever measured how many distinct things
+  a click can actually do, so there was no denominator: 196 candidates might be
+  a tenfold over-count or a tenfold under-count and the repository could not
+  tell you which. D-020 then compared object-targeted clicks against a dumb
+  lattice sweep, found them indistinguishable in aggregate, and concluded that
+  "D-005's pruning is not earning anything as a driving heuristic". That
+  conclusion rested on a proxy statistic — the count of distinct changed-pixel
+  signatures produced over a rollout — chosen because no better one existed.
+
+  The second is **when the click is worth spending an action on at all**. Six of
+  the 25 games publish only `[6]`, six never publish `6`, and thirteen are
+  mixed (`drive.py` docstring, re-verified this session). The published mask
+  tells you the click is *legal*. Nothing told us whether it *does anything*.
+
+  What made both answerable now is a property of the local engine that had been
+  recorded but never exploited: **`RESET` restores the level start exactly.**
+  Measured this session across 19 games × 4,096 clicks, the frame after
+  `RESET` is byte-identical to the frame before the click every time, and the
+  corroborating evidence is sp80, where 4,096 clicks each followed by a `RESET`
+  produced exactly **one** distinct outcome — impossible under any drift.
+
+  That makes the click map free *offline*. It is emphatically **not** free
+  online: at evaluation every click is permanent (D-009) and a `RESET` costs an
+  action without rewinding the action count. This is an instrument of the same
+  kind as the sprite oracle (D-010) — ground truth to score perception against,
+  never an input to the agent.
+
+### Experiment — click every pixel, on every game that accepts clicks
+
+- **Question:** of the 4,096 pixels, how many do anything; how many *distinct*
+  things can a click do; and do the targets segmentation proposes reach them?
+- **Setup:** `scripts/eval_clickmap.py`, seed 0, level-1 start state, all 19
+  games that publish `6`. For each pixel: click it, hash the resting frame,
+  `RESET`. Two proposal sets scored against the map — `object_targets` (the
+  union of click targets over all six segmentations, which is what D-005
+  proposes) and `lattice_targets(8)` (a 64-point sweep, D-020's null
+  hypothesis). Reproduce with
+  `python scripts/eval_clickmap.py --out clickmap.json`. ~4 minutes.
+- **Two metrics, and the second is the one that matters.** *Precision* is the
+  fraction of proposed targets that change anything. *Class coverage* is the
+  fraction of the game's distinct outcomes that the proposal set can reach. A
+  planner does not need every live pixel; it needs **one pixel per distinct
+  outcome**. Precision measures waste, coverage measures whether a reachable
+  move has been made unreachable — and only the second can silently cost a
+  level.
+- **Result:**
+
+  | game | live % | distinct outcomes | obj targets | obj prec | obj coverage | lat prec | lat coverage |
+  |---|---|---|---|---|---|---|---|
+  | ar25 | **0.0** | 0 | 20 | — | — | — | — |
+  | m0r0 | **0.0** | 0 | 12 | — | — | — | — |
+  | sc25 | **0.0** | 0 | 30 | — | — | — | — |
+  | sk48 | **0.0** | 0 | 54 | — | — | — | — |
+  | sp80 | 100.0 | **1** | 10 | 100% | 100% | 100% | 100% |
+  | cd82 | 100.0 | 2 | 20 | 100% | 100% | 100% | 100% |
+  | ka59 | 100.0 | 2 | 16 | 100% | **100%** | 100% | 50% |
+  | cn04 | 7.7 | 2 | 12 | 58% | **100%** | 6% | 50% |
+  | lp85 | 2.3 | 2 | 51 | 6% | 100% | 3% | 100% |
+  | dc22 | 100.0 | 3 | 48 | 100% | **100%** | 100% | 67% |
+  | lf52 | 100.0 | 3 | 71 | 100% | **100%** | 100% | 67% |
+  | vc33 | 100.0 | 3 | 16 | 100% | **100%** | 100% | 33% |
+  | sb26 | 3.5 | 4 | 31 | 13% | 100% | 6% | 100% |
+  | s5i5 | 100.0 | 5 | 37 | 100% | **100%** | 100% | 60% |
+  | bp35 | 100.0 | 8 | 196 | 100% | **100%** | 100% | 88% |
+  | ft09 | 7.0 | 8 | 71 | 13% | 100% | 13% | 100% |
+  | tn36 | 100.0 | 11 | 96 | 100% | **100%** | 100% | 36% |
+  | su15 | 82.8 | **143** | 34 | 85% | 3.5% | 88% | 2.8% |
+  | r11l | 100.0 | **3096** | 47 | 100% | 1.1% | 100% | 1.7% |
+
+- **Result 1 — the click's true branching factor is tiny on 13 of 15 games.**
+  Where clicking does anything at all, the number of distinct outcomes is
+  usually between **1 and 11**. On sp80 it is **one**: every one of the 4,096
+  pixels produces the identical frame, so `ACTION6` there is not a spatial input
+  at all, it is a **button**, and the (x, y) is decorative. Measured against
+  this, D-005's proposal sets are **5–25× over-complete** (sp80 10 proposals for
+  1 outcome; lp85 51 for 2; bp35 196 for 8). The pruning is real and large —
+  4,096 down to tens — but it stops well short of the ~1–11 that is actually
+  there.
+
+- **Result 2 — object targeting beats the lattice, and D-020's sub-claim was
+  measured on the wrong statistic.** Head to head on class coverage over the 15
+  games where clicking does anything: **objects win 9, tie 5, lose 1.** The
+  losses and ties are informative — objects and lattice tie at 100% on the five
+  games whose outcomes are easy to reach, and objects lose only on r11l, where
+  both are hopeless (1.1% against 1.7% of 3,096 outcomes). Every game where the
+  two differ materially goes to objects, sometimes hugely: vc33 100% against
+  33%, tn36 100% against 36%, ka59 100% against 50%.
+
+  D-020's measurement was not wrong, and its *decision* — retain random as the
+  corpus driver — is untouched. But the statistic it used, distinct
+  changed-pixel signatures over a rollout, cannot see this: a lattice that
+  reaches one outcome class repeatedly still accumulates signature diversity
+  from the states it passes through. D-020's own vc33 anomaly (54 changed pixels
+  under object targeting against 1 for the lattice, "a 50× difference on one
+  game") is now explained rather than filed as a curiosity: the lattice reaches
+  **one of vc33's three outcome classes**. The generalisation "object targeting
+  does not beat a dumb lattice sweep" is **withdrawn**; it holds for corpus
+  diversity and fails for outcome reachability, which is what a planner needs.
+
+- **Result 3 — the published action mask is an upper bound, not a guide.** On
+  **four of nineteen games** (ar25, m0r0, sc25, sk48) the engine publishes `6`
+  in `available_actions` and **not one of the 4,096 pixels does anything** at the
+  level-1 start state. D-012 lets the agent read the mask; this says what the
+  mask is worth. A legal action is not a useful one, and on 21% of the
+  click-publishing games an agent that trusts the mask at the start state will
+  spend its clicks on nothing.
+
+  A second, smaller instance of the same point: **`RESET` is never published in
+  `available_actions`, yet is fully functional when stepped.** The mask is not a
+  description of what works in either direction.
+
+### Follow-up experiment — is an inert click a property of the game or of the state?
+
+- **Question:** Result 3 is measured at one state. Does a click that does nothing
+  at the level-1 start do nothing *anywhere*? The two readings have opposite
+  consequences: the first would license writing the action off, the second makes
+  doing so a Guardrail 1 hard rejection.
+- **Setup:** `scripts/eval_click_liveness.py`, seed 0, all 19 click games. Walk a
+  random rollout; at depths k = 0, 5, 10, 20, 40, replay to that state and test
+  what fraction of a candidate set (object targets plus a 16-pixel lattice)
+  changes the frame. Weaker question than the full map, ~2,400 engine steps per
+  game instead of ~330,000. `-` means the rollout terminated before that depth.
+- **Result**, percentage of candidate targets that are live:
+
+  | game | k=0 | k=5 | k=10 | k=20 | k=40 |
+  |---|---|---|---|---|---|
+  | ar25 | 0 | 0 | 0 | 0 | 0 |
+  | sk48 | 0 | 0 | 0 | 0 | 0 |
+  | **m0r0** | **0** | **100** | **100** | **0** | **0** |
+  | **sc25** | **0** | **26** | **25** | **24** | **24** |
+  | **cd82** | 100 | 100 | 100 | **7** | **7** |
+  | **ka59** | 100 | 100 | 100 | **6** | **6** |
+  | **sp80** | 100 | 100 | 100 | **0** | – |
+  | **r11l** | 100 | 100 | 100 | **0** | – |
+  | **dc22** | 100 | **5** | 100 | 100 | 100 |
+  | cn04 | 25 | 100 | 100 | 23 | 23 |
+  | bp35, lf52, s5i5, tn36, vc33 | 100 | 100 | 100 | 100 | 100 |
+  | ft09 | 15 | 15 | 15 | 15 | 15 |
+  | lp85 | 4 | 4 | 4 | 4 | 4 |
+  | sb26 | 9 | 8 | 8 | 8 | 8 |
+  | su15 | 82 | 82 | 82 | 82 | 82 |
+
+- **Result — click liveness is a property of the state, not of the game, on at
+  least eight of nineteen.** Two of Result 3's four inert games come alive:
+  **m0r0 goes 0% → 100% within five actions** and back to 0% by twenty, and
+  **sc25 goes 0% → 26%** and stays. Four games move the other way — cd82, ka59,
+  sp80 and r11l are fully live for ten actions and then collapse to near or
+  exactly zero. dc22 is non-monotonic (100 → 5 → 100). Only **ar25 and sk48** are
+  inert at every depth tested, and even that is one random trajectory, not a
+  proof.
+
+  Two games (sp80, r11l) **terminated before depth 40 under random play**, which
+  is why their k=40 cell is empty; the 0% at k=20 and the termination are
+  probably the same event.
+
+- **Did it change our mind? Yes, and it caught an error in this entry's own
+  first draft**, which read Result 3 as a property of the game and proposed
+  writing inert actions off. That is exactly the hard rejection Guardrail 1
+  forbids, and the measurement shows what it would have cost: an agent that
+  wrote m0r0's click off at the start state would have discarded the only input
+  that does anything five actions later.
+
+- **Result 4 — two games are genuinely position-rich**, and they are the ones
+  the object prior fails on. r11l has **3,096 distinct outcomes** from 4,096
+  pixels and su15 has 143. These are not games where a handful of targets can
+  stand in for the click space, and any planner that assumes a small click
+  branching factor will be wrong on them. They should be watched as the
+  worst case for D-005 rather than averaged away.
+
+- **Did it change our mind? Yes, on three things.** The branching-factor result
+  reframes what pruning is for; the head-to-head withdraws a generalisation from
+  D-020 that was about to be built on; and the four inert games break the
+  assumption that the mask indicates usefulness.
+
+- **Decision:**
+  1. **Keep object-derived targets as the click proposal set**, on class
+     coverage rather than on precision. The case for D-005 is now ground truth
+     rather than inference from a proxy: object targets reach **100% of the
+     distinct outcomes on 13 of the 15 live games**, and win or tie against the
+     lattice on 14 of 15.
+  2. **Add outcome-class merging as the next step on top of it.** Because two
+     targets that produce the same resting frame are the same move, the agent
+     should collapse them the moment it observes it, taking the effective click
+     branching factor from ~46 proposals toward the measured ~1–11. This is
+     learned online from transitions the agent is taking anyway and costs no
+     extra actions.
+  3. **Track per-action liveness as a decaying weight, never as a rejection**
+     (Guardrail 1, D-003). An input observed inert is down-weighted and retried
+     when the state has changed materially; it is never struck off. The
+     follow-up experiment shows why in numbers.
+  4. **Treat the root sweep's liveness findings as perishable.** What a click
+     *does* to an object is likely to persist; *whether it does anything* is
+     state-gated on eight of nineteen games and must be re-checked after the
+     state moves.
+  5. **`scripts/eval_clickmap.py` and `scripts/eval_click_liveness.py` are
+     offline-only**, on the D-010 footing. It
+     must never be importable from the agent's code path.
+- **Options rejected:**
+  - *Report precision as the headline* — it is the intuitive number and it is
+    the misleading one. lp85 scores 6% precision and 100% class coverage: the
+    proposal set wastes most of its targets and still reaches every distinct
+    move in the game. Optimising precision would prune away reachability.
+  - *Conclude from Result 1 that the click space is small and hard-code a small
+    branching factor* — r11l's 3,096 outcomes forbid it, and Guardrail 2 forbids
+    hand-crafting the hypothesis space from an eyeballed taxonomy of 25 games.
+    The branching factor is something to **measure per game at runtime**, which
+    is what decision 2 does.
+  - *Run the full map at several states per game* — the exhaustive version of
+    the follow-up experiment, and not run: returning to a depth-*k* state costs
+    *k* replayed steps per pixel, making it a ~35-minute job. The cheap
+    liveness probe answered the question that mattered. What remains unmeasured
+    is whether the *outcome classes* drift with depth, as opposed to mere
+    liveness, and that is the live gap this entry leaves open.
+  - *Use the click map as an agent input* — it is 8,192 engine steps per game
+    per state, all of them permanent at evaluation. Not a temptation worth
+    leaving undocumented, since the code makes it look easy.
+- **Consequences:** D-005 is now measured rather than argued, and is committed
+  to on the coverage argument specifically. The planner gets a concrete
+  follow-on job (class merging) and two named worst-case games (r11l, su15).
+  D-020's driving decision stands; its targeting generalisation does not, and
+  its status is amended to note the correction rather than superseded, since the
+  decision it records is unaffected.
+- **Revisit if:** outcome classes measured at a non-start state differ
+  materially from the start state, which would mean class merging must be
+  re-learned per state rather than per level — liveness already drifts, so this
+  is a live worry rather than a hypothetical, and it is the first thing to
+  measure if class merging underperforms; or class coverage on the
+  position-rich games matters for score, at which point the object prior is not
+  the right proposal mechanism for them and something continuous is needed.
+
+---
+
+## D-022 — Exploration when every probe is permanent: design thesis §8, re-derived
+
+- **Date:** 2026-09-17
+- **Status:** accepted
+- **Context:** This entry pays a debt that has been outstanding since session 1.
+  Design thesis §8 argued for exploration using a value-of-information test of
+  the form *is this worth two actions?* — one to probe, one to undo. D-009
+  established that **there is no Undo**, and §8 was annotated in place rather
+  than rewritten, with a note that "the argument has to be re-derived without
+  it" and that the re-derivation "is owed its own decision-log entry". It never
+  got one. `state-of-play.md` has carried it as **open, owed a decision entry**
+  through two sessions.
+
+  The annotation's own guess at the answer was that with no rollback "every
+  probe is permanent, so the cost of an uninformative action is not two actions
+  but two actions plus whatever state damage it did". **That guess is too
+  pessimistic, and the reason matters.**
+
+### The structural fact the annotation missed
+
+`RESET` is not Undo, but it is not nothing. It restores the level start
+**exactly** — verified this session across 19 games and 4,096 clicks each
+(D-021), with sp80's single distinct outcome over 4,096 trials as corroboration
+that no drift occurs. It costs one action and does not rewind the action count
+(D-009).
+
+So the level is **not a one-way corridor**. It is a tree rooted at the level
+start, and because the engine is deterministic under a fixed seed, any state at
+depth *k* is re-reachable by `RESET` followed by replaying *k* actions. Reversion
+exists; it just is not cheap, and its price is not constant.
+
+**The cost of revert is *k*+1, not 2.** §8's two-action probe-and-revert is the
+special case *k*=1. It is real, and it exists only at the root.
+
+(One caveat kept visible: this is verified at level 1. D-009 records that
+`RESET` restarts the *current* level, so the tree is rooted at each level's
+start, but that has not been measured at level ≥ 2 and should be before anything
+leans on it. A second, smaller observation from the same measurement: `RESET`
+is **never published in `available_actions` yet is fully functional when
+stepped** — another instance of D-021's Result 3, that the mask is an upper
+bound on legality and not a description of what works.)
+
+### What follows
+
+1. **Exploration cost is linear in depth, and a sweep at depth *k* is
+   quadratic-ish in aggregate.** Probing *b* branches at depth *k* and returning
+   each time costs *b*(*k*+1). The same *b* branches at the root cost 2*b*.
+   Information is therefore roughly ***k* times more expensive to buy at depth
+   *k* than at the root.**
+
+2. **So front-load: learn everything learnable near the root before descending.**
+   This replaces §8's "is it worth two actions?" with **"is it worth *k*+1
+   actions, and could it have been learned at a shallower depth?"** The second
+   clause is the operative one and it is new: an agent that descends before
+   exhausting the root pays for the same information several times over. This is
+   a concrete ordering rule, not a disposition.
+
+   **With one measured qualification, which arrived the same day as the
+   derivation.** Front-loading only pays for information that *keeps*. D-021's
+   liveness probe shows that on eight of nineteen games, which inputs are live
+   changes with depth — so a root sweep can learn a fact that is false fifteen
+   actions later. This does not overturn the cost argument, because the root is
+   still where information is cheapest and a perishable fact bought for 2 actions
+   beats the same fact bought for 21. It does mean the root sweep is **not a
+   one-off phase that completes**, and any design treating it as a prologue to be
+   finished before play begins is wrong.
+
+3. **The case for the model gets stronger, not weaker.** With a correct dynamics
+   model, replay happens internally and the *k*+1 vanishes entirely. The value of
+   D-002 therefore **scales with the depth at which exploration is needed**.
+   §8's original framing, by assuming a cheap Undo, accidentally *understated*
+   the case for the model — a cheap Undo is precisely the condition under which
+   model-free probing stays viable. Removing it removes the alternative.
+
+4. **Irreversibility is now priced rather than feared.** §7's irreversibility
+   heuristic was about avoiding damage. Under this derivation the question is
+   sharper: an action is expensive not when it is "irreversible" in the abstract
+   but when **recovering from it costs more than the information is worth**, and
+   that is a number. Toggles are the cheap case and are now cheaply detectable —
+   an outcome class that maps *S*→*S'* such that repeating it returns to *S* is
+   a toggle, and D-021's class machinery finds these for free.
+
+### What exploration play should therefore be
+
+The user's question — *without a goal, do we need a goal hypothesis or do we
+need exploration play?* — resolves into **both, in sequence, with the RHAE
+budget deciding when to switch.**
+
+**The value function has two phases.** While the dynamics model is uncertain,
+states are ranked by **expected information gain about dynamics**, which is
+well-defined without knowing the goal and is what Guardrail 4 already demands
+("early actions go to dynamics disambiguation"). Once a goal hypothesis has
+support, states are ranked against it. The switch is not a matter of taste: per-
+level human baselines ship in `metadata.json` (D-012), and RHAE's penalty above
+baseline is quadratic, so **the affordable exploration budget is computable
+offline per level before the agent takes its first action.**
+
+The ordering, cheapest first:
+
+1. **Spend nothing on what is already free.** The action mask, the `tags`, the
+   UI/playfield split, and above all the up-to-42-frame animation returned by any
+   action being taken anyway. D-021 weakens this tier: the mask says legal, not
+   useful, and on four of nineteen click games it is legal-and-useless.
+2. **Sweep at the root, where revert costs 1.** Enumerate the distinct actions;
+   for the click, use the object proposal set, which D-021 measures at 100%
+   outcome-class coverage on **13 of 15** live games (the exceptions are the
+   position-rich pair, r11l and su15). **This sweep is exactly where
+   D-021's class merging happens** — the root sweep both explores and collapses
+   the click branching factor from ~46 proposals to the measured ~1–11.
+3. **Descend only on actions whose outcome class is already known**, so that
+   descending spends movement budget rather than information budget.
+4. **Re-check liveness after the state moves, and never write an input off.**
+   D-021's follow-up measured click liveness at depths 0, 5, 10, 20 and 40 and
+   found it **state-gated on eight of nineteen games** — m0r0 goes from 0% live
+   at the root to 100% five actions later, cd82 and ka59 go the other way. So
+   the root sweep's conclusions are of two kinds with different shelf lives:
+   what an action *does* to an object is a dynamics fact and should persist,
+   whereas *whether it does anything here* is a state fact and expires. Only the
+   first is safe to carry down the tree.
+5. **Never probe for the goal** (Guardrail 4). Unchanged, but now with a cost
+   model behind it rather than an intuition.
+
+- **Decision:** Adopt the above as the replacement for design thesis §8. Record
+  in the thesis that §8's VOI test is superseded by the depth-priced version
+  here. The two phases of the value function, and the RHAE-derived budget that
+  switches between them, are the project's answer to "what ranks states before
+  a goal is known".
+- **Options rejected:**
+  - *Treat every action as irreversible and plan conservatively* — the
+    annotation's implicit position, and it is wrong on the measurement. It would
+    forgo root sweeps that cost 2 actions and return the entire click structure
+    of the level.
+  - *Use `RESET` freely as a general-purpose undo* — tempting once exactness is
+    verified, and wrong under RHAE: the action count does not rewind, so a
+    policy that resets often is quadratically punished for it. `RESET` is for
+    the root sweep and for recovering from a genuinely fatal state, not for
+    routine backtracking.
+  - *Derive the exploration budget from a tuned constant* — the baselines are in
+    the metadata and the penalty is a published formula, so a constant would be
+    a worse version of a number we can compute. It would also fail silently if
+    D-012's metadata bet loses.
+  - *Settle the value function now* — out of scope and not owed. This entry
+    fixes the *exploration* half, which is answerable from the cost structure.
+    Ranking states against a *goal* remains the weakest link (design thesis §7)
+    and is untouched.
+  - *Defer the whole re-derivation until dynamics induction reports* — the
+    argument for waiting is that a negative result on D-002 would make it moot.
+    Rejected because the derivation is what says the dynamics experiment's root
+    sweep is affordable in the first place, and because two sessions of "owed"
+    is long enough.
+- **Consequences:** §8 is no longer load-bearing in its original form; the
+  depth-priced version is what the planner will be built against. Commits us to
+  a root-first exploration shape, which will look wasteful on any game where the
+  interesting structure is deep, and that is the cost being accepted. Gives the
+  planner a defined budget input (baseline actions) and therefore a hard
+  dependency on D-012's metadata bet for the switch point, mitigated by the
+  withheld-metadata path.
+- **Revisit if:** outcome *classes* measured at depth differ materially from
+  those at the root. Note that this condition has **already partly fired**:
+  D-021's follow-up shows liveness drifting with depth on eight of nineteen
+  games, which is the weaker of the two versions of this worry. What is still
+  unmeasured, and what would genuinely collapse the ordering, is whether the
+  *outcome classes themselves* — what a click does, not whether it does
+  anything — drift the same way. That measurement is the highest-value cheap
+  experiment this entry leaves undone. Also revisit if `RESET` turns out not to
+  restore exactly at level ≥ 2, which is assumed and verified only at level 1;
+  or if a game is found where the root sweep itself is fatal, making even
+  depth-1 probing unsafe (sp80 and r11l terminate under random play before depth
+  40, so this is not far-fetched).
+
+---
+
+## D-023 — Drop static-to-interactive transfer as a parallel objective
+
+- **Date:** 2026-09-17
+- **Status:** accepted
+- **Context:** `field-review.md` §5 noted that the living survey reports
+  static-to-interactive transfer as largely absent — nobody has established
+  whether ARC-AGI-2 ability helps on ARC-AGI-3 — and flagged it as "answerable
+  with modest compute and a cheaper, more certain research output than winning
+  the track". It has sat in `state-of-play.md` under *Parked, not dead* through
+  three sessions, and was raised again this session as one of the project's
+  standing open questions.
+- **Decision:** Drop it. Remove it from *Parked, not dead* and record here that
+  it was considered and declined rather than forgotten.
+- **Reasoning:** the objective is only cheap for someone who already has an
+  ARC-AGI-2 system to transfer *from*. **This project has done no ARC-AGI-2
+  work and has none planned.** The "modest compute" estimate in `field-review.md`
+  silently assumed a static solver already in hand; without one, the cheaper
+  parallel objective is not cheaper, it is a second project. With ~46 days to the
+  2 November deadline, the core bet (D-002) untested, and available time dropping
+  from early October, there is no version of this that is affordable.
+- **Options rejected:**
+  - *Keep it parked* — parking is not free. `state-of-play.md` is the file every
+    session reads first, and an item that will never be picked up costs attention
+    every time it is read and implies an optionality that does not exist.
+  - *Do it with an off-the-shelf ARC-AGI-2 solver instead of building one* —
+    would answer a question about someone else's system, not about ours, and the
+    transfer question is only interesting for a solver whose internals you can
+    inspect.
+  - *Delete the `field-review.md` §5 note as well* — no. The survey's observation
+    is true and worth a competent stranger knowing. What changes is our
+    relationship to it, which is what this entry records.
+- **Consequences:** the project is now single-track on ARC-AGI-3 with no hedge.
+  If D-002 fails, there is no parallel result to fall back on, and the value of
+  the work is entirely in the negative-result record — which is what `CLAUDE.md`
+  says it should be anyway.
+- **Revisit if:** an ARC-AGI-2 solver appears in this repository for some other
+  reason, at which point the marginal cost of the transfer experiment drops to
+  roughly what `field-review.md` originally assumed.
+
+---
+
+<!-- Next entry: D-024. Copy the template from CLAUDE.md. -->
