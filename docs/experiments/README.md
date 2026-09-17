@@ -1,0 +1,28 @@
+# Raw experiment output
+
+Kept because `CLAUDE.md` requires that any experiment be reproducible from the
+log alone, and because a decision-log entry quotes summary numbers while the
+per-game detail is often what a later reader actually needs. These are the
+*outputs*, not the record — the record is `docs/decision-log.md`.
+
+Every file here is regenerable. None of it is an input to anything.
+
+| file | produced by | recorded |
+|---|---|---|
+| `dynamics_sweep.txt` / `.json` | `scripts/eval_dynamics.py --out dynamics_sweep.json` | D-025, 2026-09-17 |
+| `dynamics_curve.txt` / `.json` | `scripts/eval_dynamics_curve.py --carving colour_4 --test-tail 30 --games dc22,m0r0,cn04,tr87,wa30,ls20,cd82,re86` | D-025 follow-up, 2026-09-17 |
+
+Both need the corpus, which is gitignored and rebuilt deterministically:
+
+```bash
+python scripts/record_corpus.py                          # 25 games x 100 actions, ~15 s
+python scripts/record_corpus.py --actions 300 --out corpus300   # ~41 s, for the curve
+```
+
+All seeds are 0. The sweep takes 7,888 s; the curve about 40 minutes on eight
+games.
+
+**A caution when reading `dynamics_sweep.json`.** The `exact_ex_bk` field is a
+diagnostic and can be vacuous — if a game changes nothing outside the induced
+bookkeeping mask, "exact outside the mask" is satisfied by predicting nothing.
+Check the `vacuous` flag before quoting it. The headline metric is `exact`.

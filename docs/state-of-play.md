@@ -142,7 +142,7 @@ alternatives in `decision-log.md`.
 | D-022 | Exploration re-derived without Undo: revert costs *k*+1, so front-load at the root | medium — a derivation, not yet a measurement |
 | D-023 | Static-to-interactive transfer **dropped**, not parked | high |
 | D-024 | The rule language: `(action, selector) → effect`, MDL-selected | medium — deliberately at the floor of expressiveness |
-| D-025 | **Dynamics experiment: weak pass. D-002 stands.** Keep all six carvings; bookkeeping layer is next | high — measured, 6 carvings × 25 games |
+| D-025 | **Dynamics experiment: weak pass. D-002 stands.** Keep all six carvings; language-limited not evidence-limited; bookkeeping layer is next | high — measured, 6 carvings × 25 games |
 
 ---
 
@@ -219,6 +219,8 @@ given alongside, because the drift is itself the useful record.
 | **Best carving is game-dependent** | `colour_4` wins 5 games, `foreground_4` wins 2 and is the only carving finding signal on ar25/cn04. Union 7 > any single 5 — D-018 is load-bearing |
 | **Deformed moves: not the constraint** | `foreground_*` cuts deformation 3× (14% vs 53%) and scores **half** as well. Hypothesis refuted |
 | Sweep cost | 7,888 s for 6 carvings × 25 games, against D-019's 2–2.5 h estimate |
+| **Dynamics saturates at ~50 actions** | exact match gains **+0.0000** from n=50 to n=200 training transitions. **Language-limited, not evidence-limited** |
+| **Two games: perfect object model, zero score** | ls20 at n=200 and sp80 both reach **100% changed-object accuracy with 0% exact match** — a 2-pixel UI counter fails every frame comparison |
 
 **D-007's tarpit condition was not triggered.** Cross-frame identity works, and
 it works well inside the two-week reassessment window.
@@ -326,6 +328,7 @@ argument was meant to prevent, live in the suite since session 1.
 | **16 of 23 games score exactly zero** | the mechanism works on a minority | open. D-025 argues a large part is residual bookkeeping rather than missing expressiveness, and names the test that would prove it wrong |
 | **The metric conflates two failures** | sp80 has a *perfect* object model and scores 0% because a 2-pixel UI counter ticks every action | open, and deliberately not fixed by moving the goalposts. Headline stays exact-frame (D-019) |
 | **No population of hypotheses** | Guardrail 1 and D-003 require one; dynamics uses the single MDL-best rule set | **open by choice**, a narrowing for the go/no-go only. First in the queue now the language is shown to work |
+| **"50 actions suffice" may not survive the private set** | measured on random play over 25 public games; a game whose mechanics only appear after a long sequence would break it | open. The claim here most exposed to the private set |
 | **Animation frames unused by dynamics** | up to 42 sub-transitions per action recorded, only endpoints read | open. Large unexploited evidence source |
 | Object identity may not track | kills D-005's pruning | **retired.** 0.8% switch rate (D-014) |
 | **Fragmentation at 2.55** | one object read as several means several rules where one would do | live; watch it during dynamics induction |
@@ -379,14 +382,21 @@ thing, and it should happen next.
 D-025 names the order, and it is deliberately not "make the rule language
 richer", which is what 16 zero-scoring games superficially argue for.
 
-1. **The bookkeeping layer.** The cheapest large win available. sp80 has a
-   perfect object model and scores 0% exact because a two-pixel counter ticks
-   every action; ls20 is the same story. The layer is spatially separable and
-   learnable from change frequency alone, and predicting a counter is a far
-   smaller problem than object interaction. The concrete test of whether this
-   diagnosis is right: sp80, re86, g50t and ar25 all have high changed-object
-   accuracy and near-zero exact match. If predicting the counter does not
-   convert them, D-025's Result 3 is wrong and the gap is really expressiveness.
+0. **Do not buy more actions.** The learning curve saturates at **n=50**:
+   exact match gains +0.0000 from 50 to 200 training transitions. Fifty actions
+   of random play extract everything this rule language can extract. This is
+   good news for the RHAE budget and a firm instruction about where *not* to
+   invest.
+1. **The bookkeeping layer.** The cheapest large win available. **ls20 at 200
+   training transitions scores 100% changed-object accuracy and 0% exact
+   match**; sp80 is the same shape. Two independent games with a perfect object
+   model and a zero score, both failing on a two-pixel counter. The layer is
+   spatially separable and learnable from change frequency alone, and predicting
+   a counter is a far smaller problem than object interaction. The concrete test
+   of whether this diagnosis is right: sp80, re86, g50t and ar25 all have high
+   changed-object accuracy and near-zero exact match. If predicting the counter
+   does not convert them, D-025's Result 3 is wrong and the gap is really
+   expressiveness after all.
 2. **A population of rule sets, not the MDL-best one.** Restores Guardrail 1 and
    D-003, knowingly suspended for the go/no-go. The MDL scores already computed
    are the natural weights, so this is cheap.

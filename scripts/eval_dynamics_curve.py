@@ -16,6 +16,10 @@ is the worst available trade.
 Test set is held fixed at the tail of the episode for every training size, so
 the curve is not confounded by a moving target.
 
+Read the **saturation point**, not the endpoints. A curve that rises steeply to
+n=50 and is then flat to n=200 has the same endpoints as one still climbing, and
+they mean opposite things.
+
 Usage:
     python scripts/record_corpus.py --actions 300 --out corpus300
     python scripts/eval_dynamics_curve.py --carving foreground_8
@@ -91,14 +95,30 @@ def main() -> None:
         print(f"{'MEAN':6s}" + "".join(f"{100 * m:9.1f}%" for m in means))
         cmeans = [float(np.mean([r[f"chgobj_{n}"] for r in rows])) for n in SIZES]
         print(f"{'chgobj':6s}" + "".join(f"{100 * m:9.1f}%" for m in cmeans))
-        first, last = means[0], means[-1]
+        # Saturation, not first-vs-last. The first version of this compared the
+        # endpoints and reported "still climbing" for a curve that was flat from
+        # n=50 onward: 7.1% -> 13.5% looks like growth, but every point from 50
+        # to 200 was 13.5% to three significant figures. Endpoint comparison
+        # cannot distinguish a rising curve from one that rose early and
+        # stopped, which is the entire question being asked.
+        final = means[-1]
+        saturation = next(
+            (n for n, v in zip(SIZES, means) if final > 0 and v >= 0.98 * final), SIZES[-1]
+        )
+        tail_gain = means[-1] - means[len(SIZES) // 2]
+        still_rising = tail_gain > 0.01
         verdict = (
-            "still climbing - evidence-limited, more actions would help"
-            if last > first * 1.25 + 0.01
-            else "plateaued - language-limited, more actions buy little"
+            "EVIDENCE-LIMITED: the curve is still rising in its second half, so "
+            "more actions buy a better model"
+            if still_rising
+            else f"LANGUAGE-LIMITED: saturates at n={saturation}, and the second "
+            f"half of the curve adds {100 * tail_gain:+.1f}pp. More actions buy "
+            f"nothing; expressiveness is the binding constraint"
         )
         print(f"\n{SIZES[0]} -> {SIZES[-1]} transitions: "
-              f"{100 * first:.1f}% -> {100 * last:.1f}%  ({verdict})")
+              f"{100 * means[0]:.1f}% -> {100 * means[-1]:.1f}%")
+        print(f"saturation at n={saturation};  second-half gain {100 * tail_gain:+.2f}pp")
+        print(f"\n{verdict}")
 
     if args.out:
         Path(args.out).write_text(json.dumps(rows, indent=2), encoding="utf-8")

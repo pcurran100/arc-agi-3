@@ -699,6 +699,34 @@ Three things to read off, in order of how much they should change your picture:
    counter in the UI ticks two pixels every action. Object-level dynamics work
    on ~60% of games; exact frame reconstruction works on 30%.
 
+### 7.5 How much evidence does it need? Fifty actions.
+
+`scripts/eval_dynamics_curve.py --carving colour_4 --test-tail 30`, eight games,
+300-action corpus, seed 0, fixed test tail:
+
+| training transitions | 10 | 25 | 50 | 100 | 200 |
+|---|---|---|---|---|---|
+| exact on changed | 7.1% | 11.7% | **13.5%** | **13.5%** | **13.5%** |
+| changed-object accuracy | 47.7% | 55.4% | 62.3% | 63.0% | 63.4% |
+
+**Exact match gains +0.0000 from n=50 to n=200.** Everything happens by fifty
+transitions; after that the curve stops. So the subsystem is
+**language-limited, not evidence-limited**, and the practical consequence is
+unexpectedly cheerful: dynamics learning costs about fifty actions of *random*
+play, so actions are not the scarce input to model quality. That materially
+softens D-022's central worry.
+
+The clinching case is ls20, which at n=200 scores **100% changed-object
+accuracy and 0% exact match** — every object predicted correctly on held-out
+transitions, and the frame comparison failing every time on two pixels of move
+counter. With sp80 showing the same shape, two independent games now have a
+perfect object model and a zero score, which is why §7.4's third point is the
+reason the headline is 4.8% rather than an aside.
+
+*Read the saturation point, not the endpoints.* The first version of this
+script compared 7.1% to 13.5% and printed "still climbing — evidence-limited",
+the exact opposite of the truth, for a curve flat across its whole second half.
+
 **What this does not do.**
 
 - **Nothing about objects that appear.** Rules are keyed to before-frame objects,
@@ -718,7 +746,7 @@ Three things to read off, in order of how much they should change your picture:
   subsystem.
 - **It is a point hypothesis, not a population.** See §5.
 
-### 7.5 A note on positive controls
+### 7.6 A note on positive controls
 
 The first run of the experiment reported 0% on every game under every
 condition — a clean-looking refutation of D-002. Four separate bugs, all in the

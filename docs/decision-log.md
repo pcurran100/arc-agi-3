@@ -1605,4 +1605,265 @@ where the power came from.
 
 ---
 
-<!-- Next entry: D-025. Copy the template from CLAUDE.md. -->
+## D-025 — The dynamics-induction experiment: a weak pass on D-002
+
+- **Date:** 2026-09-17
+- **Status:** accepted
+- **Context:** The go/no-go deferred since D-007 and named in `state-of-play.md`
+  as "the option deliberately deferred... and the go/no-go on D-002 and
+  therefore on most of the project". Design thesis falsification condition #1:
+  *"If simple object-tracking plus rule induction cannot predict held-out
+  transitions better than chance on the public demo environments, section 4 is
+  wrong and the whole model-based plan goes with it."*
+
+  Everything it needed was in place: D-018 made the segmentation an axis, D-019
+  sized the compute and measured chance at **0%**, D-020 settled the driving
+  policy, D-024 settled the rule language.
+
+### Setup
+
+- **Corpus:** `scripts/record_corpus.py`, 25 games x 100 actions, random driver,
+  seed 0, `RESET` on terminal (recorded once, 15 s, replayed offline
+  thereafter). 2,500 actions, 7,687 frames.
+- **Sweep:** `scripts/eval_dynamics.py --out dynamics_sweep.json`. All six
+  carvings x 25 games. **7,888 s (2 h 11 m)**, against D-019's estimate of
+  2-2.5 h — the sizing held.
+- **Split:** temporal and within-game, first 70% induce, last 30% test. This
+  departs from the letter of `state-of-play.md`'s "hold out by game, not by
+  transition", and the reason is recorded in the script docstring: dynamics are
+  *per game*, so a cross-game split would measure transfer between unrelated
+  games, which nothing in the thesis claims. The protection the instruction was
+  after — no near-duplicate transitions across the split, no per-game tuning —
+  is preserved.
+- **Metric:** D-019's, unchanged. Exact resting-frame match on changed
+  transitions. Chance = 0%, re-measured on this corpus by both baselines.
+- **Starved games:** ft09 and lp85 reported separately per D-020.
+
+### Result
+
+| carving | mean exact | exact>0 | medres<=2 | mean chgobj | deformed moves |
+|---|---|---|---|---|---|
+| **colour_4** | **4.8%** | **5/23** | 10/23 | 36.3% | 52.5% |
+| colour_8 | 4.8% | 5/23 | 10/23 | 36.4% | 53.3% |
+| foreground_4 | 1.8% | 3/23 | 10/23 | 28.8% | **14.0%** |
+| foreground_8 | 1.8% | 3/23 | 10/23 | 28.7% | 18.8% |
+| colour_mass | 4.6% | 4/23 | 9/23 | 34.3% | 73.9% |
+| bbox | 4.2% | 5/23 | 9/23 | 37.2% | 55.6% |
+
+Best per game, across all six: **exact>0 on 7/23**, `medres<=2` on **13/23**,
+changed-object accuracy >=50% on **14/23**, >=90% on **6/23**.
+
+Per-game bests: dc22 44.4%, m0r0 26.1%, cn04 21.1%, tr87 20.0%, wa30 16.0%,
+ar25 7.4%, sc25 4.2%. Starved games: **0.0%** exact at 98% no-op, as expected.
+
+- **Verdict: the falsification condition is not met, but it is not comfortably
+  cleared either.** Held-out exact-frame prediction is non-zero on 7 of 23
+  games where chance is exactly zero, reaching 44% on dc22. Design thesis
+  section 4 survives. It survives weakly: 16 of 23 games score zero under every
+  carving, and 4.8% mean is nowhere near what planning needs.
+
+- **Result 1 — the best carving is game-dependent, which vindicates D-018.**
+  `colour_4` wins on dc22, m0r0, sc25, tr87 and wa30; `foreground_4` wins on
+  ar25 and cn04 and is the *only* carving that finds signal on either. The union
+  across carvings (7 games) is strictly larger than any single carving (5), so
+  maintaining several notions of object is not redundancy — it is the difference
+  between finding dynamics on 5 games and on 7. Had the experiment fixed one
+  carving, as D-018 was written to prevent, it would have under-reported by 29%
+  and attributed the loss to the method.
+
+- **Result 2 — deformation is NOT the binding constraint, refuting the
+  hypothesis this session formed before running the sweep.** Mid-experiment
+  diagnosis found that 27-48% of real moves are unrepresentable because the
+  object changed silhouette as it moved, and predicted that `foreground_*`,
+  which keeps a multi-coloured sprite whole instead of fragmenting it, would cut
+  that rate and improve prediction. **The first half was right and the second
+  was wrong.** `foreground_*` cuts the deformed-move rate by a factor of
+  three — 14.0% against 52.5% — and its exact-match score is **less than half**
+  `colour_4`'s. Lower deformation, worse prediction.
+
+  Within a single carving, deformation does track failure: the 18 zero-scoring
+  games average 58.3% deformed against 31.9% for the seven that score. Across
+  carvings it anti-correlates. So deformation is a *symptom* of a game being
+  hard, not the mechanism of failure, and reducing it by merging objects costs
+  more than it saves. The likely reason, offered as a hypothesis and not a
+  finding: `foreground_*` merges distinct objects into one component, which
+  destroys exactly the colour and size distinctions the selectors need to
+  identify which object moves. Worth testing directly before acting on.
+
+- **Result 3 — the headline metric substantially understates the mechanism, and
+  sp80 is the proof.** Under `colour_4`, sp80 scores **100% changed-object
+  accuracy** with a **median residual of 2 pixels** and **0% exact match**. A
+  model that gets every object's behaviour right scores zero.
+
+  This is the ls20 story from D-024's bug hunt, now visible as a general
+  pattern rather than one game's quirk: the 64x64 frame is a composite with a
+  bookkeeping layer drawn over it, and a move counter ticking two pixels per
+  action is enough to fail an exact comparison forever. The three aggregates
+  tell the story in order: exact>0 on 7/23, within-2-pixels on 13/23,
+  changed-object accuracy >=50% on 14/23. **The object-level mechanism works on
+  roughly 60% of games; exact frame reconstruction works on 30%.** The gap is
+  small residuals, not wrong dynamics.
+
+  D-019 chose exact-frame match because it is unambiguous and because chance is
+  cleanly zero, and both remain true. What it did not anticipate is that the
+  metric conflates *"the model of the game is wrong"* with *"there are two
+  pixels of UI I cannot predict"*. That is a real defect in the metric, and it
+  is recorded here rather than fixed by moving the goalposts after seeing the
+  answer — see the rejected options.
+
+- **Result 4 — 53 of 464 changed transitions in the zero-scoring games are
+  unpredictable in principle**, because something appeared that no rule keyed to
+  a before-frame object can produce (D-024's first stated limitation). That is
+  11%, so it is a real ceiling but not the main story.
+
+### Follow-up experiment — is the model evidence-limited or language-limited?
+
+- **Question:** the sweep says dynamics induce weakly. Two very different
+  diagnoses fit that, with opposite consequences. If accuracy climbs with
+  training transitions, the binding constraint is **evidence**, and under RHAE
+  the right response is to spend actions — D-022's exploration budget becomes
+  the priority. If it plateaus, more actions buy nothing and the constraint is
+  the **rule language**, so the response is expressiveness. Guessing wrong costs
+  a session and, at evaluation, costs score quadratically.
+- **Setup:** `scripts/eval_dynamics_curve.py --carving colour_4 --test-tail 30`,
+  300-action corpus (`record_corpus.py --actions 300 --out corpus300`), seed 0,
+  eight games chosen to span the outcome: five that score (dc22, m0r0, tr87,
+  wa30, re86) and three that do not (cd82, cn04, ls20). Training sizes 10, 25,
+  50, 100, 200 against a **fixed** test tail, so the curve is not confounded by
+  a moving target.
+- **Result**, mean over the eight games:
+
+  | training transitions | 10 | 25 | 50 | 100 | 200 |
+  |---|---|---|---|---|---|
+  | exact on changed | 7.1% | 11.7% | **13.5%** | **13.5%** | **13.5%** |
+  | changed-object accuracy | 47.7% | 55.4% | 62.3% | 63.0% | 63.4% |
+
+- **Result — it is language-limited, and the saturation is abrupt.** Exact match
+  gains **+0.0000** from n=50 to n=200 — identical to four decimal places — and
+  changed-object accuracy gains 1.05pp. Everything happens by **n=50**: from 10
+  to 50 transitions exact match rises 6.4pp and object accuracy 14.7pp, and
+  then the curve simply stops. The three zero-scoring games are still at exactly
+  zero with 200 training transitions, so their failure is not starvation either.
+
+- **Two consequences, and the first is unexpectedly good news.**
+
+  1. **Dynamics learning is cheap in actions: ~50 suffice.** This materially
+     softens the central worry of D-022. Exploration budget was expected to be a
+     hard constraint on model quality under RHAE's quadratic penalty; measured,
+     the model extracts everything this language can extract from about fifty
+     actions of *random* play. Actions are not the scarce input to dynamics.
+     (Caveat kept in view: fifty actions of random play on 25 public games. It
+     says nothing about a game needing a deep sequence before its mechanics are
+     visible at all.)
+  2. **More actions must not be the next investment.** Spending them on a model
+     that stopped learning at n=50 is, in the script's own terms, the worst
+     available trade.
+
+- **The clinching case, and it is the same case as Result 3.** ls20 at n=200
+  scores **100% changed-object accuracy and 0% exact match.** Every object's
+  behaviour is predicted correctly, on held-out transitions, with 200 training
+  examples — and the frame comparison fails, every time, on the two pixels of
+  its move counter. sp80 is the same shape under the sweep. **Two independent
+  games now show a perfect object model scoring zero**, which is what promotes
+  Result 3's diagnosis from an anecdote to the reason the headline is 4.8%.
+
+- **Did it change our mind? Yes, and it corrected the script that measured it.**
+  The first version of the verdict heuristic compared the endpoints, saw 7.1% ->
+  13.5%, and printed "still climbing — evidence-limited, more actions would
+  help" — the exact opposite of the truth, for a curve that is flat across its
+  entire second half. Endpoint comparison cannot distinguish a rising curve from
+  one that rose early and stopped, which is the whole question. It now reports a
+  saturation point and the second-half gain. Worth recording because the wrong
+  verdict was the more comfortable one: it would have justified more data
+  collection instead of harder representational work.
+
+- **Did it change our mind? Yes, four times.** D-002 is not refuted, which was
+  genuinely uncertain going in. D-018's multi-carving requirement turned out to
+  be load-bearing rather than cautious. Our own mid-experiment hypothesis about
+  deformation was wrong in a way that would have sent the next session down a
+  blind alley had it not been measured. And the action budget turns out not to
+  be the constraint on dynamics at all, which is the most useful single thing
+  learned here.
+
+- **A note on how this result was nearly the opposite.** The first run of this
+  experiment reported **0% on every game under every condition** — a clean,
+  publishable-looking refutation of D-002. All of it was wrong, and the four
+  causes were in the scoring and the search rather than in the hypothesis:
+  erase-to-background rendering, an unmodelled move counter, an MDL cost that
+  priced partitions instead of descriptions, and an object-accuracy figure that
+  was really measuring how often objects sit still. Each is now a named
+  regression test in `tests/test_dynamics.py` recording the false conclusion it
+  would otherwise cause. **The lesson is specific and worth carrying: a
+  go/no-go experiment needs a positive control.** The one that broke this open
+  was supplying ground-truth effects and asking whether the renderer could
+  reproduce the frame at all; it could not, on 0 of 100, which localised the
+  fault immediately. No amount of staring at the induction would have found it.
+
+- **Decision:**
+  1. **D-002 stands. Continue with the model-based plan**, on the strength of
+     7/23 games with non-zero exact prediction against a zero baseline and
+     14/23 with a working object-level model.
+  2. **Keep all six carvings in the pipeline** and select per game. D-018 is
+     upgraded from a methodological precaution to a load-bearing design
+     decision.
+  3. **The next subsystem is the bookkeeping layer, not a richer rule
+     language and not more actions.** It is the cheapest large win available: it
+     is spatially separable, learnable from change frequency alone, and it is
+     what stands between a perfect object model and a zero score on **both**
+     sp80 and ls20 — the latter demonstrated at 100% object accuracy with 200
+     training transitions. Predicting a counter is a far smaller problem than
+     object interaction.
+  4. **Do not spend the next session buying more actions.** The curve saturates
+     at n=50. Fifty actions of random play extract everything this language can
+     extract, which is good news for the RHAE budget and a firm instruction
+     about where not to invest.
+  4. **Do not act on the deformation hypothesis.** It is refuted as a cause.
+- **Options rejected:**
+  - *Declare the bet vindicated* — 4.8% mean and 16 of 23 games at zero does not
+    support it, and the project's value depends on not overclaiming here.
+  - *Declare the bet refuted and stop* — the falsification condition as written
+     is "better than chance", chance is measured at exactly 0%, and seven games
+     are above it with one at 44%. Writing this off would be the mirror of the
+     first run's error: accepting a headline number without checking what
+     produced it.
+  - *Retroactively promote `medres<=2` or changed-object accuracy to the
+    headline* — the tempting move, since both look much better (13/23 and 14/23
+    against 7/23), and it is exactly what D-019's "options rejected" forbade in
+    advance. Changing the primary metric after seeing which one flatters the
+    result would make every future comparison uninterpretable. The headline
+    stays exact-frame; the others are reported beside it as the diagnostics
+    D-019 designated them.
+  - *Fix the metric by excluding UI regions from the comparison* — this is the
+    `exact_ex_bookkeeping` figure, and it is kept strictly as a diagnostic
+    because it can be vacuous: vc33 changes **nothing** outside the induced mask
+    and scored 100% on it with 0% object accuracy. It now carries a denominator
+    and a `vacuous` flag for that reason.
+  - *Extend the rule language now* (interaction, appearance, track identity) —
+    the obvious response to 16 zeros, and premature. Result 3 says a large part
+    of the gap is residual bookkeeping rather than missing expressiveness, and
+    the learning curve says which of the two binds. Spending a session on
+    expressiveness before reading that would be guessing.
+  - *Re-run the whole sweep on the bigger corpus to firm up the numbers* — 30
+    test transitions per game is coarse (3.3% resolution per transition), and a
+    300-action corpus is recorded. Rejected outright once the curve landed:
+    accuracy is identical at n=50 and n=200, so a larger corpus would change no
+    conclusion and cost another two hours.
+- **Consequences:** the project continues on its stated thesis, with the first
+  quantitative evidence for it rather than an argument. Commits us to per-game
+  carving selection, which multiplies pipeline cost by six unless something
+  later selects among them cheaply — and nothing does yet (`architecture.md`
+  section 3.4). Names the bookkeeping layer as the next subsystem, ahead of the
+  richer rule language that the zero-scoring games superficially argue for.
+- **Revisit if:** the bookkeeping layer lands and exact-frame match does *not*
+  rise substantially on the games with high changed-object accuracy — sp80,
+  re86, g50t and ar25 are the specific tests, and if predicting the counter does
+  not convert them, then Result 3's diagnosis is wrong and the gap is really
+  missing expressiveness; or the learning curve shows the model is
+  evidence-limited, in which case actions rather than expressiveness are the
+  thing to spend on and D-022's exploration budget becomes the priority; or a
+  cheap selector among the six carvings cannot be found, in which case the
+  six-fold cost has to be paid at runtime and that changes the compute picture.
+
+---
+
+<!-- Next entry: D-026. Copy the template from CLAUDE.md. -->
