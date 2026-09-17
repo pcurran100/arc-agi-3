@@ -29,3 +29,9 @@ venv/
 
 # Recorded runs from the arc-agi engine (its own format, not ours)
 recordings/
+
+# Dynamics induction corpus — 816 KB of recorded rollouts, regenerable in ~15 s
+# by `python scripts/record_corpus.py` (deterministic, seed 0). The committed
+# fixtures/ cover offline testing; this is bulk evidence, not a fixture.
+corpus/
+corpus300/

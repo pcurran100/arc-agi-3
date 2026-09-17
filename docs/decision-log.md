@@ -1493,4 +1493,116 @@ The ordering, cheapest first:
 
 ---
 
-<!-- Next entry: D-024. Copy the template from CLAUDE.md. -->
+## D-024 — The rule language for dynamics induction
+
+- **Date:** 2026-09-17
+- **Status:** accepted
+- **Context:** D-019 closed with "what remains undecided is the **driving
+  policy** and the **rule language**. Neither is settled by this entry and both
+  block the experiment proper." D-020 settled the driving policy. This settles
+  the rule language, which was the last thing standing between the project and
+  its go/no-go experiment.
+
+  The difficulty is Guardrail 2. A rule language *is* a hypothesis space, so
+  writing one down is the very act the guardrail warns against on the evidence
+  that Tufa Labs found hand-crafted tools actively *hurt*. There is no way to
+  run the experiment without one, so the question is not whether to hand-craft
+  but how to hand-craft as little as possible and make the remainder visible.
+
+### The language
+
+A rule is `(action, selector) -> effect`, with a per-action default beneath.
+
+- **Effects** are `static`, `translate(dx,dy)`, `recolour(c)`, `vanish`. Four,
+  closed.
+- **Selectors** are conjunctions of attribute *equalities*, arity 0 to 2, over
+  five attributes: `colour`, `size`, `shape`, `rect`, `clicked`.
+- **Selection** between candidate rule sets is by minimum description length,
+  exhaustively over all 16 partitions of arity <= 2 per action.
+
+### The three constraints that keep it honest
+
+1. **Nothing may be conditioned on that perception does not already emit.**
+   `colour`, `size`, `shape` and `rect` are pre-existing fields of
+   `perception.segment.Component`. Not one feature was invented for dynamics.
+   The single addition is `clicked` — whether the action's click landed inside
+   this object — which is *relational* rather than descriptive, applies to every
+   game with a pointer, and encodes no game-specific content. D-021 is the
+   argument for it: a click's effect is about *what* you clicked, not where the
+   pixel was.
+
+2. **The effect vocabulary is the tracker's report, not a taxonomy of games.**
+   Those four effects are exactly what `match_frames` can distinguish. The
+   language is therefore precisely as expressive as the perception beneath it and
+   no more, which means it cannot smuggle in game knowledge through the back
+   door — if we want a richer effect we have to make perception see it first.
+
+3. **MDL, not accuracy, and no regularisation constant.** Accuracy alone always
+   prefers the finest partition: splitting on `size` gives nearly every object
+   its own rule and scores perfectly in training. The bit costs come from the
+   sizes of the spaces actually being encoded, so nothing is tuned.
+
+### What the language deliberately cannot say
+
+Recorded here because a negative result will turn on exactly these, and because
+the experiment's job is to find out whether the *simplest* object-level language
+beats chance. Starting richer would mean a positive result told us nothing about
+where the power came from.
+
+- **Nothing about objects that appear.** Every rule is keyed to an object present
+  in the before-frame.
+- **No object-to-object interaction.** "The block stops at the wall" is
+  unsayable; there is no collision, containment or support.
+- **No state beyond the current frame.** No velocity, no counters, no memory.
+- **No numeric relations.** Equality only, so "bigger than 4 pixels" cannot be
+  said and MDL will refuse to fake it by enumeration.
+- **No simultaneous move-and-recolour**, and **no move-with-deformation.** The
+  second turned out to matter enormously and is the subject of D-025.
+
+- **Options rejected:**
+  - *A program-synthesis DSL over grid transformations* (the ARC-AGI-1 house
+    style) — far more expressive and the obvious thing to reach for. Rejected
+    for this experiment because its search cost is large enough to become the
+    thing being measured: a negative result would not distinguish "dynamics do
+    not induce" from "the search did not find it in the budget". The point of
+    starting at the floor is that failure is attributable.
+  - *A learned transition model (small CNN or transformer over frame pairs)* —
+    would sidestep the whole hand-crafting problem and is what the field would
+    default to. Rejected on three counts: it needs orders of magnitude more data
+    than 100 actions per game, it cannot be inspected when it fails, and a
+    learned model is not *queryable* in the way planning needs (D-002's whole
+    argument is that we want a model we can plan against, not one we can only
+    sample). Parked, not dead — it is the natural fallback if symbolic induction
+    fails for reasons of expressiveness rather than principle.
+  - *Rules keyed on track identity rather than attributes* — i.e. "object #7
+    moves", using the tracker's persistent ids. Strictly more powerful, and it
+    would solve the case where the mover is identifiable only by its history
+    rather than by any attribute. Rejected *for now* because a track id does not
+    generalise across levels or episodes, so a model written in track ids cannot
+    persist the way design thesis section 9 requires. This is the most likely
+    first extension and D-025 records the evidence for it.
+  - *Letting an LLM propose the rules* — deferred by scope, not rejected on
+    merit. The architecture reserves the LLM for goal proposal (D-004), and
+    introducing it here would make the experiment untestable offline and
+    unreproducible from a log.
+  - *A weighted population of rule sets rather than the MDL-best one* — this is
+    what Guardrail 1 and D-003 actually require, and the experiment violates it
+    knowingly. A population cannot rescue a language that cannot express the
+    dynamics, so the single best hypothesis is the right instrument for a
+    go/no-go. If the experiment succeeds, the population is the first thing to
+    add, and the MDL scores already computed are the natural weights.
+- **Consequences:** the experiment can run, and its failures are attributable to
+  a named, small set of expressive limits rather than to a search budget. Commits
+  us to a language that will need at least one extension before it can model
+  most games — which is a finding, not a defect, and is what D-025 reports.
+  Because the language is small, every one of its limits is now a measurable
+  quantity rather than a worry.
+- **Revisit if:** the deformed-move rate stays high under every segmentation,
+  which would mean the effect vocabulary rather than the carving is the binding
+  constraint; or exact-frame match is non-zero but low everywhere, which would
+  point at the absent interaction rules; or a population of hypotheses is needed
+  to get off zero at all, which would reverse the narrowing above.
+
+---
+
+<!-- Next entry: D-025. Copy the template from CLAUDE.md. -->
