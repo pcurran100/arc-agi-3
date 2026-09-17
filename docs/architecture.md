@@ -1,8 +1,9 @@
 # Architecture: what is built, how it works, and what it does not do
 
-- **Last updated:** 2026-09-08, session 2
-- **Scope:** the perception layer, which as of this writing is the only
-  subsystem that exists.
+- **Last updated:** 2026-09-17, session 3
+- **Scope:** the perception layer (§1-§6) and dynamics induction (§7). Goal
+  proposal and the planner still do not exist, and neither does a loop that
+  plays a game.
 - **Companion documents:** `design-thesis.md` argues *why* we are building this
   kind of agent. `benchmark.md` records what the environment actually does.
   `state-of-play.md` is the short status snapshot. `decision-log.md` is the
@@ -540,11 +541,24 @@ have declined, with the condition that would reopen it.
 - **No scipy, no heavyweight dependencies.** Everything must vendor into an
   offline Kaggle notebook. This is why the assignment algorithm and the
   connected-component labeller are written out rather than imported.
-- **No agent, no dynamics, no goal, no planner.** Three of the four subsystems in
-  the intended architecture do not exist, and neither does a loop that plays a
+- **No agent, no goal, no planner.** Dynamics landed in session 3 (§7). Two of
+  the four subsystems still do not exist, and neither does a loop that plays a
   game. Session 1's scope was perception only (D-007), deliberately, so that the
   expensive machinery is not built on a perception layer that turns out not to
   work.
+- **No population of dynamics hypotheses**, only the single MDL-best rule set.
+  This knowingly violates Guardrail 1 and D-003, which require weighted
+  hypotheses with soft down-weighting. It is a narrowing for the go/no-go
+  experiment: a population cannot rescue a language that cannot express the
+  dynamics, so the point hypothesis is the right instrument for asking whether
+  the language works at all. *Reopen* — and it is first in the queue — now that
+  D-025 has shown the language does work on some games. The MDL scores already
+  computed are the natural weights.
+- **No use of the intermediate animation frames in dynamics.** Up to 42
+  sub-transitions per action are recorded and dynamics reads only the resting
+  endpoints. A rule that predicts a whole trajectory is far more constrained
+  than one that predicts an endpoint, so this is a large unexploited source of
+  evidence. *Reopen* when endpoint prediction stops being the bottleneck.
 
 ---
 
@@ -573,3 +587,150 @@ natural repair is for dynamics to push back on segmentation. **The current code
 has no channel to receive that push.** Whether it needs one urgently, or whether
 the redundancy is tolerable, is an empirical question the dynamics experiment
 will answer — and it is a question worth holding explicitly while running it.
+
+
+---
+
+## 7. Dynamics induction
+
+Landed in session 3. This is the subsystem D-002 stakes the project on, and §7.4
+reports the experiment that was its go/no-go.
+
+### 7.1 What a hypothesis is allowed to say
+
+A rule is `(action, selector) → effect`, with a per-action default beneath
+(D-024, `src/arc3/dynamics/rules.py`):
+
+- **effects**: `static`, `translate(dx,dy)`, `recolour(c)`, `vanish` — four,
+  closed, and chosen to be exactly what `match_frames` can distinguish, so the
+  language is as expressive as the perception beneath it and no more;
+- **selectors**: conjunctions of attribute *equalities*, arity 0-2, over
+  `colour`, `size`, `shape`, `rect`, `clicked`. Every one but the last is a
+  pre-existing field of `Component`; `clicked` — did this action's click land
+  inside this object — is relational rather than descriptive and general to any
+  game with a pointer (D-021).
+
+Guardrail 2 says do not hand-craft the hypothesis space, and a rule language is
+one, so the constraint adopted is that **nothing may be conditioned on that
+perception does not already emit.** No feature was invented for dynamics.
+
+### 7.2 How a rule set is chosen
+
+By minimum description length, exhaustively over all 16 partitions of arity ≤ 2
+per action (`induce.py`). No search heuristic, no local optimum, no tuned
+regularisation constant — the bit costs come from the sizes of the spaces being
+encoded.
+
+MDL rather than accuracy because accuracy always prefers the finest partition:
+splitting on `size` gives nearly every object its own rule and scores perfectly
+in training.
+
+**One subtlety that is easy to get wrong and expensive when you do.** Only
+groups that *disagree with the default* are charged for. The first version
+charged bits per group in the partition, which prices the partition rather than
+the description. On ls20 that made it prefer a selector with **16 errors** over
+one with **1 error in 316**, because the better selector induced 37 groups of
+which 35 said "static" and needed no rule written down at all.
+
+Here is what it induces on ls20 under `colour_8`, seed 0:
+
+```
+6 rules, 4 defaults
+  action4 & shape=shape#f972 -> translate(+5,+0)
+  action4 & shape=shape#5539 -> translate(+5,+0)
+  action3 & shape=shape#f972 -> translate(-5,+0)
+  action3 & shape=shape#5539 -> translate(-5,+0)
+  action2 & shape=shape#3556 -> vanish
+  action2 & shape=shape#9776 -> recolour(->11)
+  action1 & any -> static   [default]
+```
+
+Read it: two shapes — a 2-part sprite — move one 5-pixel cell left on ACTION3
+and right on ACTION4. That is the player and its controls, induced from 70
+transitions of random play with no game knowledge.
+
+### 7.3 Rendering a prediction
+
+The metric demands a full 64×64 frame, so predicted object states are rendered
+back to a grid (`predict.py`): erase the footprint of everything that is not
+staying put, then paint, in two passes over all objects rather than one pass per
+object.
+
+**What is revealed behind a departing object has to be guessed**, and this is
+the single largest correctness trap in the subsystem. The obvious answer — the
+frame's background colour — is wrong whenever objects rest on a surface rather
+than on the void, which is most games. On ls20 the sprite crosses floor colour 3
+while the frame's background is 4. Measured with ground-truth effects supplied,
+erase-to-background reproduced **0 of 100** frames with a median of 27 pixels
+wrong. Erasing instead to the modal colour of the one-pixel ring around the
+footprint took the median residual to **2**.
+
+### 7.4 What it measurably does, and does not
+
+`scripts/eval_dynamics.py`, six carvings × 25 games, seed 0, 7,888 s. Full
+result and interpretation in D-025.
+
+| carving | mean exact | exact>0 | medres≤2 | mean chgobj | deformed moves |
+|---|---|---|---|---|---|
+| **colour_4** | **4.8%** | **5/23** | 10/23 | 36.3% | 52.5% |
+| colour_8 | 4.8% | 5/23 | 10/23 | 36.4% | 53.3% |
+| foreground_4 | 1.8% | 3/23 | 10/23 | 28.8% | **14.0%** |
+| foreground_8 | 1.8% | 3/23 | 10/23 | 28.7% | 18.8% |
+| colour_mass | 4.6% | 4/23 | 9/23 | 34.3% | 73.9% |
+| bbox | 4.2% | 5/23 | 9/23 | 37.2% | 55.6% |
+
+Against a chance baseline measured at **0%**. Best per game across all six:
+exact>0 on **7/23**, within 2 pixels on **13/23**, changed-object accuracy ≥50%
+on **14/23**.
+
+Three things to read off, in order of how much they should change your picture:
+
+1. **The best carving is game-dependent.** `colour_4` wins on five games,
+   `foreground_4` on two — and is the only carving that finds anything at all on
+   ar25 and cn04. The union (7) beats any single carving (5). Keeping six
+   notions of object is load-bearing, not redundancy (D-018).
+2. **Lower deformation does not mean better prediction.** `foreground_*` cuts
+   the deformed-move rate by three times and scores less than half. Deformation
+   is a symptom of a hard game, not the mechanism of failure — an important
+   negative result, because the opposite was this session's working hypothesis.
+3. **The metric understates the mechanism.** sp80 scores **100%
+   changed-object accuracy, 2 pixels median residual, and 0% exact match.** The
+   object model is perfect and the frame comparison fails, because a move
+   counter in the UI ticks two pixels every action. Object-level dynamics work
+   on ~60% of games; exact frame reconstruction works on 30%.
+
+**What this does not do.**
+
+- **Nothing about objects that appear.** Rules are keyed to before-frame objects,
+  so a frame containing something new is unpredictable in principle. 53 of 464
+  changed transitions in the zero-scoring games are blocked this way (11%).
+- **No object-to-object interaction.** "The block stops at the wall" is
+  unsayable. No collision, containment or support.
+- **No state beyond the current frame.** No velocity, no counters, no memory.
+- **No numeric relations.** Equality only; "bigger than 4 pixels" cannot be said.
+- **No move-with-deformation and no simultaneous move-and-recolour.** Both are
+  silently recorded as `static`. The first accounts for 14-74% of observed moves
+  depending on carving.
+- **No bookkeeping layer.** The induced mask (`bookkeeping_mask`) is a scoring
+  *diagnostic*, deliberately conservative — horizontal bands only, at most 4
+  rows — so that it under-reports UI rather than excusing the model. It is not a
+  model of the counter and nothing predicts one. D-025 names this as the next
+  subsystem.
+- **It is a point hypothesis, not a population.** See §5.
+
+### 7.5 A note on positive controls
+
+The first run of the experiment reported 0% on every game under every
+condition — a clean-looking refutation of D-002. Four separate bugs, all in the
+scoring and search rather than the hypothesis, each sufficient on its own:
+erase-to-background rendering; an unmodelled move counter; an MDL cost that
+priced partitions instead of descriptions; and an "object accuracy" of 91.6%
+that was really measuring how often objects sit still (16.4% on objects that
+actually changed).
+
+What broke it open was a **positive control**: supply ground-truth effects and
+ask whether the renderer can reproduce the frame at all. It could not, on 0 of
+100, which localised the fault immediately. No amount of inspecting the
+induction would have found it. Every one of the four is now a named regression
+test in `tests/test_dynamics.py` recording the false conclusion it would
+otherwise produce.

@@ -5,9 +5,12 @@ currently doing.** Read this first every session. Update it before the session
 ends if anything below is stale.
 
 - **Last updated:** 2026-09-17, session 3
-- **Status:** perception layer built, measured and audited. The click action
-  space is now mapped against ground truth, and design thesis §8 has finally
-  been re-derived. Still no agent, no dynamics, no score.
+- **Status:** **the go/no-go on D-002 has been run. It is a weak pass.**
+  Held-out exact-frame prediction is non-zero on 7 of 23 games where chance is
+  exactly 0%, reaching 44% on dc22, and the object-level model works on 14 of
+  23. Perception layer built, measured and audited; click space mapped against
+  ground truth; design thesis §8 re-derived. Still no goal, no planner, no
+  agent loop, no score.
 - **Days to Milestone #2 (30 Sep):** **13** — out of reach
 - **Days to final submission (2 Nov):** **46** — the real target
 
@@ -138,6 +141,8 @@ alternatives in `decision-log.md`.
 | D-021 | Ground-truth click map: keep object targets, on **class coverage** not precision; merge outcome classes online | high — measured on 19 games |
 | D-022 | Exploration re-derived without Undo: revert costs *k*+1, so front-load at the root | medium — a derivation, not yet a measurement |
 | D-023 | Static-to-interactive transfer **dropped**, not parked | high |
+| D-024 | The rule language: `(action, selector) → effect`, MDL-selected | medium — deliberately at the floor of expressiveness |
+| D-025 | **Dynamics experiment: weak pass. D-002 stands.** Keep all six carvings; bookkeeping layer is next | high — measured, 6 carvings × 25 games |
 
 ---
 
@@ -157,12 +162,18 @@ src/arc3/
     segment.py      six candidate segmentations per frame
     track.py        object identity by global assignment              (D-014)
   drive.py          corpus-generation policies: random, round_robin  (D-020)
+  dynamics/
+    rules.py        the rule language and what it cannot say           (D-024)
+    induce.py       observation extraction, and MDL rule selection
+    predict.py      rendering a prediction, scoring, baselines
   oracle/           TEST-ONLY ground truth from engine sprites        (D-010)
 scripts/            fetch_environments, record_fixtures, eval_geometry, eval_tracking,
                     size_pipeline, eval_baseline, eval_drivers,
                     eval_clickmap, eval_click_liveness                (D-021)
+                    record_corpus, eval_dynamics, eval_dynamics_curve (D-025)
 fixtures/           5 recorded episodes, 68 KB gzipped
-tests/              139 tests, ~35 s
+corpus/             25 games x 100 actions, gitignored, 15 s to rebuild
+tests/              170 tests, ~40 s
 docs/architecture.md  how it all actually works, and what it does not do (D-017)
 ```
 
@@ -203,6 +214,11 @@ given alongside, because the drift is itself the useful record.
 | Click legal but inert at level-1 start | **4 of 19 games** (ar25, m0r0, sc25, sk48) — the published mask is an upper bound |
 | **Click liveness is state-gated** | **8 of 19 games.** m0r0 0%→100% by 5 actions; cd82/ka59 100%→~6% by 20 |
 | `RESET` exactness | byte-identical restore, 19 games × 4,096 trials — the fact D-022 rests on |
+| **Dynamics: exact held-out frame** (D-025) | **best-per-game non-zero on 7/23 games, max 44.4% (dc22), against chance 0%.** Mean 4.8% under `colour_4` |
+| Dynamics: object-level | changed-object accuracy ≥50% on **14/23**, ≥90% on 6/23; within 2 pixels on **13/23** |
+| **Best carving is game-dependent** | `colour_4` wins 5 games, `foreground_4` wins 2 and is the only carving finding signal on ar25/cn04. Union 7 > any single 5 — D-018 is load-bearing |
+| **Deformed moves: not the constraint** | `foreground_*` cuts deformation 3× (14% vs 53%) and scores **half** as well. Hypothesis refuted |
+| Sweep cost | 7,888 s for 6 carvings × 25 games, against D-019's 2–2.5 h estimate |
 
 **D-007's tarpit condition was not triggered.** Cross-frame identity works, and
 it works well inside the two-week reassessment window.
@@ -226,7 +242,15 @@ it works well inside the two-week reassessment window.
 
 ---
 
-## Immediate next step
+## Immediate next step — superseded, see below
+
+*The dynamics experiment described in this section has been run. Its result is
+D-025 and the summary is in **Measured results** above. The section is kept
+because its five design constraints all held up, and because the record of what
+we expected is worth more than a tidy page. What is now next is at the end of the
+document, under **What is next (session 4)**.*
+
+### Original framing (sessions 1-2)
 
 Run the **dynamics-induction validation experiment** — the option deliberately
 deferred in D-007, and the go/no-go on D-002 and therefore on most of the
@@ -298,7 +322,11 @@ argument was meant to prevent, live in the suite since session 1.
 
 | Risk | Why it matters | Status |
 |---|---|---|
-| **Dynamics may not induce** from observed transitions | kills D-002 and most of the thesis | **untested — this is the next job** |
+| ~~**Dynamics may not induce**~~ | kills D-002 and most of the thesis | **answered by D-025: it induces, weakly.** 7/23 games above a 0% chance baseline. Not refuted, not comfortably cleared |
+| **16 of 23 games score exactly zero** | the mechanism works on a minority | open. D-025 argues a large part is residual bookkeeping rather than missing expressiveness, and names the test that would prove it wrong |
+| **The metric conflates two failures** | sp80 has a *perfect* object model and scores 0% because a 2-pixel UI counter ticks every action | open, and deliberately not fixed by moving the goalposts. Headline stays exact-frame (D-019) |
+| **No population of hypotheses** | Guardrail 1 and D-003 require one; dynamics uses the single MDL-best rule set | **open by choice**, a narrowing for the go/no-go only. First in the queue now the language is shown to work |
+| **Animation frames unused by dynamics** | up to 42 sub-transitions per action recorded, only endpoints read | open. Large unexploited evidence source |
 | Object identity may not track | kills D-005's pruning | **retired.** 0.8% switch rate (D-014) |
 | **Fragmentation at 2.55** | one object read as several means several rules where one would do | live; watch it during dynamics induction |
 | **Objecthood is not revisable** | segmentation is recomputed blind every frame; no evidence can ever change how a frame is carved, so fragmentation cannot self-correct | **open by choice** (D-016). The repair is a dynamics→segmentation feedback channel the code cannot currently receive |
@@ -343,3 +371,32 @@ The real deadline is **2 November**, **46 days** away. Between those sits the st
 term, so assume available time drops sharply from early October — front-load
 anything needing sustained attention. The dynamics-induction experiment is that
 thing, and it should happen next.
+
+---
+
+## What is next (session 4)
+
+D-025 names the order, and it is deliberately not "make the rule language
+richer", which is what 16 zero-scoring games superficially argue for.
+
+1. **The bookkeeping layer.** The cheapest large win available. sp80 has a
+   perfect object model and scores 0% exact because a two-pixel counter ticks
+   every action; ls20 is the same story. The layer is spatially separable and
+   learnable from change frequency alone, and predicting a counter is a far
+   smaller problem than object interaction. The concrete test of whether this
+   diagnosis is right: sp80, re86, g50t and ar25 all have high changed-object
+   accuracy and near-zero exact match. If predicting the counter does not
+   convert them, D-025's Result 3 is wrong and the gap is really expressiveness.
+2. **A population of rule sets, not the MDL-best one.** Restores Guardrail 1 and
+   D-003, knowingly suspended for the go/no-go. The MDL scores already computed
+   are the natural weights, so this is cheap.
+3. **A cheap selector among the six carvings.** Per-game carving selection is
+   now a design commitment (D-025), and nothing selects among them
+   (`architecture.md` §3.4), so the pipeline pays 6× until something does.
+4. **Use the animation frames.** Up to 42 sub-transitions per action are
+   recorded and unread. A rule that predicts a trajectory is much more
+   constrained than one that predicts an endpoint.
+
+Still owed from earlier sessions, unchanged: whether click *outcome classes*
+drift with depth (D-021/D-022's shared revisit condition, the highest-value
+cheap experiment outstanding), and the value function (design thesis §7).
