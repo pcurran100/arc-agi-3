@@ -1,9 +1,9 @@
 # Architecture: what is built, how it works, and what it does not do
 
-- **Last updated:** 2026-09-17, session 3
-- **Scope:** the perception layer (§1-§6) and dynamics induction (§7). Goal
-  proposal and the planner still do not exist, and neither does a loop that
-  plays a game.
+- **Last updated:** 2026-09-24, session 4
+- **Scope:** the perception layer (§1-§6), dynamics induction (§7) and
+  exploration (§8). Goal proposal and the planner still do not exist, and
+  nothing yet plays *to win* — §8 plays to make things happen.
 - **Companion documents:** `design-thesis.md` argues *why* we are building this
   kind of agent. `benchmark.md` records what the environment actually does.
   `state-of-play.md` is the short status snapshot. `decision-log.md` is the
@@ -762,3 +762,96 @@ ask whether the renderer can reproduce the frame at all. It could not, on 0 of
 induction would have found it. Every one of the four is now a named regression
 test in `tests/test_dynamics.py` recording the false conclusion it would
 otherwise produce.
+
+
+---
+
+## 8. Exploration
+
+The first component here that acts rather than measures. It exists because of a
+decomposition, not a hunch: D-028 split the sixteen zero-scoring games and found
+that **half of them are not a modelling failure at all** — the agent never makes
+the game do anything, so there is nothing in the corpus to learn from. D-030 then
+established the moves are there to be found, with vc33 responding to 2 of 256
+probes at the level start and **254 of 256** five actions later.
+
+### 8.1 What it optimises
+
+`ExploringDriver` (`src/arc3/explore.py`) does Thompson sampling over a Beta
+posterior on one question: *does this choice move the playfield?*
+
+Three properties, each forced by a measurement rather than chosen:
+
+**It counts playfield changes, not frame changes.** vc33 changed its frame on 99
+of 99 actions and its playfield on **zero** — every change was a move counter
+ticking. A policy rewarded for frame change would have been perfectly satisfied
+by a game that never responds. `OnlineBand` estimates the bookkeeping band
+incrementally, the runtime counterpart of §7's `bookkeeping_mask`, and stays
+empty until warmup so it is under-confident early rather than wrong early.
+
+**Arms are object signatures, not pixels.** Objects move, so a pixel that paid
+off last turn means nothing this turn. An arm is the attribute vector §7.1's
+rule language already selects on, so exploration experience transfers as objects
+move and the explorer and the learner look at the same features.
+
+**Evidence decays.** Responsiveness is state-dependent. A stationary estimate
+would learn "clicking does nothing" at the level start and never revise it.
+`_Arm.decay` pulls towards the prior rather than past it, so Guardrail 1's "never
+hard reject" survives arbitrarily long runs of failure — an arm that has failed
+twenty times is heavily down-weighted and still occasionally retried, which is
+exactly what a state-gated game needs.
+
+### 8.2 What it measurably does
+
+`scripts/eval_exploration.py`, 25 games, 100 actions, seed 0:
+
+| | `random` | `random_objects` | **`explore`** |
+|---|---|---|---|
+| playfield activity, all games | 49% | 55% | **63%** |
+| playfield activity, the starved eight | **3%** | 14% | **47%** |
+| **games the agent cannot move (<15%)** | **8** | 6 | **1** |
+| levels cleared | 1 | 1 | **4** |
+
+The corpus it leaves behind is correspondingly richer — on the starved games,
+3% activity and 2.5 distinct playfield events per game become **46% and 30.9**.
+lp85 goes from 1 distinct event to 76; vc33 from 0 to 88.
+
+Of the four levels, **r11l is cleared by all three drivers** and is not the
+explorer's doing; ft09, lp85 and tn36 are cleared only by `explore`.
+
+### 8.3 The arm-space constraint
+
+The single most important tuning fact, and both first guesses were wrong. The
+symptom was that the explorer was *less active than uniform sampling* on
+object-rich games — cd82 at 20% against `random_objects`' 79%.
+
+| | activity | distinct events |
+|---|---|---|
+| `random_objects` | 38% | 27.4 |
+| union of all six carvings as targets | 45% | 25.2 |
+| `(colour, size)` arms | 58% | 35.8 |
+| **`colour` arms** | **58%** | **44.9** |
+
+Drawing targets from all six carvings — the obvious fix, since D-021 showed the
+union is what reaches every distinct click outcome — made it **worse**, because
+it doubled the arm count and Thompson sampling then spends its whole budget
+establishing posteriors it never exploits. The binding constraint is **arms
+against action budget**: 83-136 arms against 100 actions. Pooling to colour
+gives 6-14.
+
+**What this does not do.**
+
+- **No goal.** It maximises "something happened in the playfield", which is a
+  proxy for interestingness and explicitly not a proxy for winning. The four
+  cleared levels are a side effect of poking a responsive game.
+- **No model.** It knows whether an action tends to do something, never what.
+- **It is worse than random where random already works** — cd82 39%→28%, dc22
+  59%→34%, sk48 69%→52%. A policy spending budget on posterior estimation loses
+  to uniform sampling where uniform sampling suffices.
+- **No RESET policy**, though some games become *less* responsive with depth.
+- **No credit assignment across steps**, which is precisely what vc33 rewards:
+  the action that unlocks responsiveness gets none of the credit.
+- **Three unfitted constants** (decay, warmup, band threshold). They are set to
+  the values `bookkeeping_mask` already used, which makes them consistent rather
+  than tuned — deliberately, after D-029 caught itself selecting a rule on test
+  data.
