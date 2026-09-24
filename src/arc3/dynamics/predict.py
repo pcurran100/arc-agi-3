@@ -156,6 +156,7 @@ class Score:
     n_changed_outside: int = 0
     n_moves: int = 0
     n_moves_deformed: int = 0
+    n_blind: int = 0
     n_changed_objects: int = 0
     n_changed_objects_correct: int = 0
     residuals: list = None  # type: ignore[assignment]
@@ -194,6 +195,16 @@ class Score:
     def vacuous(self) -> bool:
         """True when almost nothing changes outside the bookkeeping mask."""
         return self.n_changed > 0 and self.n_changed_outside < 0.1 * self.n_changed
+
+    @property
+    def blind_rate(self) -> float:
+        """Objects whose pixels changed while the vocabulary saw nothing.
+
+        The correction factor on :attr:`changed_object_accuracy`. A carving that
+        cannot see a change cannot be scored wrong for it, so a coarse carving
+        buys object accuracy by being blind. Read the two together or neither.
+        """
+        return self.n_blind / self.n_objects if self.n_objects else 0.0
 
     @property
     def deformed_move_rate(self) -> float:
@@ -293,6 +304,7 @@ def score_transitions(
                     s.n_changed_objects_correct += 1
         s.n_moves += obs.n_moves
         s.n_moves_deformed += obs.n_moves_deformed
+        s.n_blind += obs.n_blind
     return s
 
 

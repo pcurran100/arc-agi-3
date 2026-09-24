@@ -91,6 +91,7 @@ class TransitionObservation:
     changed: bool
     n_moves: int = 0
     n_moves_deformed: int = 0
+    n_blind: int = 0
 
     @property
     def is_predictable_in_principle(self) -> bool:
@@ -98,8 +99,12 @@ class TransitionObservation:
         return self.n_appeared == 0
 
 
-def _effect_from_match(prev, nxt, same_colour: bool) -> Effect:
+def _effect_from_match(prev, nxt, same_colour: bool, before=None, after=None) -> tuple:
     """Classify one matched pair into the closed effect vocabulary.
+
+    Returns ``(effect, blind)``, where ``blind`` marks a pair whose pixels
+    demonstrably changed while every property the vocabulary can see stayed the
+    same. See below.
 
     Displacement is taken from the **bounding-box corner**, not the centroid.
     `match_frames` rounds a centroid difference, which is correct for scoring a
@@ -107,6 +112,26 @@ def _effect_from_match(prev, nxt, same_colour: bool) -> Effect:
     makes an exact-frame prediction fail. The corner delta is exact whenever the
     silhouette is preserved, which is the only case a translate should be
     claimed for.
+
+    **Partial recolouring is invisible to this vocabulary, and pretending
+    otherwise corrupted a headline metric.** A component can keep its mask, its
+    size, its bounding box and its *dominant* colour while some of its pixels
+    change colour. `foreground_*` carvings make this common, because a component
+    there is "anything that is not background" and its internal colouring is not
+    part of its identity. The observation then reports ``static``, the model
+    predicts ``static``, the two agree, and `changed_obj_acc` scores the pair as
+    correct while the rendered frame is wrong.
+
+    Measured on s5i5 under `foreground_4`: **100% changed-object accuracy, zero
+    deformed moves, zero appearances, and a 2-pixel median residual outside the
+    bookkeeping band** — residuals which turned out to be pixels going 11->5 and
+    13->11 inside a component whose mask never moved. The model was not perfect;
+    the *observation* could not see what was wrong.
+
+    So when the frames are supplied, the pixel content is compared directly and
+    the mismatch is counted. The effect returned is still ``static``, because
+    the language genuinely cannot express a partial recolour — but the blindness
+    is now reported rather than scored as success.
     """
     dx = nxt.bbox.x0 - prev.bbox.x0
     dy = nxt.bbox.y0 - prev.bbox.y0
@@ -116,14 +141,19 @@ def _effect_from_match(prev, nxt, same_colour: bool) -> Effect:
         and prev.size == nxt.size
     )
     if (dx or dy) and same_silhouette:
-        return Effect(TRANSLATE, dx=int(dx), dy=int(dy))
+        return Effect(TRANSLATE, dx=int(dx), dy=int(dy)), False
     if not (dx or dy) and not same_colour:
-        return Effect(RECOLOUR, colour=int(nxt.dominant_colour))
+        return Effect(RECOLOUR, colour=int(nxt.dominant_colour)), False
     if not (dx or dy) and same_silhouette:
-        return STATIC_EFFECT
+        blind = False
+        if before is not None and after is not None:
+            m = prev.mask
+            if not np.array_equal(before[m], after[m]):
+                blind = True
+        return STATIC_EFFECT, blind
     # Deformed: the language cannot say this. Treated as static, which will
     # simply fail the exact-frame check and be counted as a miss.
-    return STATIC_EFFECT
+    return STATIC_EFFECT, False
 
 
 def observe_transition(
@@ -138,7 +168,7 @@ def observe_transition(
     matching = match_frames(seg_b, seg_a)
 
     events: list[ObjectEvent] = []
-    n_moves = n_deformed = 0
+    n_moves = n_deformed = n_blind = 0
     by_prev = matching.by_prev()
     for i, comp in enumerate(seg_b.components):
         m = by_prev.get(i)
@@ -146,7 +176,9 @@ def observe_transition(
             effect = Effect(VANISH)
         else:
             nxt = seg_a.components[m.next_index]
-            effect = _effect_from_match(comp, nxt, m.same_colour)
+            effect, blind = _effect_from_match(comp, nxt, m.same_colour, before, after)
+            if blind:
+                n_blind += 1
             if (nxt.bbox.x0 - comp.bbox.x0) or (nxt.bbox.y0 - comp.bbox.y0):
                 n_moves += 1
                 if effect.kind != TRANSLATE:
@@ -161,6 +193,7 @@ def observe_transition(
         changed=not transition.is_noop,
         n_moves=n_moves,
         n_moves_deformed=n_deformed,
+        n_blind=n_blind,
     )
 
 
