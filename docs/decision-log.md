@@ -2350,4 +2350,115 @@ bounded: it rescues **two** games, not the eight the zeros might have suggested.
 
 ---
 
-<!-- Next entry: D-029. Copy the template from CLAUDE.md. -->
+## D-029 — Carving selection does not work at this corpus size
+
+- **Date:** 2026-09-24
+- **Status:** accepted
+- **Context:** D-025 found the best carving is game-dependent — any single
+  carving scores on 5 of 23 games, best-per-game on 7 — and `architecture.md`
+  section 3.4 has recorded "nothing selects among the six" since session 2 as
+  though it were an open research problem. It is not. **Held-out validation is
+  the standard answer and had simply never been applied.** D-027 made it
+  objective 1 on the grounds that it was the cheapest item with measured
+  headroom.
+
+  `scripts/eval_carving_selection.py`: split the training transitions again,
+  induce under all six carvings on the inner split, keep whichever wins on the
+  held-out validation split, then induce that carving on the full training set
+  and score on the untouched test set. Reported against two reference points —
+  the best fixed carving (what no selection gets) and an oracle that picks per
+  game by looking at the test score (the ceiling).
+
+  **The headroom is small to begin with:** 4.8% fixed against 6.1% oracle, a gap
+  of 1.2 percentage points and two games.
+
+### Experiment — four selection keys, then a check on the check
+
+- **Setup:** 25 games, 100-action random corpus, seed 0, 70/30 train/test with a
+  further 75/25 inner split. ~52 min per run. The script records every candidate
+  key on the validation split so rules can be compared offline without re-running.
+- **First attempt, selecting on validation exact match:** recovered **8%** of the
+  headroom. Diagnosis was immediate and is the useful part: **exact match is zero
+  under every carving on most games** at ~20 validation transitions, so there is
+  nothing to rank and the tie-break does the work.
+- **What a selection key has to be**, written down before re-running: *dense*,
+  so ~20 transitions carry signal; and *carving-independent*, or the comparison
+  is rigged. The second rules out changed-object accuracy, which is measured in
+  terms of the carving being judged — a carving producing two big objects scores
+  easily where one producing fifty cannot. That is exactly D-019's objection to
+  object-level scoring as a headline and it applies with full force to using it
+  as a selector.
+- **Result, all four keys:**
+
+  | selection key | mean exact | games >0 | headroom recovered |
+  |---|---|---|---|
+  | fixed `colour_4`, no selection | 4.8% | 5/23 | — |
+  | validation exact match | 4.6% | 5/23 | **−18%** |
+  | validation median residual | 4.7% | 6/23 | **−6%** |
+  | validation changed-object accuracy | 4.9% | 6/23 | +8% |
+  | **validation mean residual** | **5.9%** | **7/23** | **+86%** |
+  | oracle (cheating) | 6.1% | 7/23 | 100% |
+
+  Mean residual matching the oracle's game count looked like a clean win, and
+  there was an a-priori story for it: median residual saturates at small
+  integers and ties constantly, while the mean is continuous and sensitive to
+  the catastrophic misses that actually distinguish a bad carving.
+
+- **Then the check that mattered.** That comparison chose among four rules *by
+  looking at the test set*, which is meta-level overfitting with 23 games and
+  four candidates. Re-run honestly — choose the rule on a random half of the
+  games, evaluate it on the other half, 200 splits:
+
+  | | |
+  |---|---|
+  | rule chosen on the unseen half | `meanres` 103/200, `chgobj` 51, `exact` 46 |
+  | mean headroom recovered on unseen games | **−42%** (median +46%) |
+  | splits where selection beat fixed `colour_4` | **51%** |
+
+- **Result: a coin flip.** Selection beats doing nothing on 51% of splits, the
+  mean headroom is negative because the misses are catastrophic when they
+  happen, and the winning *rule* is not even stable across splits. The +86% was
+  an artefact of choosing the rule on the test set.
+
+- **Did it change our mind? Yes, twice, and the second time reversed the first.**
+  The initial 8% looked like "weak signal, try a better key". The better key
+  looked like a decisive fix. Cross-validation showed the fix was an illusion.
+  Without the game-holdout check this entry would have recorded an 86% success
+  and the pipeline would have adopted a selector that is a coin flip.
+
+- **Decision:** **Do not select carvings. Use fixed `colour_4`.** D-027's
+  objective 1 is closed as a negative result, and D-028 had already demoted it
+  on separate grounds — it was worth about one game where exploration is worth
+  eight.
+- **Options rejected:**
+  - *Adopt mean-residual selection on the 86% figure* — it does not survive a
+    holdout over games, and adopting it would have been exactly the error D-019
+    guarded against when it refused to pick a metric after seeing which one
+    flattered the result.
+  - *Ensemble the six carvings instead of selecting one* — plausible, and not
+    tried. It multiplies inference cost sixfold for a ceiling of 1.2pp, which is
+    a bad trade at this stage. Worth revisiting only if the ceiling rises.
+  - *Conclude that per-game carving choice is worthless* — too strong, and the
+    oracle contradicts it: 7 games against 5 is real, and s5i5 and tn36 swing
+    from 0% to 100% object accuracy on carving alone. The choice matters; we
+    cannot currently *make* it from 20 validation transitions.
+  - *Fix it by growing the corpus* — the learning curve saturates at n=50
+    (D-025), so a bigger corpus improves the model not at all; it would only
+    improve the validation signal. That is a real option and a narrow one, and
+    it costs a 300-action recording plus another hour of sweep for at most
+    1.2pp.
+- **Consequences:** the pipeline stays on one fixed carving, so the six-fold
+  sweep cost is a research expense rather than a runtime one. `architecture.md`
+  section 3.4's "nothing selects among the six" is now answered: something
+  could, but not reliably at this data scale.
+- **Revisit if:** layer separation lands (D-028 objective 2) and residuals can
+  be measured on the **playfield alone** — the current residual signal is
+  contaminated by the bookkeeping band, which is a large and carving-independent
+  chunk of every measurement, and cleaning it is the single most likely way to
+  make this signal work; or the corpus grows enough that validation carries
+  signal; or the exact-match ceiling rises far enough that 1.2pp of headroom
+  becomes worth the sixfold cost.
+
+---
+
+<!-- Next entry: D-030. Copy the template from CLAUDE.md. -->

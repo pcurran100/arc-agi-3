@@ -400,7 +400,7 @@ selection is worth about one and layer separation about two.
 | 2 | **Layer separation: model UI and playfield apart** | **2 games** (sp80 0%→100%, dc22 44%→100%), and it is a *prerequisite* for 1 — the activity rate is what exploration optimises | with 1 |
 | 3 | **Weighted hypothesis population with priors** | enables a hypothesis from a *single* observation, which the MDL point learner structurally cannot | after 2 |
 | 4 | **Online loop: act on hypotheses, update from outcomes** | the actual agent | after 3 |
-| 5 | **Carving selection** | ~1 game; demoted by D-028 | measured, see D-029 |
+| ~~5~~ | ~~Carving selection~~ | ~1 game | **closed, negative (D-029).** Beats doing nothing on 51% of game-splits — a coin flip. Revisit after layer separation, when residuals can be measured on the playfield alone |
 | 6 | **Multi-step rollout accuracy** | unmeasured, and planning depends on it entirely | any time |
 | 7 | **End-to-end agent producing a real RHAE score** | every number here is an offline proxy | before 2 Nov |
 
@@ -420,6 +420,7 @@ which is about the thesis; this is about the machine.
 | **42-frame animations unread** | Up to 42 sub-transitions recorded per action; dynamics reads only resting endpoints | D-024 |
 | **Driver comparisons differ in train *and* test data** | D-026's two sweeps are different recordings, so per-game deltas mix better evidence with a harder test set. A clean rerun would hold the test set fixed | D-026 |
 | **Object-model quality does not convert to score** | The central puzzle. Click-game object accuracy rose +6.8pp in D-026 with no headline movement | objective 2 |
+| **Cannot choose a carving from 20 validation transitions** | The choice matters (oracle 7/23 vs fixed 5/23; s5i5 and tn36 swing 0%→100% object accuracy on carving alone) but no selection key is reliable. Mean residual looked like an 86% fix until a game-holdout showed 51%, i.e. chance | D-029 |
 
 ## Standing risks to the thesis
 

@@ -1,0 +1,40 @@
+corpus=corpus  selection on a held-out inner split
+
+game           chosen     sel  oracle  oracle carving
+-----------------------------------------------------
+ar25     foreground_4    7.4%    7.4%    foreground_4
+bp35             bbox    0.0%    0.0%        colour_4  <-- missed
+cd82             bbox    0.0%    0.0%        colour_4  <-- missed
+cn04     foreground_4   21.1%   21.1%    foreground_4
+dc22         colour_4   44.4%   44.4%        colour_4
+g50t         colour_4    0.0%    0.0%        colour_4
+ka59         colour_8    0.0%    0.0%        colour_4  <-- missed
+lf52         colour_4    0.0%    0.0%        colour_4
+ls20         colour_4    0.0%    0.0%        colour_4
+m0r0     foreground_4    0.0%   26.1%        colour_4  <-- missed
+r11l      colour_mass    0.0%    0.0%        colour_4  <-- missed
+re86         colour_4    0.0%    0.0%        colour_4
+s5i5         colour_4    0.0%    0.0%        colour_4
+sb26         colour_4    0.0%    0.0%        colour_4
+sc25         colour_4    4.2%    4.2%        colour_4
+sk48     foreground_4    0.0%    0.0%        colour_4  <-- missed
+sp80         colour_4    0.0%    0.0%        colour_4
+su15         colour_4    0.0%    0.0%        colour_4
+tn36         colour_4    0.0%    0.0%        colour_4
+tr87         colour_4   20.0%   20.0%        colour_4
+tu93     foreground_4    0.0%    0.0%        colour_4  <-- missed
+vc33         colour_4    0.0%    0.0%        colour_4
+wa30     foreground_4   12.0%   16.0%        colour_4  <-- missed
+-----------------------------------------------------
+
+23 games, 3124s
+
+strategy                      mean exact  games >0
+best single (colour_4)              4.8%     5/23 
+validation-selected                 4.7%     6/23 
+oracle (cheating)                   6.1%     7/23 
+
+validation picked the oracle carving on 15/23 games
+fraction of the available headroom recovered: -6%
+
+wrote docs/experiments/carving_selection.json

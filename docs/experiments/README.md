@@ -12,6 +12,8 @@ Every file here is regenerable. None of it is an input to anything.
 | `dynamics_sweep.txt` / `.json` | `scripts/eval_dynamics.py --out dynamics_sweep.json` | D-025, 2026-09-17 |
 | `dynamics_curve.txt` / `.json` | `scripts/eval_dynamics_curve.py --carving colour_4 --test-tail 30 --games dc22,m0r0,cn04,tr87,wa30,ls20,cd82,re86` | D-025 follow-up, 2026-09-17 |
 | `dynamics_sweep_objdriver.txt` / `.json` | `scripts/eval_dynamics.py --corpus corpus_obj --carvings colour_4,foreground_4` | D-026, 2026-09-24 |
+| `carving_selection_exactkey.*` | first attempt, selecting on validation exact match | D-029, 2026-09-24 |
+| `carving_selection.*` | `scripts/eval_carving_selection.py`; records every candidate key so rules compare offline | D-029, 2026-09-24 |
 
 Both need the corpus, which is gitignored and rebuilt deterministically:
 
