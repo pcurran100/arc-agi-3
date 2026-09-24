@@ -1,0 +1,38 @@
+playfield activity rate, 100 actions, seed 0
+(* = playfield-starved under random play, D-028/D-030)
+
+game           random  random_object        explore
+---------------------------------------------------
+ar25              91%            90%            85%
+bp35              55%           100%            62%
+cd82              39%            79%            28%
+cn04              85%            95%            96%
+dc22              59%            33%            34%
+ft09 *             7%            14%            52%
+g50t              81%            81%            75%
+ka59              65%            62%            61%
+lf52 *             2%             5%            19%
+lp85 *             1%             3%            77%
+ls20              75%            75%            75%
+m0r0              58%            56%            52%
+r11l             100%            98%           100%
+re86             100%           100%            98%
+s5i5 *             2%            41%            46%
+sb26 *             3%             7%            37%
+sc25              45%            54%            69%
+sk48              69%            58%            52%
+sp80              58%            60%            59%
+su15 *             3%            13%            12%
+tn36 *             4%            11%            36%
+tr87             100%           100%           100%
+tu93              34%            34%            56%
+vc33 *             0%            16%           100%
+wa30              84%            84%            92%
+---------------------------------------------------
+ALL               49%            55%            63%
+STARVED             3%            14%            47%
+
+402s
+best on the starved games: explore at 47% (random: 3%)
+levels cleared: {'random': 1, 'random_objects': 1, 'explore': 4}
+wrote docs/experiments/exploration.json

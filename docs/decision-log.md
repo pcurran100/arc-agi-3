@@ -2643,4 +2643,154 @@ comparison.
 
 ---
 
-<!-- Next entry: D-031. Copy the template from CLAUDE.md. -->
+## D-031 — An exploration policy, and the first capability this project has gained
+
+- **Date:** 2026-09-24
+- **Status:** accepted
+- **Context:** D-028 decomposed the sixteen zero-scoring games and found that
+  half are not a modelling failure — the agent never makes the game do anything
+  — making exploration objective 1, worth up to eight games where carving
+  selection was worth about one (and turned out to be worth none, D-029). D-030
+  then showed the moves are there to be found: vc33 responds to 2 of 256 probes
+  at the level start and **254 of 256** five actions later.
+
+  `src/arc3/explore.py`: Thompson sampling over a Beta posterior on *"does this
+  choice move the playfield"*. The first component in the repository that learns
+  from what comes back and changes what it does next.
+
+### The three design points, each forced by a measurement
+
+1. **Count playfield changes, not frame changes.** vc33 changed its frame on 99
+   of 99 actions and its playfield on **zero** (D-028); a policy rewarded for
+   frame change would have been perfectly satisfied by a game that never
+   responds. `OnlineBand` estimates the bookkeeping band incrementally — the
+   online counterpart of `bookkeeping_mask`, same rule and thresholds — and is
+   deliberately empty until warmup, so it is under-confident early rather than
+   wrong early. **This is D-028's objective 2, layer separation, arriving as a
+   component rather than a scoring trick.**
+2. **Arms are object signatures, not pixels.** Objects move, so a pixel that
+   paid off last turn means nothing this turn. An arm is the attribute vector
+   the rule language already selects on, so experience transfers as objects move
+   and explorer and learner look at the same features.
+3. **Evidence decays.** Responsiveness is state-dependent (D-021 on eight of
+   nineteen games, D-030 for vc33). A stationary estimate would learn "clicking
+   does nothing" at the level start and never revise it.
+
+Guardrail 1 holds by construction: Thompson sampling never gives an arm zero
+probability, and `_Arm.decay` pulls towards the prior rather than past it, so an
+arm that has failed twenty times is heavily down-weighted and still occasionally
+retried — exactly what a state-gated game requires.
+
+### Experiment — playfield activity, 25 games, 100 actions, seed 0
+
+`scripts/eval_exploration.py`. The band is computed **per driver from its own
+episode**, since an agent has no access to anyone else's recording.
+
+| | `random` | `random_objects` | **`explore`** |
+|---|---|---|---|
+| all 25 games | 49% | 55% | **63%** |
+| the starved eight | **3%** | 14% | **47%** |
+| **games still under 15% activity** | **8** | 6 | **1** |
+| levels cleared | 1 | 1 | **4** |
+
+Per game, the gains are where D-028 said the headroom was: vc33 0%→**100%**,
+lp85 1%→**77%**, ft09 7%→**52%**, s5i5 2%→46%, sb26 3%→37%, tn36 4%→36%, lf52
+2%→19%. **lp85 was described two sessions ago as "starved past rescue" and
+needing its own investigation.** It needed a policy that notices what works.
+
+**Levels cleared, checked rather than quoted.** r11l is cleared by all three
+drivers and is not the explorer's doing. ft09, lp85 and tn36 are cleared **only**
+by `explore`. So three levels are genuinely attributable — the first time
+anything in this project has cleared a level another policy could not. They are
+still *incidental*: the policy optimises "something happened", not winning, and
+cleared them while poking a game that had become responsive.
+
+**The honest cost.** `explore` is worse than `random` on several already-active
+games: cd82 39%→28%, dc22 59%→34%, sk48 69%→52%, g50t 81%→75%, ar25 91%→85%.
+A policy spending budget on posterior estimation loses to uniform sampling where
+uniform sampling already works.
+
+### Two rejected variants, both measured at equal budget
+
+The failure being chased was that the explorer was *less active than uniform* on
+object-rich games — cd82 at 20% against `random_objects`' 79%, which a policy
+maximising activity should not manage.
+
+| | activity | distinct events |
+|---|---|---|
+| `random_objects` | 38% | 27.4 |
+| `explore`, union of all six carvings | 45% | 25.2 |
+| `explore`, `(colour, size)` arms | 58% | 35.8 |
+| **`explore`, `colour` arms** | **58%** | **44.9** |
+
+- **The union of carvings made it worse**, against the expectation from D-021
+  that the union is what reaches every distinct click outcome. It roughly
+  doubled the arm count (tn36 136 arms to 288) and Thompson sampling then spends
+  its entire budget establishing posteriors it never exploits. Kept as
+  `union_targets`.
+- **The binding constraint is arms against action budget.** `(colour, size)`
+  gives 83–136 arms on object-rich games against 100 actions. Pooling to
+  `colour` gives 6–14, is equal on activity, far better on the diversity a
+  learning corpus needs, and repairs the regression (sk48 31%→52%, ar25
+  72%→85%, lp85 54%→77%).
+
+  A genuine trade, not a free win: sb26 falls 73%→37% and tn36 53%→36% under
+  pooling, games where *size* distinguishes the productive object.
+
+- **Did it change our mind? Yes.** D-028 estimated exploration was worth up to
+  eight games. On its own metric it is: the count of games the agent cannot move
+  falls from eight to one. Whether that converts into *score* is a separate
+  question this entry does not answer.
+
+- **Decision:**
+  1. **`explore` becomes the default driver** for any new corpus. `random` and
+     `random_objects` are retained as named baselines.
+  2. **Both rejected variants stay in the code** (`union_targets`, `key_mode`),
+     because each cost an hour to measure and deleting them invites the next
+     session to re-run the same experiment.
+  3. **The next refinement is a hierarchical prior**, pooling a new
+     `(colour, size)` arm towards its colour's aggregate rather than starting it
+     at Beta(1,1). It is the principled resolution of the pooling trade and is
+     not built.
+  4. **Re-record the corpus with `explore` and re-run the dynamics sweep.** The
+     learner has never seen a corpus in which the starved games do anything.
+- **Options rejected:**
+  - *Use activity as the agent's objective* — it is a proxy for
+    interestingness and explicitly **not** a proxy for winning. It earns its
+    place because D-028 measured that the agent's problem is inactivity, and it
+    should be replaced the moment a goal hypothesis exists.
+  - *Tune the decay, warmup and band thresholds* — three constants, and tuning
+    them on 25 public games is exactly the overfitting D-029 caught itself doing
+    with the selection key. They are set to the same values `bookkeeping_mask`
+    already used, which at least makes them consistent rather than fitted.
+  - *Add a RESET policy now* — some games become *less* responsive with depth
+    (cd82 and ka59 fall to ~6% by twenty actions, D-021), so noticing a dry
+    spell and restarting would sometimes be right. `RESET` costs an action and
+    does not rewind the count, so it needs D-022's cost model, and it is a
+    second change on top of this one.
+- **Consequences:** the repository now contains something that plays rather than
+  only measures. Commits us to activity as the exploration objective, which is a
+  placeholder. The band estimator becomes a runtime component, so its failure
+  modes are now the agent's failure modes rather than a diagnostic's.
+- **Revisit if:** a re-recorded corpus does not improve the dynamics results,
+  which would mean activity and learnability are less related than assumed and
+  the objective is wrong; or the regression on already-active games costs more
+  than the starved games gain once results are scored rather than counted; or
+  su15 — the one game still under 15% — turns out to need something structurally
+  different, since it is now the only member of its category.
+
+### Footnote: a bug worth recording
+
+The first full run died with `MemoryError` inside the connected-component
+labeller, which had nothing to do with it: a 64x64 grid yields at most ~16k
+edges. `EnvClient` constructs its own `Arcade` whenever it is not handed one,
+and each loads and caches the environment files; the harness builds one client
+per game per driver, so **75 engine instances**. The traceback landed wherever
+the next allocation happened to fall. Fixed with `client.env.make_arcade()` for
+scripts that loop over games. Relevant beyond the harness: Kaggle caps memory,
+and a misattributed resource failure in an unrelated component is exactly the
+kind of thing that costs a day at the wrong moment.
+
+---
+
+<!-- Next entry: D-032. Copy the template from CLAUDE.md. -->

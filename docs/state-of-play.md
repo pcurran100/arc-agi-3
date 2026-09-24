@@ -145,6 +145,10 @@ alternatives in `decision-log.md`.
 | D-025 | **Dynamics experiment: weak pass. D-002 stands.** Keep all six carvings; language-limited not evidence-limited; bookkeeping layer is next | high — measured, 6 carvings × 25 games |
 | D-026 | Corpus clicked random pixels and could not teach a click rule. `random_objects` is the new default | high — measured both ways |
 | D-027 | **Target architecture: online, hypothesis-driven, discovery-minimising.** Single-observation hypotheses; acting and learning interleaved; frame modelled as a composite | high — sets the direction for the remaining time |
+| D-028 | Half the zeros are an **exploration** failure, not a learning one | high — measured, corrected by D-030 |
+| D-029 | Carving selection is a coin flip; **closed, negative** | high |
+| D-030 | `foreground_*`'s low deformed-move rate is **blindness**; object accuracy needs `blind_rate` beside it | high |
+| D-031 | **Exploration policy works.** Games the agent cannot move: 8 → 1. `explore` is the default driver | high — measured, 25 games |
 
 ---
 
@@ -396,8 +400,9 @@ selection is worth about one and layer separation about two.
 
 | # | Objective | Worth | Status |
 |---|---|---|---|
-| 1 | **Exploration: make the game move on purpose** | up to **8 games**. vc33 changes the playfield on **0 of 99** actions under random play | **next** |
-| 2 | **Layer separation: model UI and playfield apart** | **2 games** (sp80 0%→100%, dc22 44%→100%), and it is a *prerequisite* for 1 — the activity rate is what exploration optimises | with 1 |
+| 1 | ~~**Exploration: make the game move on purpose**~~ | **done (D-031).** Games the agent cannot move: **8 → 1**. Starved-game activity 3% → 47%. vc33 0% → 100%, lp85 1% → 77%. Three levels cleared that no other driver clears | **done** |
+| 2 | **Layer separation: model UI and playfield apart** | **2 games** (sp80 0%→100%, dc22 44%→100%). Half done: `OnlineBand` (D-031) separates the layers *for the explorer*; the **learner** still does not model the UI | partly done |
+| 2b | **Re-record the corpus with `explore`, re-run the dynamics sweep** | the learner has never seen a corpus in which the starved games do anything | **next** |
 | 3 | **Weighted hypothesis population with priors** | enables a hypothesis from a *single* observation, which the MDL point learner structurally cannot | after 2 |
 | 4 | **Online loop: act on hypotheses, update from outcomes** | the actual agent | after 3 |
 | ~~5~~ | ~~Carving selection~~ | ~1 game | **closed, negative (D-029).** Beats doing nothing on 51% of game-splits — a coin flip. Revisit after layer separation, when residuals can be measured on the playfield alone |
