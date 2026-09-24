@@ -2090,4 +2090,129 @@ to the full set rather than hard-excluding anything (Guardrail 1).
 
 ---
 
-<!-- Next entry: D-027. Copy the template from CLAUDE.md. -->
+## D-027 — The target architecture: online, hypothesis-driven, discovery-minimising
+
+- **Date:** 2026-09-24
+- **Status:** accepted
+- **Context:** Everything built so far collects a corpus by random play, induces
+  a model in one batch afterwards, and never acts on what it learned. That was
+  right for a go/no-go — it isolates the question "can dynamics be induced at
+  all" from "can an agent use them" — and D-025 answered it. It is **not** the
+  agent, and continuing to optimise it would be optimising the instrument.
+
+  The direction was set by the project owner, and it is a sharper statement than
+  design thesis §8 or D-022 had reached:
+
+  > Form hypotheses from single actions. Subsequent actions are taken based on
+  > hypotheses — whatever will advance towards the goal given current beliefs.
+  > Hypotheses are updated from the observation that comes back. Minimise the
+  > amount of pure discovery actions.
+
+  Three commitments follow, and each contradicts something currently in the code.
+
+### 1. A single observation must be able to create a hypothesis
+
+The present learner cannot do this, and the reason is structural rather than
+accidental. MDL charges roughly the same bits to state a rule as to record one
+exception, so **one** observation of "clicking this made it vanish" is never
+worth a rule and is always cheaper to store as an exception. `LEARNABLE_HITS` in
+`scripts/eval_click_evidence.py` is set to 3 for exactly this reason, and D-026
+measured the corpus against that bar.
+
+A human clicking something once and watching it disappear does not withhold
+judgement pending a second trial. They form *"clicking things like this makes
+them vanish"* — a hypothesis carrying a prior, not a certainty, immediately
+actionable and immediately falsifiable.
+
+That is the weighted hypothesis population Guardrail 1 and D-003 have required
+since before any code existed, and which D-024 knowingly suspended for the
+go/no-go. The suspension is now lifted: **single-observation generalisation is a
+requirement, not a nice-to-have**, and MDL over a point hypothesis is the wrong
+machinery for it.
+
+**This inverts a conclusion from D-026.** That entry found the corpus needs to
+hit the same object repeatedly for a click rule to be learnable, and named an
+object-targeted driver *with deliberate repetition* as the missing piece. If the
+learner generalises from one observation, repetition is waste and the right
+driver is the one that touches the **most distinct objects** — which is what
+`random_objects` already does. The repetition driver is therefore **not built**,
+and D-026's "known gap" is withdrawn: it was a workaround for a limitation we
+are removing instead.
+
+### 2. Acting and learning interleave; discovery is a cost to minimise
+
+Currently: collect 100 random actions, then learn. Target: every action is
+chosen for what it is expected to achieve *and* what it is expected to reveal,
+and an action taken purely to find something out is a cost to be minimised
+rather than a phase to be completed.
+
+D-022 derived a two-phase value function — information gain while the model is
+uncertain, goal-directed once a goal hypothesis has support — with an
+RHAE-derived budget deciding the switch. **That framing is superseded here.**
+The phases are not sequential. A good action advances the goal *and* discriminates
+between live hypotheses, and pure discovery is what you do only when nothing
+else does both. D-022's cost model (revert costs *k*+1, information is *k* times
+dearer at depth) survives intact and is what prices the trade.
+
+The measured fact that makes this affordable: dynamics learning **saturates at
+about 50 actions** of random play (D-025). The model does not need a long
+discovery phase; it needs the right fifty observations, and a hypothesis-driven
+policy should need fewer.
+
+### 3. The frame is a composite and must be modelled as one
+
+`benchmark.md` correction #2 established that a 64x64 frame is a camera view,
+integer-upscaled and letterboxed, with a UI layer drawn last at full resolution.
+Every model built so far treats it as a single homogeneous surface, and is then
+scored against both layers at once.
+
+The cost of that conflation is now measured rather than suspected. **Six of 23
+games reach >=90% changed-object accuracy under some carving; three of them
+score exactly 0%** — s5i5, sp80 and tn36 — with median residuals of 1, 2 and 1
+pixels. sp80 was traced precisely: **row 0 of the frame** changes from colour 14
+to colour 0 on nearly every action and the model predicts no change, which fails
+the whole-frame comparison every single time. Row 0 is a status strip. It is not
+the game.
+
+- **Decision:** adopt the three commitments above as the architecture to build
+  towards. Concretely, and in the order the evidence supports:
+  1. **Carving selection by held-out validation** (D-028) — cheapest, and it
+     recovers a gap that is already measured.
+  2. **Layer separation**, modelling UI and playfield separately.
+  3. **A weighted hypothesis population with priors**, replacing MDL-over-a-point-
+     hypothesis, enabling single-observation generalisation.
+  4. **An online loop** that selects actions by expected goal progress plus
+     expected discrimination between live hypotheses.
+- **Options rejected:**
+  - *Keep improving the batch pipeline* — it is a research instrument and it has
+    now answered the question it was built for. D-026 spent a session making the
+    corpus better and moved the headline not at all, which is the clearest
+    possible signal that the corpus is no longer the constraint.
+  - *Build the repetition driver as planned* — see above; it optimises for a
+    learner limitation we are removing, and would make the corpus worse for the
+    learner we want.
+  - *Go straight to the online loop and skip 1-3* — tempting with 39 days left,
+    and wrong. An online agent acting on a model that cannot predict UI pixels,
+    cannot choose its own representation, and cannot learn from one observation
+    would fail for reasons we could not separate. Each of 1-3 removes a named,
+    measured blocker.
+  - *Abandon symbolic induction for a learned transition model* — still the
+    fallback if expressiveness rather than machinery turns out to be the wall
+    (D-024 records the reasoning). Nothing since has made it more attractive: the
+    data budget is ~50 actions per game.
+- **Consequences:** the corpus/batch pipeline becomes a measurement harness
+  rather than the thing being built, and its numbers stay comparable only as
+  long as it is not changed underneath them. Commits us to replacing the MDL
+  point-hypothesis learner, which is most of `dynamics/induce.py`. Supersedes
+  D-022's sequential two-phase value function and withdraws D-026's repetition
+  driver.
+- **Revisit if:** single-observation hypotheses turn out to produce so many
+  candidates that the population cannot be maintained or searched, in which case
+  some evidence threshold has to come back and the repetition driver returns
+  with it; or the online loop cannot be made to work at all inside the remaining
+  time, in which case the batch pipeline plus a greedy policy is the fallback
+  submission.
+
+---
+
+<!-- Next entry: D-028. Copy the template from CLAUDE.md. -->

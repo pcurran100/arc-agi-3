@@ -144,6 +144,7 @@ alternatives in `decision-log.md`.
 | D-024 | The rule language: `(action, selector) → effect`, MDL-selected | medium — deliberately at the floor of expressiveness |
 | D-025 | **Dynamics experiment: weak pass. D-002 stands.** Keep all six carvings; language-limited not evidence-limited; bookkeeping layer is next | high — measured, 6 carvings × 25 games |
 | D-026 | Corpus clicked random pixels and could not teach a click rule. `random_objects` is the new default | high — measured both ways |
+| D-027 | **Target architecture: online, hypothesis-driven, discovery-minimising.** Single-observation hypotheses; acting and learning interleaved; frame modelled as a composite | high — sets the direction for the remaining time |
 
 ---
 
@@ -382,51 +383,43 @@ thing, and it should happen next.
 
 ---
 
-## What is next (session 4)
+## Objectives, in order (set by D-027)
 
-D-025 names the order, and it is deliberately not "make the rule language
-richer", which is what 16 zero-scoring games superficially argue for.
+The batch corpus pipeline has answered the question it was built for and is now
+a **measurement harness, not the agent**. D-026 spent a session making the corpus
+better and moved the headline not at all, which is the clearest signal available
+that the corpus is no longer the constraint. What follows is ordered by evidence,
+cheapest first.
 
-0. **Do not buy more actions, and the corpus is no longer the excuse.** The
-   click corpus was genuinely broken and is now genuinely fixed (D-026), and the
-   click games' zeros largely survived it. The learning curve saturates at
-   **n=50**:
-   exact match gains +0.0000 from 50 to 200 training transitions. Fifty actions
-   of random play extract everything this rule language can extract. This is
-   good news for the RHAE budget and a firm instruction about where *not* to
-   invest.
-1. **The bookkeeping layer.** The cheapest large win available, and now
-   reinforced rather than merely confirmed. **Four** games have an object model
-   that is right or nearly right and a score at or near zero: ls20 (100% object
-   accuracy at n=200, 0% exact), sp80, **tn36 (0%→100% object accuracy under the
-   D-026 corpus, still 0% exact)** and dc22 (100% object accuracy, 34.8% exact). The layer is
-   spatially separable and learnable from change frequency alone, and predicting
-   a counter is a far smaller problem than object interaction. The concrete test
-   of whether this diagnosis is right: sp80, re86, g50t and ar25 all have high
-   changed-object accuracy and near-zero exact match. If predicting the counter
-   does not convert them, D-025's Result 3 is wrong and the gap is really
-   expressiveness after all.
-2. **A population of rule sets, not the MDL-best one.** Restores Guardrail 1 and
-   D-003, knowingly suspended for the go/no-go. The MDL scores already computed
-   are the natural weights, so this is cheap.
-3. **A cheap selector among the six carvings.** Per-game carving selection is
-   now a design commitment (D-025), and nothing selects among them
-   (`architecture.md` §3.4), so the pipeline pays 6× until something does.
-4. **Use the animation frames.** Up to 42 sub-transitions per action are
-   recorded and unread. A rule that predicts a trajectory is much more
-   constrained than one that predicts an endpoint.
+| # | Objective | Why now | Status |
+|---|---|---|---|
+| 1 | **Carving selection by held-out validation** | Best carving is game-dependent; any single carving scores on 5/23 games, best-per-game on 7/23. The selection criterion already exists and was never applied | **in progress** |
+| 2 | **Layer separation: model UI and playfield apart** | 6/23 games reach ≥90% object accuracy; **3 score exactly 0%** blocked by 1–2 pixels of UI. sp80 traced to row 0 alone | next |
+| 3 | **Weighted hypothesis population with priors** | Enables forming a hypothesis from a *single* observation, which the MDL point-hypothesis learner structurally cannot. Restores Guardrail 1 / D-003 | after 2 |
+| 4 | **Online loop: act on hypotheses, update from outcomes** | The actual agent. Actions chosen for goal progress *and* discrimination between live hypotheses; pure discovery minimised | after 3 |
+| 5 | **Multi-step rollout accuracy** | Never measured, and planning depends on it entirely. Cheap — the machinery exists | can run any time |
+| 6 | **End-to-end agent producing a real RHAE score** | Every number in this repo is an offline proxy. Nothing has ever played a game with intent | before 2 Nov |
 
-Still owed from earlier sessions, unchanged: whether click *outcome classes*
-drift with depth (D-021/D-022's shared revisit condition, the highest-value
-cheap experiment outstanding), and the value function (design thesis §7).
+## Current issues, named
 
-### Known gap, not yet built
+Live problems with what is known about each. Distinct from the risk table above,
+which is about the thesis; this is about the machine.
 
-**An object-targeted driver with deliberate repetition.** D-026 found that
-aiming clicks at objects *spreads* them, which is the opposite of what the
-`clicked` feature needs — it needs the same object hit several times before MDL
-will write a rule. bp35, with 196 object targets, regressed from 4 learnable
-signatures to 1 for exactly this reason. The right driver hits each candidate
-two or three times before moving on, and neither existing driver does. Roughly
-an hour, and it is the difference between "the confound is removed" and "the
-corpus is good".
+| Issue | What is known | Where |
+|---|---|---|
+| **UI layer defeats the headline metric** | 4+ games have a right-or-nearly-right object model and score ~0. sp80 = row 0 only, 14→0 every action. ls20 = rows 61–62, a move counter | D-025, D-026, objective 2 |
+| **Learner cannot generalise from one observation** | MDL charges as much to state a rule as to log an exception, so a single event is never worth a rule. This is structural, not a threshold to tweak | D-027, objective 3 |
+| **"Deformed" moves are mostly a carving artefact** | s5i5 and tn36 go from 100% deformed / 0% object accuracy under `colour_4` to **0% deformed / 100%** under `foreground_4`. Same game, same data. cd82 stays 100% under every carving and may be genuinely deformed | D-025, objective 1 |
+| **lp85 is starved past rescue** | 2.3% of pixels live, 97% no-ops under *every* driver tried, only 2 distinct click outcomes in the whole game. Needs a targeted look: the click map knows exactly which pixels are live, so the question is why aiming at objects still misses them | D-020, D-026 |
+| **No population of hypotheses** | Guardrail 1 and D-003 require one; the learner keeps only the MDL-best rule set | D-024, objective 3 |
+| **42-frame animations unread** | Up to 42 sub-transitions recorded per action; dynamics reads only resting endpoints | D-024 |
+| **Driver comparisons differ in train *and* test data** | D-026's two sweeps are different recordings, so per-game deltas mix better evidence with a harder test set. A clean rerun would hold the test set fixed | D-026 |
+| **Object-model quality does not convert to score** | The central puzzle. Click-game object accuracy rose +6.8pp in D-026 with no headline movement | objective 2 |
+
+## Standing risks to the thesis
+
+Unchanged from the risk table above. The one that matters most and is still
+unmeasured: **whether predictions chain**. Every number in this repository is
+single-step. Planning needs depth, and a model that is 44% right once may be
+useless three steps out — or may be reliable within a well-behaved subset. The
+data cannot currently distinguish those, and they have opposite consequences.
