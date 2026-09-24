@@ -2461,4 +2461,186 @@ bounded: it rescues **two** games, not the eight the zeros might have suggested.
 
 ---
 
-<!-- Next entry: D-030. Copy the template from CLAUDE.md. -->
+## D-030 — The starved games, and a metric that was scoring blindness as success
+
+- **Date:** 2026-09-24
+- **Status:** accepted
+- **Context:** D-028 made exploration objective 1 on the strength of eight games
+  that move the playfield on fewer than 15% of actions. Before building an
+  exploration policy it was worth asking the question that decides what kind of
+  policy is needed: **is there anything at the start state that moves these
+  games at all?**
+
+  If yes, random play missed a move that exists — a *targeting* problem, cheap
+  to fix. If no, the game needs a specific sequence before anything responds — a
+  *depth* problem, and the condition D-028 named as putting these games beyond
+  reach in the remaining time.
+
+  `scripts/eval_playfield_map.py` answers it by brute force: probe the action
+  space from a fixed state, RESET between probes, and count only changes
+  **outside the bookkeeping band**. That last clause also discharges an action
+  item D-028 left open — D-021's click map hashed the whole frame, so a click
+  that merely ticked a counter registered as a live pixel producing a distinct
+  outcome.
+
+### Finding 1 — D-028's starvation figures were measured on a superseded corpus
+
+This is an error in D-028 and it is mine. D-026 had already made
+`random_objects` the default driver, and D-028's activity rates were computed on
+`corpus/`, recorded with the old uniform-random-pixel driver. Recomputed on
+`corpus_obj/`:
+
+| game | `random` | `random_objects` |
+|---|---|---|
+| s5i5 | 2% | **41%** |
+| vc33 | **0%** | **16%** |
+| ft09 | 7% | 14% |
+| su15 | 3% | 13% |
+| tn36 | 4% | 11% |
+| sb26 | 3% | 7% |
+| lf52 | 2% | 5% |
+| lp85 | 1% | 3% |
+
+Aiming clicks at objects multiplies playfield activity by **2× to 20×** on every
+one of the eight. vc33 goes from literally nothing to 16%.
+
+**This strengthens D-028's conclusion rather than weakening it.** Its claim was
+that the largest category of failure is the agent never making anything happen,
+and that better acting is the lever. Here is that lever moving, from a change of
+*targeting alone*, before any hypothesis-driven policy exists.
+
+### Finding 2 — the starved games are state-gated, not inert
+
+Probing 256 click positions plus every keyboard action, outside the band:
+
+| game | depth 0 | depth 5 |
+|---|---|---|
+| vc33 | **2 of 256** | **254 of 256** |
+| tn36 | 6 of 256 | 6 of 256 |
+
+vc33 is almost completely unresponsive at the level start and almost completely
+responsive five actions later. So these are **targeting-and-state** problems,
+not depth-in-principle problems: the moves exist, and a policy that notices when
+the game has become responsive would find them. D-028's pessimistic branch — "no
+single action responds, a sequence is needed" — did not fire. This is the same
+state-gating D-021 measured for click *liveness* on eight of nineteen games,
+now confirmed for playfield effect specifically.
+
+### Finding 3 — all eight still score 0%, and chasing why broke a metric
+
+Even on the improved corpus every one of the eight scores 0% exact. Two of them,
+s5i5 and tn36, do so while reporting **100% changed-object accuracy, 0%
+deformed moves, zero appearances** and a median residual of 1–2 pixels *outside*
+the bookkeeping band. That combination should be impossible: a perfect object
+model with no unrepresentable events should reconstruct the frame.
+
+Tracing s5i5's residual pixels: they are pixels going 11→5, 11→13, 13→11 inside
+a component whose mask, size, bounding box and dominant colour never changed.
+**Partial recolouring.**
+
+The vocabulary cannot see it. `_effect_from_match` decided "same position, same
+silhouette, same dominant colour" and returned `static`. The model also
+predicted `static`. The two agreed, and `changed_obj_acc` scored the pair
+**correct** — while the rendered frame was wrong.
+
+**So `changed_obj_acc` was never measuring model quality. It measures agreement
+with a lossy observation, and a carving that cannot see a change cannot be
+scored wrong for it.** `foreground_*` carvings make this acute, because there a
+component is "anything not background" and its internal colouring is not part of
+its identity.
+
+Measured across 23 games on `corpus_obj`, four carvings, seed 0:
+
+| carving | changed-object acc | **blind rate** | exact |
+|---|---|---|---|
+| `colour_4` | 41.4% | **2.8%** | 4.0% |
+| `bbox` | 44.1% | 3.1% | 3.6% |
+| `colour_mass` | 33.4% | 7.7% | 3.5% |
+| **`foreground_4`** | 29.9% | **24.7%** | **2.1%** |
+
+`foreground_4` is blind to **a quarter of every object change it observes**,
+against under 3% for the colour carvings.
+
+**This resolves the paradox D-025 recorded and could not account for, though not
+in the way this entry first guessed.** The draft of this section asserted that
+`foreground_*` wins object accuracy by being blind. It does not — it has the
+*lowest* object accuracy of the four, 29.9% against 41.4%. The real mechanism is
+better and simpler:
+
+> `foreground_*`'s famously low deformed-move rate — 14% against 52% for
+> `colour_4`, which D-025 flagged as its one clear advantage and this session
+> spent an hour hypothesising about — **is blindness, not cleanliness.** A change
+> the carving cannot see is not recorded as a deformed move. It is not recorded
+> as a move at all. The deformation did not go away; it stopped being visible,
+> and went on to be unpredicted in the frame.
+
+That is why D-025's central puzzle had no answer: it asked why a threefold
+reduction in unrepresentable moves produced *half* the exact-match score, and
+the answer is that the reduction was not real. `foreground_*` trades 24.7%
+blindness for a low deformed-move rate and pays for it in every whole-frame
+comparison.
+
+- **Did it change our mind? Yes, four times, and three times against my own
+  earlier claims in this session.** The starvation figures were stale. The "perfect
+  object model" reading of s5i5 and tn36 — which I had already corrected once
+  today, from "one pixel from scoring" to "starved" — was wrong a second time,
+  and for a third reason: the model is not perfect, the observation is blind.
+  And the first draft of this very entry explained the blindness backwards,
+  asserting that `foreground_*` buys object accuracy by being blind when it has
+  the lowest object accuracy of any carving. Each correction was found by
+  insisting on a mechanism for a number rather than accepting the number, and
+  the last one was caught only because the mechanism was measured instead of
+  asserted.
+
+- **Decision:**
+  0. **`foreground_*` carvings are not preferred on their low deformed-move
+     rate**, which is an artefact. Nothing currently selects carvings (D-029), so
+     this changes no behaviour today; it removes a false argument that would
+     otherwise have driven the choice when something does.
+  1. **Count and report blindness.** `observe_transition` now compares pixel
+     content directly when position and silhouette are unchanged, and reports
+     `n_blind`; `Score.blind_rate` exposes it. The effect returned is still
+     `static`, because the language genuinely cannot express a partial recolour
+     — but the blindness is reported rather than scored as success.
+  2. **`changed_obj_acc` is never to be quoted without `blind_rate`**, and never
+     compared across carvings. D-019 refused object-level scoring as a headline
+     because it is carving-dependent; this is the concrete mechanism, and it is
+     worse than carving-dependence — it is a metric a representation can win by
+     being less expressive.
+  3. **Exploration stays objective 1**, now with direct evidence for it: a pure
+     targeting change moved playfield activity 2–20× on every starved game.
+  4. **The state-gating result feeds the exploration policy directly.** A policy
+     should detect that a game has become responsive and exploit it, rather than
+     sampling uniformly over a level where the response rate varies from 0.8% to
+     99% depending on where it is standing.
+- **Options rejected:**
+  - *Add a partial-recolour effect to the vocabulary now* — the obvious fix, and
+    premature. It is one more effect on top of a language already known to be
+    missing interaction, appearance and memory, and D-027 decided the learner is
+    being replaced rather than extended. Worth doing *inside* the new learner.
+  - *Drop `changed_obj_acc`* — it is still the only dense per-object signal
+    available and D-025 used it correctly as a diagnostic. Reporting it beside
+    `blind_rate` preserves its use and removes its ability to mislead.
+  - *Re-run every prior measurement with the blindness correction* — the
+    headline metric is exact-frame match and is unaffected; only the object-level
+    diagnostic moves. The affected claims are identified in this entry rather
+    than recomputed at a cost of hours.
+  - *Treat the stale-corpus error by quietly recomputing D-028* — the log is
+    append-only and the error is instructive: a measurement was made against the
+    old default two entries after the default changed.
+- **Consequences:** object-level scoring now carries a companion figure that can
+  invalidate it. Exploration keeps priority with better evidence. The explanation
+  for D-025's foreground paradox closes a question that has been open since the
+  sweep.
+- **Revisit if:** the new learner represents partial recolouring, at which point
+  the blindness disappears rather than being reported and `foreground_*` may
+  become genuinely competitive; or blindness turns out to behave differently on
+  the private set, where sprite colouring conventions need not match the public
+  games. Note the measured answer to the obvious first question: blindness is
+  **rare under `colour_*`** (2.8%) and `bbox` (3.1%), so colour-based object
+  accuracy can be read close to face value and it is specifically the
+  background-versus-foreground carvings that are compromised.
+
+---
+
+<!-- Next entry: D-031. Copy the template from CLAUDE.md. -->
