@@ -297,6 +297,13 @@ def make_driver(name: str, seed: int = 0) -> Driver:
         return RoundRobinDriver(target_policy="lattice", seed=seed)
     if name in ("random_objects", "random_obj"):
         return RandomObjectDriver(seed=seed)
+    if name in ("explore", "exploring"):
+        # Imported lazily: explore.py depends on dynamics, and drive.py is
+        # imported by recording scripts that should not need the learner.
+        from .explore import ExploringDriver
+
+        return ExploringDriver(seed=seed)
     raise ValueError(
-        f"unknown driver {name!r}; have random, random_objects, round_robin, lattice"
+        f"unknown driver {name!r}; have random, random_objects, explore, "
+        f"round_robin, lattice"
     )
