@@ -1866,4 +1866,228 @@ ar25 7.4%, sc25 4.2%. Starved games: **0.0%** exact at 98% no-op, as expected.
 
 ---
 
-<!-- Next entry: D-026. Copy the template from CLAUDE.md. -->
+## D-026 — The corpus could not teach a click rule, and now mostly can
+
+- **Date:** 2026-09-24
+- **Status:** accepted
+- **Context:** D-025 reported that every click-only game scored zero on
+  held-out prediction, and attributed it to the rule language. That attribution
+  was confounded, and the confound was one this project built for itself.
+
+  Every corpus in the repository was recorded with `RandomDriver`, which picks a
+  legal action uniformly and, when that action is the click, picks a **uniformly
+  random pixel**. That choice comes from D-020, which measured random against a
+  cyclic round-robin and found random better on event diversity. D-020 was
+  correct on its own terms and is not being reversed. But it was decided
+  **before D-021 existed**, and D-021 changed the picture completely: it mapped
+  all 4,096 pixels on all 19 click-publishing games and found that object-derived
+  targets reach **100% of a game's distinct click outcomes on 13 of 15** live
+  games, while the live fraction of raw pixels is as low as **7.0% on ft09 and
+  2.3% on lp85**.
+
+  So the two axes had each been measured separately and the winning combination
+  had never been built:
+
+  | | random pixel | object target |
+  |---|---|---|
+  | **random action** | `random` — used for every corpus | **did not exist** |
+  | **cyclic action** | `lattice` | `round_robin[objects]` |
+
+  The sharper version of the problem is about *learnability*, not waste. The
+  rule language's only relational feature is `clicked` (D-024). For MDL to
+  condition on it, the corpus must hit the **same object more than once** — a
+  single observation cannot outweigh the bits needed to state a rule. Scattering
+  fifty clicks uniformly over 4,096 pixels almost never does that. The corpus
+  was close to structurally incapable of teaching a click rule, which makes
+  D-025's click-game zeros uninterpretable as evidence about the language.
+
+### The driver
+
+`RandomObjectDriver` (`src/arc3/drive.py`): uniform random over legal actions,
+exactly as `RandomDriver`, with the click target drawn from the object proposal
+set instead of the pixel grid. **One variable changes**, so a comparison
+isolates it. A test asserts that both drivers emit an identical action sequence
+on a keyboard-only game.
+
+It is deliberately *not* an information-seeking driver: it does not prefer
+untried targets, avoid objects known to be inert, or merge targets with
+identical outcomes. All three are what D-021 decision 2 argues for and all three
+are what D-020 deferred until there is a model to seek information for.
+
+**One finding fell out of writing the test.** `object_targets` **includes the
+background**: `colour_4`, `colour_8`, `colour_mass` and `bbox` all partition the
+entire frame, so the background region is a component like any other and
+contributes its own click target, usually near the middle of the frame. The
+first test asserting "clicks land inside objects" failed on pixel (32,32). This
+is correct behaviour for D-005, where dropping a live target costs more than
+carrying a dead one, and it partly explains why D-021's proposal counts are as
+large as they are. A driver spending real actions wants
+`foreground_object_targets`, which excludes the background colour and falls back
+to the full set rather than hard-excluding anything (Guardrail 1).
+
+### Experiment 1 — the old proxy metrics say nothing happened
+
+- **Setup:** `scripts/eval_drivers.py --actions 60 --seed 0`, all 25 games, now
+  with four drivers.
+- **Result:**
+
+  | driver | no-op % | mean changed px | distinct events/game | coverage % |
+  |---|---|---|---|---|
+  | `random` | 20.3 | 51 | 40.1 | 99 |
+  | `random_objects` | 20.5 | 40 | **40.7** | 99 |
+  | `round_robin` | 19.3 | 51 | 36.9 | 100 |
+  | `lattice` | 19.5 | 52 | 36.2 | 100 |
+
+- **Reading: indistinguishable, and that is the second time these metrics have
+  been blind to something real.** D-021 already showed that distinct
+  changed-pixel signatures cannot see outcome-class structure — a driver that
+  reaches one outcome repeatedly still accumulates signature diversity from the
+  states it passes through. Taking this table at face value would repeat exactly
+  the error D-020 made. It is reported because it is the like-for-like
+  comparison with D-020, not because it settles anything.
+
+### Experiment 2 — the metric that matches what the learner needs
+
+- **Question:** can a corpus teach a click rule *at all*? Independent of whether
+  induction works: how often is the same object clicked enough times for MDL to
+  write a rule about it?
+- **Setup:** `scripts/eval_click_evidence.py --corpus corpus --compare
+  corpus_obj`, both corpora 25 games x 100 actions, seed 0, `colour_8`. An
+  object's identity is the attribute vector the rule language selects on
+  (colour, size, shape, rect), so "hit twice" means hit twice *in the sense the
+  inducer cares about*. A signature needs **3** hits to count as learnable.
+- **Result:**
+
+  | | `random` | `random_objects` |
+  |---|---|---|
+  | clicks landing on a repeated object | 65.2% | **75.0%** |
+  | learnable signatures per game | 2.4 | **4.6** |
+  | learnable **live** signatures per game | 1.5 | **3.2** |
+  | **games with ≥1 learnable live signature** | **10/19** | **16/19** |
+
+- **Reading: the confound was real and is largely removed.** Six more games now
+  have at least one click rule that is learnable in principle. The per-game
+  gains are concentrated where D-021 predicted: s5i5 2→12 learnable live
+  signatures, r11l 7→12, vc33 3→9, sc25 0→3, su15 0→3, cd82 0→1, sp80 0→1.
+
+- **Two honest costs.**
+  - **bp35 goes 4→1.** It has 196 object targets, the most of any game, so
+    aiming at objects *spreads* clicks across many of them and reduces repeat
+    hits. Object targeting diversifies, and on an object-rich game diversity is
+    the enemy of the repetition `clicked` needs. This is a genuine trade, not
+    noise, and it predicts that the best click driver is object-targeted *with
+    repetition*, which neither driver does.
+  - **lp85 stays at 0** under both. With 2.3% of pixels live and 97% no-ops it
+    is starved past the point any targeting policy fixes, confirming D-020's
+    separate reporting of it.
+- **Cost:** recording rises from 15 s to 157 s for 25 games x 100 actions,
+  because segmentation now runs on every click. Irrelevant offline; worth noting
+  because it is per-action work an agent would also pay at evaluation.
+
+### Experiment 3 — does the better corpus produce better dynamics?
+
+- **Setup:** `scripts/eval_dynamics.py --corpus corpus_obj --carvings
+  colour_4,foreground_4`, the two carvings that won games in D-025, 25 games,
+  seed 0, same 70/30 temporal split. 464 s. Compared against D-025's numbers.
+- **A caveat that has to come first.** The two sweeps run on **different
+  recordings**, so both the training *and* the test transitions differ. A
+  per-game change in exact match therefore conflates "better training evidence"
+  with "a differently hard test set", and with only ~30 test transitions per
+  game that is noisy. Changed-object accuracy averages over hundreds of objects
+  rather than 30 binary outcomes and is the more trustworthy of the two.
+- **Result, aggregate:**
+
+  | carving | mean exact | exact>0 | click-game mean exact | click-game mean chgobj |
+  |---|---|---|---|---|
+  | colour_4 | 4.8% → **4.0%** | 5/23 → 5/23 | 4.4% → **3.3%** | 30.5% → **37.3%** |
+  | foreground_4 | 1.8% → **2.1%** | 3/23 → 2/23 | 1.7% → **2.1%** | 31.1% → **32.6%** |
+
+- **Result — the object model improves and the headline does not.** On the click
+  games, changed-object accuracy rises by **+6.8pp** under `colour_4` and
+  +1.5pp under `foreground_4`, while exact-frame match is flat to slightly down
+  and well inside the noise of a 30-transition test set. The corpus fix did the
+  thing it was designed to do — the learner now gets the click evidence it was
+  missing, and its model of what objects do got better — and that did not
+  convert into whole-frame predictions.
+
+- **The standout, and it is a third instance of the same pattern.** **tn36 goes
+  from 0.0% to 100.0% changed-object accuracy** and stays at **0.0% exact
+  match.** Its object model went from useless to perfect and its score did not
+  move. dc22 does a smaller version of the same thing: 91.7% → 100%
+  changed-object accuracy, exact match 44.4% → 34.8%. With sp80 and ls20 from
+  D-025, that is now **four games where the model of the game is right or nearly
+  right and the frame comparison scores zero**.
+
+  cn04 is the one game where the fix converts end to end: 0% → 3.6% exact under
+  `colour_4`, and **21.1% → 35.7%** under `foreground_4`, with changed-object
+  accuracy 47% → 74%.
+
+- **Did it change our mind? Yes, and in the direction that was predicted before
+  the run rather than after it.** The prediction on record was that the click
+  games would move only modestly, for three reasons already measured: lp85 is
+  starved past rescue, five games have a 100% deformed-move rate under `colour_*`
+  so the language cannot express their changes whatever the corpus, and the UI
+  residual is untouched by anything here. That is what happened.
+
+  So the confound is now resolved **in both directions**. D-025's click-game
+  zeros were not mainly a corpus artefact — the corpus was genuinely broken, it
+  is now genuinely fixed, and the zeros largely remain. D-025's original
+  attribution to the rule language was right, and it was right for a reason it
+  had not established. It has now been established.
+
+- **Did it change our mind? Yes.** D-025's claim that the click-only games'
+  zeros are evidence about the rule language was **unsupported when it was
+  made** — the corpus could not have taught those rules. Experiment 3 then
+  re-establishes the claim on a corpus that can. The conclusion is unchanged and
+  the evidence for it is now real, which is not the same thing as the original
+  reasoning having been sound.
+
+- **Decision:**
+  1. **`random_objects` becomes the default corpus driver** for any game that
+     publishes the click, on Experiment 2. `random` is retained as the named
+     baseline, as are `round_robin` and `lattice`.
+  2. **`foreground_object_targets` is what a driver aims at**; `object_targets`
+     keeps its background-inclusive behaviour for D-005's pruning, where the
+     asymmetry runs the other way.
+  3. **D-025's headline stands, now on better evidence.** Dynamics induce
+     weakly; the click games' zeros survive a corpus that can teach click rules.
+     Its per-game click numbers are superseded by
+     `docs/experiments/dynamics_sweep_objdriver.json`.
+  4. **The bookkeeping layer is reinforced as the next subsystem**, not merely
+     confirmed. There are now four games (sp80, ls20, tn36, dc22) whose object
+     model is right or nearly right while the frame comparison scores at or near
+     zero, and tn36 is the sharpest: 100% changed-object accuracy, 0% exact.
+- **Options rejected:**
+  - *Leave the corpus alone and treat D-025 as final* — the cheapest option and
+    the wrong one. A confound identified and not measured is worse than one
+    never noticed, because the record then implies it was checked.
+  - *Adopt `round_robin[objects]`, which already aimed at objects* — it pairs
+    object targeting with cyclic action selection, and D-020 measured cyclic
+    selection as worse. Combining a winner with a loser and calling it an
+    improvement is how the previous confound happened.
+  - *Build an information-seeking driver now* (prefer untried targets, drop
+    inert ones, merge equivalent outcomes) — it would almost certainly beat
+    this, and it changes two things at once. D-021's outcome-class merging is
+    the natural home for it and it belongs there, after this comparison is
+    clean.
+  - *Re-record every corpus and re-run every prior measurement* — the perception
+    numbers (D-014, D-015) were measured under `random` and are unaffected by
+    click placement in any way that has been shown. Re-running 2.2 hours of
+    sweep to restate numbers about tracking would be motion, not progress.
+- **Consequences:** the click-game half of the dynamics result becomes
+  interpretable for the first time. Commits us to a driver whose cost scales with
+  segmentation, and to the finding that the *best* click driver is
+  object-targeted with deliberate repetition — which neither existing driver
+  does and which is now a named gap.
+- **Revisit if:** bp35's regression turns out to be the common case on
+  object-rich games rather than the exception, which would mean object targeting
+  needs a repetition policy before it is safe as a default — the specific
+  driver that would settle it is object-targeted *with deliberate repetition*,
+  which does not exist; or a like-for-like comparison on a **shared test set**
+  contradicts Experiment 3's read, which is worth doing if the click games ever
+  become the critical path, since the two sweeps here differ in both train and
+  test data.
+
+---
+
+<!-- Next entry: D-027. Copy the template from CLAUDE.md. -->

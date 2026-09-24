@@ -4,15 +4,15 @@
 currently doing.** Read this first every session. Update it before the session
 ends if anything below is stale.
 
-- **Last updated:** 2026-09-17, session 3
+- **Last updated:** 2026-09-24, session 4
 - **Status:** **the go/no-go on D-002 has been run. It is a weak pass.**
   Held-out exact-frame prediction is non-zero on 7 of 23 games where chance is
   exactly 0%, reaching 44% on dc22, and the object-level model works on 14 of
   23. Perception layer built, measured and audited; click space mapped against
   ground truth; design thesis §8 re-derived. Still no goal, no planner, no
   agent loop, no score.
-- **Days to Milestone #2 (30 Sep):** **13** — out of reach
-- **Days to final submission (2 Nov):** **46** — the real target
+- **Days to Milestone #2 (30 Sep):** **6** — out of reach
+- **Days to final submission (2 Nov):** **39** — the real target
 
 ---
 
@@ -143,6 +143,7 @@ alternatives in `decision-log.md`.
 | D-023 | Static-to-interactive transfer **dropped**, not parked | high |
 | D-024 | The rule language: `(action, selector) → effect`, MDL-selected | medium — deliberately at the floor of expressiveness |
 | D-025 | **Dynamics experiment: weak pass. D-002 stands.** Keep all six carvings; language-limited not evidence-limited; bookkeeping layer is next | high — measured, 6 carvings × 25 games |
+| D-026 | Corpus clicked random pixels and could not teach a click rule. `random_objects` is the new default | high — measured both ways |
 
 ---
 
@@ -161,7 +162,8 @@ src/arc3/
     diff.py         structural frame diff, and whole-animation diff
     segment.py      six candidate segmentations per frame
     track.py        object identity by global assignment              (D-014)
-  drive.py          corpus-generation policies: random, round_robin  (D-020)
+  drive.py          corpus policies: random, random_objects,          (D-026)
+                    round_robin, lattice                              (D-020)
   dynamics/
     rules.py        the rule language and what it cannot say           (D-024)
     induce.py       observation extraction, and MDL rule selection
@@ -171,9 +173,10 @@ scripts/            fetch_environments, record_fixtures, eval_geometry, eval_tra
                     size_pipeline, eval_baseline, eval_drivers,
                     eval_clickmap, eval_click_liveness                (D-021)
                     record_corpus, eval_dynamics, eval_dynamics_curve (D-025)
+                    eval_click_evidence                               (D-026)
 fixtures/           5 recorded episodes, 68 KB gzipped
 corpus/             25 games x 100 actions, gitignored, 15 s to rebuild
-tests/              170 tests, ~40 s
+tests/              197 tests, ~45 s
 docs/architecture.md  how it all actually works, and what it does not do (D-017)
 ```
 
@@ -220,7 +223,9 @@ given alongside, because the drift is itself the useful record.
 | **Deformed moves: not the constraint** | `foreground_*` cuts deformation 3× (14% vs 53%) and scores **half** as well. Hypothesis refuted |
 | Sweep cost | 7,888 s for 6 carvings × 25 games, against D-019's 2–2.5 h estimate |
 | **Dynamics saturates at ~50 actions** | exact match gains **+0.0000** from n=50 to n=200 training transitions. **Language-limited, not evidence-limited** |
-| **Two games: perfect object model, zero score** | ls20 at n=200 and sp80 both reach **100% changed-object accuracy with 0% exact match** — a 2-pixel UI counter fails every frame comparison |
+| **Four games: object model right, score ~zero** | ls20, sp80, **tn36 (0%→100% object accuracy, 0% exact)** and dc22 (100% object accuracy, 34.8% exact). A 2-pixel UI counter fails the frame comparison |
+| **Click corpus was broken** (D-026) | clicks went to uniformly random pixels. Games with a learnable live click signature: **10/19 → 16/19** after aiming at objects |
+| Corpus fix: effect on dynamics | click-game object accuracy **+6.8pp** (`colour_4`); exact-frame **flat**. The evidence improved, the headline did not |
 
 **D-007's tarpit condition was not triggered.** Cross-frame identity works, and
 it works well inside the two-week reassessment window.
@@ -382,15 +387,19 @@ thing, and it should happen next.
 D-025 names the order, and it is deliberately not "make the rule language
 richer", which is what 16 zero-scoring games superficially argue for.
 
-0. **Do not buy more actions.** The learning curve saturates at **n=50**:
+0. **Do not buy more actions, and the corpus is no longer the excuse.** The
+   click corpus was genuinely broken and is now genuinely fixed (D-026), and the
+   click games' zeros largely survived it. The learning curve saturates at
+   **n=50**:
    exact match gains +0.0000 from 50 to 200 training transitions. Fifty actions
    of random play extract everything this rule language can extract. This is
    good news for the RHAE budget and a firm instruction about where *not* to
    invest.
-1. **The bookkeeping layer.** The cheapest large win available. **ls20 at 200
-   training transitions scores 100% changed-object accuracy and 0% exact
-   match**; sp80 is the same shape. Two independent games with a perfect object
-   model and a zero score, both failing on a two-pixel counter. The layer is
+1. **The bookkeeping layer.** The cheapest large win available, and now
+   reinforced rather than merely confirmed. **Four** games have an object model
+   that is right or nearly right and a score at or near zero: ls20 (100% object
+   accuracy at n=200, 0% exact), sp80, **tn36 (0%→100% object accuracy under the
+   D-026 corpus, still 0% exact)** and dc22 (100% object accuracy, 34.8% exact). The layer is
    spatially separable and learnable from change frequency alone, and predicting
    a counter is a far smaller problem than object interaction. The concrete test
    of whether this diagnosis is right: sp80, re86, g50t and ar25 all have high
@@ -410,3 +419,14 @@ richer", which is what 16 zero-scoring games superficially argue for.
 Still owed from earlier sessions, unchanged: whether click *outcome classes*
 drift with depth (D-021/D-022's shared revisit condition, the highest-value
 cheap experiment outstanding), and the value function (design thesis §7).
+
+### Known gap, not yet built
+
+**An object-targeted driver with deliberate repetition.** D-026 found that
+aiming clicks at objects *spreads* them, which is the opposite of what the
+`clicked` feature needs — it needs the same object hit several times before MDL
+will write a rule. bp35, with 196 object targets, regressed from 4 learnable
+signatures to 1 for exactly this reason. The right driver hits each candidate
+two or three times before moving on, and neither existing driver does. Roughly
+an hour, and it is the difference between "the confound is removed" and "the
+corpus is good".
