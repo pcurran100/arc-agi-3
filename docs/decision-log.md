@@ -2215,4 +2215,139 @@ the game.
 
 ---
 
-<!-- Next entry: D-028. Copy the template from CLAUDE.md. -->
+## D-028 — Decomposing the zeros: a third of the games never move the playfield
+
+- **Date:** 2026-09-24
+- **Status:** accepted
+- **Context:** D-025 left 16 of 23 games scoring exactly zero and attributed it,
+  loosely, to the rule language. D-027 then set an agenda — carving selection,
+  then layer separation, then a hypothesis population — on the assumption that
+  the zeros were a *modelling* failure. Before spending sessions on that
+  ordering it was worth asking what the zeros are actually made of.
+
+  The decomposition needs one new quantity: the **playfield activity rate**, the
+  fraction of an episode's actions that change at least one pixel *outside* the
+  detected bookkeeping band. It separates "the agent did something and we failed
+  to predict it" from "the agent did nothing but tick a counter".
+
+### Measurement
+
+- **Setup:** all 25 games, 100-action random corpus, seed 0, bookkeeping band
+  from `bookkeeping_mask` fitted on the training split only.
+- **Result:** **8 of 25 games move the playfield on fewer than 15% of actions.**
+
+  | game | actions changing *anything* | actions changing the **playfield** |
+  |---|---|---|
+  | vc33 | 99/99 | **0** |
+  | lf52 | 99/99 | **2** |
+  | s5i5 | 99/99 | **2** |
+  | sb26 | 41/100 | **3** |
+  | su15 | 42/99 | **3** |
+  | tn36 | 99/99 | **4** |
+  | lp85 | 1/100 | **1** |
+  | ft09 | 7/100 | **7** |
+
+  vc33 is the extreme and the clearest: **99 transitions in which the frame
+  changed, and not one of them altered a single pixel outside the UI band.**
+  Every one of those changes was a counter ticking.
+
+- **All eight score 0% exact.** They are, therefore, half of the sixteen zeros,
+  and they are not a modelling failure at all — there is nothing in their corpus
+  to model.
+
+### Two corrections to claims made earlier today
+
+1. **"Three games are one or two pixels from scoring" was wrong for two of the
+   three.** s5i5 and tn36 reach 100% changed-object accuracy under
+   `foreground_4` with a median residual of 1 pixel, and I read that as a
+   near-miss caused by the UI. It is not. Their object model is a **perfect
+   model of the counter**, because the counter is essentially the only thing
+   that ever moves. Only **sp80** is genuinely UI-blocked, and it is: 56 of its
+   96 changed transitions alter the playfield, its object model is right, and
+   excluding the band takes it from **0% to 100%**.
+
+2. **D-021's click map conflated UI changes with playfield effects.** It scored
+   a pixel as "live" and counted distinct outcomes by hashing the **whole
+   frame**, so a click that only ticked the counter registered as a live pixel
+   producing a distinct outcome. vc33 is the proof: D-021 recorded it as 100%
+   live with 3 distinct outcomes, and the playfield activity rate is **zero**.
+   Its click outcomes are counter states.
+
+   This does not overturn D-021's *decision* — object targets still reach
+   whatever outcomes exist, and the branching factor is still small — but its
+   "live %" and "distinct outcomes" figures are **upper bounds on playfield
+   effect, not measures of it**, and any future use must recompute them outside
+   the bookkeeping band.
+
+### What layer separation is actually worth
+
+Measured, not estimated, from the existing sweep by excluding the detected band:
+
+| game | exact | excluding the UI band |
+|---|---|---|
+| sp80 | 0.0% | **100.0%** |
+| dc22 | 44.4% | **100.0%** |
+| m0r0 | 26.1% | 44.4% |
+| re86 | 0.0% | 6.7% |
+
+Two games go to a perfect score and one improves substantially. Real, and
+bounded: it rescues **two** games, not the eight the zeros might have suggested.
+
+### The revised decomposition of the sixteen zeros
+
+- **8 games — playfield-starved.** Random play never makes the game do anything.
+  An **exploration** failure, not a learning one.
+- **~1 game — UI-blocked** (sp80; dc22 and m0r0 are already scoring and merely
+  improve). A **representation** failure, and the fix is proven.
+- **~7 games — genuinely unmodelled.** Language, interaction, appearance.
+
+- **Did it change our mind? Yes, and it reorders D-027's agenda.** The largest
+  single category of failure is that **the agent never makes anything happen**.
+  That is worth up to eight games. Carving selection is worth about one and
+  layer separation about two. The ordering set this morning had the cheapest
+  items first; it now has the *smallest* items first.
+
+  It also converges with the direction the project owner set independently in
+  D-027 — form hypotheses from single actions, act on them, minimise pure
+  discovery. On a game like vc33 the problem is not that we learn badly from
+  what we see; it is that random play shows us nothing to learn from. No
+  learner, however good, recovers from a corpus in which the game never moves.
+
+- **Decision:**
+  1. **Promote exploration to objective 1**, ahead of carving selection and
+     layer separation. The target is the playfield activity rate: an action that
+     only ticks the counter is a wasted action, and that is now measurable
+     *while playing* rather than only in hindsight.
+  2. **Keep layer separation, at its measured value.** It converts sp80 and
+     dc22 and it makes the activity rate computable, which objective 1 needs.
+     It is a prerequisite, not a competitor.
+  3. **Demote carving selection** to whatever its own experiment says it is
+     worth; it was never going to be more than a game or two.
+  4. **Recompute D-021's click-map figures outside the bookkeeping band** before
+     anything relies on them again.
+- **Options rejected:**
+  - *Treat the starved games as unwinnable and drop them* — eight of 25 is a
+    third of the public set and there is no reason to think the private set is
+    kinder. Also premature: nothing has yet tried to make them move on purpose.
+  - *Blame the driver and build a better one in the same style* — D-026 already
+    ran that experiment. Object targeting improved click *evidence* markedly and
+    moved the headline not at all, and vc33 was object-targeted in `corpus_obj`
+    too. A better blind policy is not the answer; acting on a hypothesis is.
+  - *Report the eight as a corpus artefact and carry on with modelling* — the
+    honest reading is the opposite. A third of the games not responding to
+    random play is a fact about **what these games require of an agent**, and it
+    is probably the single most competition-relevant thing measured so far.
+- **Consequences:** reorders the agenda around exploration. Makes the playfield
+  activity rate a first-class metric, which means the bookkeeping band moves
+  from a scoring diagnostic to a component the agent depends on. Invalidates the
+  unqualified use of D-021's live-pixel and outcome-count figures.
+- **Revisit if:** the eight starved games turn out to need a long specific
+  action sequence before anything moves at all — which would make them an
+  exploration problem of a much harder kind than "aim better", and would put
+  them beyond reach inside the remaining time; or layer separation proves unable
+  to compute a reliable activity rate online, in which case objective 1 loses
+  the signal it is supposed to optimise.
+
+---
+
+<!-- Next entry: D-029. Copy the template from CLAUDE.md. -->

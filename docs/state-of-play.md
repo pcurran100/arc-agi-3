@@ -383,22 +383,26 @@ thing, and it should happen next.
 
 ---
 
-## Objectives, in order (set by D-027)
+## Objectives, in order (set by D-027, reordered by D-028)
 
 The batch corpus pipeline has answered the question it was built for and is now
-a **measurement harness, not the agent**. D-026 spent a session making the corpus
-better and moved the headline not at all, which is the clearest signal available
-that the corpus is no longer the constraint. What follows is ordered by evidence,
-cheapest first.
+a **measurement harness, not the agent**.
 
-| # | Objective | Why now | Status |
+**D-028 reordered this.** The sixteen zero-scoring games decompose as: **8
+playfield-starved** (random play never makes the game do anything), ~1
+UI-blocked, ~7 genuinely unmodelled. The largest category is an *exploration*
+failure, not a learning one, and it is worth up to eight games where carving
+selection is worth about one and layer separation about two.
+
+| # | Objective | Worth | Status |
 |---|---|---|---|
-| 1 | **Carving selection by held-out validation** | Best carving is game-dependent; any single carving scores on 5/23 games, best-per-game on 7/23. The selection criterion already exists and was never applied | **in progress** |
-| 2 | **Layer separation: model UI and playfield apart** | 6/23 games reach ≥90% object accuracy; **3 score exactly 0%** blocked by 1–2 pixels of UI. sp80 traced to row 0 alone | next |
-| 3 | **Weighted hypothesis population with priors** | Enables forming a hypothesis from a *single* observation, which the MDL point-hypothesis learner structurally cannot. Restores Guardrail 1 / D-003 | after 2 |
-| 4 | **Online loop: act on hypotheses, update from outcomes** | The actual agent. Actions chosen for goal progress *and* discrimination between live hypotheses; pure discovery minimised | after 3 |
-| 5 | **Multi-step rollout accuracy** | Never measured, and planning depends on it entirely. Cheap — the machinery exists | can run any time |
-| 6 | **End-to-end agent producing a real RHAE score** | Every number in this repo is an offline proxy. Nothing has ever played a game with intent | before 2 Nov |
+| 1 | **Exploration: make the game move on purpose** | up to **8 games**. vc33 changes the playfield on **0 of 99** actions under random play | **next** |
+| 2 | **Layer separation: model UI and playfield apart** | **2 games** (sp80 0%→100%, dc22 44%→100%), and it is a *prerequisite* for 1 — the activity rate is what exploration optimises | with 1 |
+| 3 | **Weighted hypothesis population with priors** | enables a hypothesis from a *single* observation, which the MDL point learner structurally cannot | after 2 |
+| 4 | **Online loop: act on hypotheses, update from outcomes** | the actual agent | after 3 |
+| 5 | **Carving selection** | ~1 game; demoted by D-028 | measured, see D-029 |
+| 6 | **Multi-step rollout accuracy** | unmeasured, and planning depends on it entirely | any time |
+| 7 | **End-to-end agent producing a real RHAE score** | every number here is an offline proxy | before 2 Nov |
 
 ## Current issues, named
 
@@ -410,7 +414,8 @@ which is about the thesis; this is about the machine.
 | **UI layer defeats the headline metric** | 4+ games have a right-or-nearly-right object model and score ~0. sp80 = row 0 only, 14→0 every action. ls20 = rows 61–62, a move counter | D-025, D-026, objective 2 |
 | **Learner cannot generalise from one observation** | MDL charges as much to state a rule as to log an exception, so a single event is never worth a rule. This is structural, not a threshold to tweak | D-027, objective 3 |
 | **"Deformed" moves are mostly a carving artefact** | s5i5 and tn36 go from 100% deformed / 0% object accuracy under `colour_4` to **0% deformed / 100%** under `foreground_4`. Same game, same data. cd82 stays 100% under every carving and may be genuinely deformed | D-025, objective 1 |
-| **lp85 is starved past rescue** | 2.3% of pixels live, 97% no-ops under *every* driver tried, only 2 distinct click outcomes in the whole game. Needs a targeted look: the click map knows exactly which pixels are live, so the question is why aiming at objects still misses them | D-020, D-026 |
+| **8 of 25 games are playfield-starved** | fewer than 15% of actions change anything outside the UI band. vc33: **0 of 99**. lf52, s5i5: 2. sb26, su15: 3. tn36: 4. lp85 and ft09 join them. All eight score 0% and none is a modelling failure | **D-028, objective 1** |
+| **D-021's click map overstates playfield effect** | it hashed the whole frame, so a click that only ticked the counter counted as a live pixel producing a distinct outcome. vc33 was recorded 100% live with 3 outcomes and has zero playfield activity. Its figures are upper bounds; recompute outside the band before reuse | D-028 |
 | **No population of hypotheses** | Guardrail 1 and D-003 require one; the learner keeps only the MDL-best rule set | D-024, objective 3 |
 | **42-frame animations unread** | Up to 42 sub-transitions recorded per action; dynamics reads only resting endpoints | D-024 |
 | **Driver comparisons differ in train *and* test data** | D-026's two sweeps are different recordings, so per-game deltas mix better evidence with a harder test set. A clean rerun would hold the test set fixed | D-026 |

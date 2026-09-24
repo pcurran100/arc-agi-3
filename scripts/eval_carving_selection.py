@@ -26,10 +26,25 @@ If `selected` sits near `oracle`, selection works and per-game carving choice
 costs nothing but compute. If it sits near `single`, the validation signal is too
 weak at this corpus size and the six-fold cost buys nothing at runtime.
 
-**A caveat on resolution.** With 100 actions per game, the inner validation split
-is only ~20 transitions. Selecting among six candidates on 20 noisy observations
-is a coin-flip in the cases that matter most, so a null result here is evidence
-about the *corpus size*, not about selection as a method.
+**Choosing what to select ON is the whole problem, and the first attempt got it
+wrong.** Selecting on validation *exact match* recovered only 8% of the
+available headroom, because exact match is **zero under every carving on most
+games** at this validation size — there is nothing to rank. A selection
+criterion has to be:
+
+- **dense**, not almost always zero, so ~20 validation transitions carry signal;
+- **carving-independent**, or the comparison is rigged. This rules out
+  changed-object accuracy, tempting though it is: it is measured in terms of the
+  carving being judged, so a carving producing two big objects scores easily
+  where one producing fifty cannot. That is exactly the objection D-019 raised
+  when it refused object-level scoring as the headline, and it applies with full
+  force to using it as a selector.
+
+**Pixel residual satisfies both.** "How many of the 4,096 pixels did the
+prediction get wrong" is measured in pixels, means the same thing under every
+carving, and is graded rather than binary. This script records all three keys on
+the validation split so selection rules can be compared offline from the JSON
+without re-running the hour-long sweep.
 
 Usage:
     python scripts/eval_carving_selection.py [--corpus corpus] [--out FILE]
@@ -86,13 +101,22 @@ def run_game(path: Path, train_frac: float = 0.7, inner_frac: float = 0.75) -> d
     for c in ALL_CARVINGS:
         # Selection signal: validation only. The test set is never consulted.
         v = _fit_and_score(inner, val, c, geo)
-        # Ranked on exact match, tie-broken by object accuracy, which is far
-        # less granular a signal on ~20 transitions and breaks many ties.
-        val_scores[c] = (v.exact_on_changed, v.changed_object_accuracy)
         t = _fit_and_score(train, test, c, geo)
+        val_scores[c] = v
         test_scores[c] = t
+        # Every candidate selection key, recorded so rules can be compared
+        # offline rather than by re-running the sweep for each one.
+        rec[f"val_exact_{c}"] = v.exact_on_changed
+        rec[f"val_chgobj_{c}"] = v.changed_object_accuracy
+        rec[f"val_medres_{c}"] = v.median_residual
+        rec[f"val_meanres_{c}"] = float(np.mean(v.residuals)) if v.residuals else 0.0
 
-    chosen = max(ALL_CARVINGS, key=lambda c: val_scores[c])
+    # Primary rule: lowest median pixel residual on validation. Dense, and it
+    # means the same thing under every carving. Ties broken by mean residual.
+    chosen = min(
+        ALL_CARVINGS,
+        key=lambda c: (val_scores[c].median_residual, rec[f"val_meanres_{c}"]),
+    )
     oracle = max(ALL_CARVINGS, key=lambda c: test_scores[c].exact_on_changed)
     rec["chosen"] = chosen
     rec["oracle"] = oracle
