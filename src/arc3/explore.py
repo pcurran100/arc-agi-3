@@ -27,6 +27,38 @@ Three things follow from the measurements, and each is a design constraint:
    features. This is the same signature D-026 used to measure whether a corpus
    could teach a click rule.
 
+   **How coarse the key is matters more than anything else here, and the first
+   two guesses were both wrong.** The failure to explain was that on object-rich
+   games this policy was *less active than uniform sampling* — cd82 at 20%
+   against `random_objects`' 79%, which a policy maximising activity should not
+   be able to manage.
+
+   The first guess was coverage: draw targets from all six carvings rather than
+   one, since D-021 showed the union is what reaches every distinct click
+   outcome. Measured, it made things **worse** — 45% mean activity against 58%,
+   and 25.2 distinct events against 35.8 — because it roughly doubled the arm
+   count (tn36 136 arms to 288) and Thompson sampling then spends its whole
+   budget establishing posteriors it never gets to exploit. `union_targets` is
+   kept as a measured-and-rejected option.
+
+   The actual constraint is **arms against action budget**. Keying on
+   ``(colour, size)`` gives 83-136 arms on object-rich games and there are only
+   100 actions. Pooling to ``colour`` alone gives 6-14, and at equal budget:
+
+   | | activity | distinct events |
+   |---|---|---|
+   | `random_objects` | 38% | 27.4 |
+   | `explore`, `(colour, size)` | 58% | 35.8 |
+   | **`explore`, `colour`** | **58%** | **44.9** |
+
+   Equal on activity, far better on the diversity a learning corpus actually
+   needs, and it repairs the regression (sk48 31%->52%, ar25 72%->85%, lp85
+   54%->77%). It is a genuine trade — sb26 falls 73%->37% and tn36 53%->36%,
+   games where size distinguishes the productive object. The principled fix for
+   that is a **hierarchical prior**, pooling a new (colour, size) arm towards its
+   colour's aggregate rather than starting it at Beta(1,1); that is the known
+   next refinement and is not built.
+
 3. **Evidence decays.** Responsiveness is *state-dependent*, measured on eight of
    nineteen games for click liveness (D-021) and confirmed for playfield effect
    on vc33 (D-030). A stationary estimate would learn "clicking does nothing"
@@ -167,6 +199,13 @@ class ExploringDriver:
     seed: int = 0
     carving: str = "colour_8"
     decay: float = DECAY
+    #: Draw click candidates from all six carvings rather than `carving` alone.
+    #: Measured and rejected by default: see the class docstring.
+    union_targets: bool = False
+    #: How coarsely to key click arms. "colour_size" gives one arm per distinct
+    #: (colour, size); "colour" pools every object of a colour into one arm.
+    #: Coarser means fewer arms and faster learning at the cost of precision.
+    key_mode: str = "colour"
     _rng: random.Random = field(init=False)
     _arms: dict[Any, _Arm] = field(default_factory=dict, init=False)
     band: OnlineBand = field(default_factory=OnlineBand, init=False)
@@ -201,11 +240,13 @@ class ExploringDriver:
 
     # -- acting ------------------------------------------------------------
 
-    @staticmethod
-    def _click_key(attrs: dict) -> tuple:
+    def _click_key(self, attrs: dict) -> tuple:
         # Colour and size, not the full signature: shape is too specific to
         # generalise across frames, and the pair was enough to isolate the mover
-        # on ls20 (D-024's worked example).
+        # on ls20 (D-024's worked example). `key_mode` trades that precision for
+        # a smaller arm space when the budget is short.
+        if self.key_mode == "colour":
+            return ("click", attrs["colour"])
         return ("click", attrs["colour"], attrs["size"])
 
     def next_action(self, obs: Observation) -> Optional[Action]:
@@ -225,14 +266,26 @@ class ExploringDriver:
             candidates.append((self._arm(key).sample(self._rng), key, Action.simple(a)))
 
         if CLICK in acts and frame is not None:
-            seg = segment(frame, include=(self.carving,))[self.carving]
-            bg = seg.background_colour
-            for comp in seg.components:
-                if bg is not None and comp.dominant_colour == bg:
-                    continue
-                x, y = comp.click_target
-                key = self._click_key(describe_object(comp, Action.click(x, y)))
-                candidates.append((self._arm(key).sample(self._rng), key, Action.click(x, y)))
+            seen: set[tuple[int, int]] = set()
+            segs = segment(frame)
+            pool = (
+                segs.segmentations
+                if self.union_targets
+                else (segs[self.carving],)
+            )
+            for seg in pool:
+                bg = seg.background_colour
+                for comp in seg.components:
+                    if bg is not None and comp.dominant_colour == bg:
+                        continue
+                    x, y = comp.click_target
+                    if (x, y) in seen:
+                        continue
+                    seen.add((x, y))
+                    key = self._click_key(describe_object(comp, Action.click(x, y)))
+                    candidates.append(
+                        (self._arm(key).sample(self._rng), key, Action.click(x, y))
+                    )
         elif CLICK in acts:
             x, y = self._rng.randrange(GRID_W), self._rng.randrange(GRID_H)
             candidates.append((self._arm(("click", -1, -1)).sample(self._rng),

@@ -35,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import numpy as np
 
-from arc3.client.env import EnvClient, available_environments
+from arc3.client.env import EnvClient, available_environments, make_arcade
 from arc3.drive import make_driver
 from arc3.dynamics.predict import bookkeeping_mask
 from arc3.types import Action
@@ -46,8 +46,8 @@ STARVED = ("ft09", "lf52", "lp85", "s5i5", "sb26", "su15", "tn36", "vc33")
 DRIVERS = ("random", "random_objects", "explore")
 
 
-def run(gid: str, driver_name: str, n_actions: int, seed: int) -> dict:
-    client = EnvClient(gid, seed=seed, record=True)
+def run(gid: str, driver_name: str, n_actions: int, seed: int, arcade=None) -> dict:
+    client = EnvClient(gid, seed=seed, record=True, arcade=arcade)
     assert client.episode is not None
     driver = make_driver(driver_name, seed=seed)
     resets = 0
@@ -99,6 +99,7 @@ def main() -> None:
         want = set(args.games.split(","))
         games = [g for g in games if g[:4] in want]
 
+    arcade = make_arcade()
     rows: list[dict] = []
     t0 = time.time()
     hdr = f"{'game':6s} " + " ".join(f"{d[:13]:>14s}" for d in drivers)
@@ -109,7 +110,7 @@ def main() -> None:
     for gid in games:
         cells = []
         for d in drivers:
-            r = run(gid, d, args.actions, args.seed)
+            r = run(gid, d, args.actions, args.seed, arcade=arcade)
             if r:
                 rows.append(r)
                 cells.append(f"{100 * r['playfield_rate']:13.0f}%")

@@ -51,6 +51,34 @@ class Client(Protocol):
     def step(self, action: Action) -> Observation: ...
 
 
+def make_arcade(
+    *, offline: bool = True, environments_dir: str = "environment_files"
+) -> Any:
+    """One engine handle, for callers that build many clients in a process.
+
+    :class:`EnvClient` constructs its own ``Arcade`` when it is not given one,
+    which is right for a single agent and wrong for an evaluation harness: each
+    instance loads and caches the environment files, so a script that builds one
+    client per game per driver holds dozens of copies. `eval_exploration.py`
+    building 75 clients exhausted memory and died inside the connected-component
+    labeller, which had nothing to do with it — the traceback simply lands
+    wherever the next allocation falls.
+
+    Scripts that loop over games should build one of these and pass it to every
+    client.
+    """
+    import arc_agi
+    from arc_agi import OperationMode
+
+    quiet = logging.getLogger("arc3.engine")
+    quiet.setLevel(logging.ERROR)
+    return arc_agi.Arcade(
+        operation_mode=OperationMode.OFFLINE if offline else OperationMode.NORMAL,
+        environments_dir=environments_dir,
+        logger=quiet,
+    )
+
+
 class EnvClient:
     """A typed wrapper over ``arc_agi``'s environment wrapper.
 
