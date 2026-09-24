@@ -35,3 +35,4 @@ recordings/
 # fixtures/ cover offline testing; this is bulk evidence, not a fixture.
 corpus/
 corpus300/
+corpus_obj/

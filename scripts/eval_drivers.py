@@ -34,7 +34,7 @@ from arc3.client.env import EnvClient, available_environments
 from arc3.drive import make_driver
 from arc3.types import Action
 
-DRIVERS = ("random", "round_robin", "lattice")
+DRIVERS = ("random", "random_objects", "round_robin", "lattice")
 
 
 def run(gid: str, driver_name: str, n_actions: int, seed: int) -> dict:

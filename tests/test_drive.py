@@ -12,7 +12,9 @@ import pytest
 from arc3.drive import (
     ACTION_CYCLE,
     RandomDriver,
+    RandomObjectDriver,
     RoundRobinDriver,
+    foreground_object_targets,
     lattice_targets,
     make_driver,
     object_targets,
@@ -107,7 +109,7 @@ def test_driver_stops_when_no_actions_are_available():
 # -- determinism (D-006: seed everything, reproduce from the log alone) ------
 
 
-@pytest.mark.parametrize("name", ["random", "round_robin", "lattice"])
+@pytest.mark.parametrize("name", ["random", "random_objects", "round_robin", "lattice"])
 def test_same_seed_gives_the_same_sequence(name):
     def seq():
         d = make_driver(name, seed=7)
@@ -171,3 +173,102 @@ def test_action_cycle_excludes_reset_and_covers_the_space():
 def test_make_driver_rejects_an_unknown_name():
     with pytest.raises(ValueError, match="unknown driver"):
         make_driver("greedy")
+
+
+# -- random_objects: random actions, object-targeted clicks (D-026) ----------
+
+
+def test_random_objects_clicks_land_inside_objects():
+    """The whole point. Under RandomDriver these land anywhere at all.
+
+    On lp85 only 2.3% of the 4,096 pixels do anything (D-021), so a uniformly
+    random pixel wastes roughly forty-nine clicks in fifty. This driver draws
+    from the object proposal set instead.
+    """
+    frame = np.zeros((64, 64), dtype=np.int8)
+    frame[10:14, 10:20] = 3
+    frame[40:44, 30:36] = 7
+    d = RandomObjectDriver(seed=0)
+    clicks = 0
+    for _ in range(60):
+        a = d.next_action(obs((6,), frame))
+        assert a.is_click
+        clicks += 1
+        assert frame[a.y, a.x] != 0, f"clicked background at ({a.x},{a.y})"
+    assert clicks == 60
+
+
+def test_random_objects_keeps_the_action_distribution_of_random():
+    """Only the click *placement* changes, so the comparison isolates one variable.
+
+    Both drivers draw uniformly from the legal actions with the same RNG calls
+    for the action choice, so on a keyboard-only game they must agree exactly.
+    """
+    a = RandomDriver(seed=3)
+    b = RandomObjectDriver(seed=3)
+    for _ in range(30):
+        assert a.next_action(obs((1, 2, 3, 4))).id == b.next_action(obs((1, 2, 3, 4))).id
+
+
+def test_random_objects_falls_back_to_a_pixel_on_a_blank_frame():
+    """A blank frame yields no object targets; the action must still be spent.
+
+    Skipping would silently change the action distribution, which is exactly
+    what this driver is designed not to do.
+    """
+    blank = np.zeros((64, 64), dtype=np.int8)
+    d = RandomObjectDriver(seed=0)
+    a = d.next_action(obs((6,), blank))
+    assert a.is_click
+    assert 0 <= a.x < 64 and 0 <= a.y < 64
+
+
+def test_random_objects_never_emits_a_click_on_a_keyboard_only_game():
+    d = RandomObjectDriver(seed=0)
+    for _ in range(40):
+        assert not d.next_action(obs((1, 2, 3, 4))).is_click
+
+
+def test_random_objects_stops_on_terminal_state():
+    o = Observation(
+        frames=(freeze_grid(np.zeros((64, 64), dtype=np.int8)),),
+        state=GameState.GAME_OVER,
+        levels_completed=0,
+        win_levels=6,
+        available_actions=(1, 2, 6),
+    )
+    assert RandomObjectDriver(seed=0).next_action(o) is None
+
+
+def test_random_objects_reaches_several_distinct_objects():
+    """One target forever would be worse than random pixels, not better.
+
+    The rule language's only relational feature is `clicked` (D-024), which
+    needs the *same* object hit repeatedly to be learnable - but a driver that
+    only ever hits one object cannot teach anything about the others.
+    """
+    frame = np.zeros((64, 64), dtype=np.int8)
+    frame[5:9, 5:9] = 3
+    frame[20:24, 20:24] = 5
+    frame[40:44, 40:44] = 7
+    d = RandomObjectDriver(seed=0)
+    hit = {int(frame[a.y, a.x]) for a in (d.next_action(obs((6,), frame)) for _ in range(60))}
+    assert len(hit) >= 3, f"only reached colours {hit}"
+
+
+def test_object_targets_include_the_background_but_foreground_ones_do_not():
+    """A finding, not a preference: the colour carvings partition the whole frame.
+
+    `object_targets` therefore offers the background region's centroid as a
+    click candidate, which is usually the least informative pixel on the frame.
+    D-021's large proposal counts are partly this.
+    """
+    frame = np.zeros((64, 64), dtype=np.int8)
+    frame[10:14, 10:20] = 3
+    frame[40:44, 30:36] = 7
+    everything = object_targets(frame)
+    foreground = foreground_object_targets(frame)
+    assert any(frame[y, x] == 0 for (x, y) in everything), "expected a background target"
+    assert foreground, "expected some non-background targets"
+    assert all(frame[y, x] != 0 for (x, y) in foreground)
+    assert len(foreground) < len(everything)
