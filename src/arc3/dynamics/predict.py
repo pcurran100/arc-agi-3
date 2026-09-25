@@ -136,7 +136,7 @@ def predict_frame(
             continue
         if effect.kind == VANISH:
             continue
-        apply_effect(canvas, before, comp, effect, bg)
+        apply_effect(canvas, before, comp, effect, bg, ruleset.shapes)
 
     return canvas
 

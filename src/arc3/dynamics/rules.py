@@ -65,6 +65,29 @@ TRANSLATE = "translate"
 RECOLOUR = "recolour"
 VANISH = "vanish"
 
+#: The object is replaced by a different shape, optionally at an offset.
+#:
+#: Added after measuring what the four original effects could not express.
+#: Profiling the five games that produce abundant evidence and score exactly
+#: zero (D-032), **63% of their non-static object events were inexpressible**,
+#: and 86% of that gap is one thing: an object whose mask changes.
+#:
+#:   deformed-move  330  (37.5% of the gap)   moved AND changed silhouette
+#:   shrank         290  (33.0%)              same place, fewer pixels
+#:   grew           119  (13.5%)              same place, more pixels
+#:   reshaped        20  ( 2.3%)              same size, different mask
+#:
+#: All four are the same statement — *the object is now this other shape* — and
+#: `BECOME` is that statement. It is not a taxonomy of game mechanics; it is the
+#: remaining thing the tracker can report and the language could not repeat.
+#:
+#: The shape is carried as a `shape_key`, so two occurrences of the same form
+#: are the same effect and MDL can generalise over them. The pixel template it
+#: refers to lives in :attr:`RuleSet.shapes`, which keeps the effect small,
+#: hashable and comparable — storing a mask inline would make every effect
+#: unique and MDL would never generalise at all.
+BECOME = "become"
+
 
 @dataclass(frozen=True, slots=True)
 class Effect:
@@ -74,12 +97,15 @@ class Effect:
     dx: int = 0
     dy: int = 0
     colour: int = -1
+    shape: bytes = b""
 
     def __str__(self) -> str:
         if self.kind == TRANSLATE:
             return f"translate({self.dx:+d},{self.dy:+d})"
         if self.kind == RECOLOUR:
             return f"recolour(->{self.colour})"
+        if self.kind == BECOME:
+            return f"become(shape#{hash(self.shape) & 0xFFFF:04x},{self.dx:+d},{self.dy:+d})"
         return self.kind
 
     @property
@@ -194,10 +220,14 @@ class RuleSet:
 
     rules: tuple[Rule, ...] = ()
     defaults: dict[int, Effect] = None  # type: ignore[assignment]
+    #: shape_key -> bbox-relative boolean template, for rendering BECOME.
+    shapes: dict = None  # type: ignore[assignment]
 
     def __post_init__(self) -> None:
         if self.defaults is None:
             self.defaults = {}
+        if self.shapes is None:
+            self.shapes = {}
 
     def effect_for(self, action: Action, attrs: dict[str, Any]) -> Effect:
         # `rules` is stored most-specific-first by the inducer.
@@ -269,6 +299,7 @@ def apply_effect(
     component: Component,
     effect: Effect,
     background: int,
+    shapes: Optional[dict] = None,
 ) -> None:
     """Draw ``component`` under ``effect`` onto ``canvas``, in place.
 
@@ -296,3 +327,21 @@ def apply_effect(
         h, w = canvas.shape
         keep = (ny >= 0) & (ny < h) & (nx >= 0) & (nx < w)
         canvas[ny[keep], nx[keep]] = source[ys[keep], xs[keep]]
+        return
+    if effect.kind == BECOME:
+        tmpl = shapes.get(effect.shape) if shapes else None
+        if tmpl is None:
+            # Shape never seen at induction time: fall back to leaving the
+            # object where it was rather than erasing it, which is the less
+            # destructive of the two wrong answers.
+            canvas[ys, xs] = source[ys, xs]
+            return
+        mask_t, colour_t = tmpl
+        th, tw = mask_t.shape
+        y0 = component.bbox.y0 + effect.dy
+        x0 = component.bbox.x0 + effect.dx
+        h, w = canvas.shape
+        tys, txs = np.nonzero(mask_t)
+        ny, nx = tys + y0, txs + x0
+        keep = (ny >= 0) & (ny < h) & (nx >= 0) & (nx < w)
+        canvas[ny[keep], nx[keep]] = colour_t[tys[keep], txs[keep]]

@@ -1,0 +1,71 @@
+[
+  {
+    "game": "vc33",
+    "playfield_transitions": 99,
+    "counts": {
+      "shrank": 127,
+      "static": 671,
+      "appeared": 13,
+      "deformed-move": 195,
+      "grew": 31,
+      "translate": 120,
+      "vanish": 12
+    }
+  },
+  {
+    "game": "s5i5",
+    "playfield_transitions": 46,
+    "counts": {
+      "shrank": 92,
+      "static": 1196,
+      "grew": 46,
+      "translate": 46,
+      "appeared": 2,
+      "deformed-move": 44
+    }
+  },
+  {
+    "game": "tn36",
+    "playfield_transitions": 36,
+    "counts": {
+      "static": 3750,
+      "shrank": 36,
+      "recolour": 52,
+      "appeared": 39,
+      "deformed-move": 51,
+      "grew": 1,
+      "translate": 70,
+      "vanish": 12,
+      "reshaped": 13
+    }
+  },
+  {
+    "game": "lf52",
+    "playfield_transitions": 19,
+    "counts": {
+      "deformed-move": 33,
+      "static": 919,
+      "shrank": 12,
+      "translate": 101,
+      "appeared": 56,
+      "grew": 29,
+      "reshaped": 3,
+      "vanish": 55,
+      "recolour": 11
+    }
+  },
+  {
+    "game": "sb26",
+    "playfield_transitions": 26,
+    "counts": {
+      "static": 633,
+      "shrank": 23,
+      "appeared": 11,
+      "reshaped": 4,
+      "translate": 22,
+      "grew": 12,
+      "vanish": 10,
+      "deformed-move": 7
+    }
+  }
+]

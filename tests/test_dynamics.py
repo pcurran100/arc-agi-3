@@ -24,6 +24,7 @@ from arc3.dynamics import (
 )
 from arc3.dynamics.predict import bookkeeping_mask, score_static_baseline
 from arc3.dynamics.rules import (
+    BECOME,
     RECOLOUR,
     STATIC,
     TRANSLATE,
@@ -87,18 +88,47 @@ def test_a_disappearance_is_observed_as_vanish():
     assert [e.effect.kind for e in obs.events] == [VANISH]
 
 
-def test_a_move_that_changes_silhouette_is_counted_as_deformed():
-    """The dominant known loss, so it must be *counted* rather than ignored.
+def test_a_move_that_changes_silhouette_is_expressed_as_become():
+    """Was the dominant known loss; D-033 made it expressible.
 
-    27-48% of real moves in the corpus are of this shape under colour_8. The
-    language cannot express them and records them as static; what it must not do
-    is fail to notice.
+    27-48% of real moves in the corpus change silhouette as they move. The
+    vocabulary used to record them as `static` and mispredict them silently.
+    `become` states the new shape and the offset, so the effect is now sayable.
+    It is still counted as a deformed move, because the *move* statistic is
+    about what the tracker saw, not about what the language can say.
     """
     t = transition(with_square(10, 10, size=4), with_square(14, 10, size=6))
     obs = observe_transition(t, "foreground_8")
     assert obs.n_moves == 1
     assert obs.n_moves_deformed == 1
-    assert all(e.effect.kind == STATIC for e in obs.events)
+    effects = [e.effect for e in obs.events if not e.effect.is_identity]
+    assert len(effects) == 1
+    assert effects[0].kind == BECOME
+    assert (effects[0].dx, effects[0].dy) == (4, 0)
+    assert effects[0].shape, "become must carry a shape key or it cannot be rendered"
+
+
+def test_growing_and_shrinking_are_expressible_and_render_exactly():
+    """grew + shrank were 46.5% of the measured vocabulary gap (D-033)."""
+    for a, b in ((4, 6), (6, 4)):
+        before, after = with_square(10, 10, size=a), with_square(10, 10, size=b)
+        t = transition(before, after)
+        obs = observe_transition(t, "foreground_8")
+        rs = induce([obs] * 4)
+        assert np.array_equal(predict_frame(before, t.action, rs, "foreground_8"), after)
+
+
+def test_become_falls_back_rather_than_erasing_an_unknown_shape():
+    """A shape absent from the registry must not blank the object.
+
+    Leaving it in place is the less destructive of the two wrong answers, and
+    the situation is real: a test transition can contain a shape induction never
+    saw.
+    """
+    before = with_square(10, 10, size=4)
+    rs = RuleSet(rules=(), defaults={1: Effect(BECOME, dx=0, dy=0, shape=b"unseen")})
+    pred = predict_frame(before, Action.simple(1), rs, "foreground_8")
+    assert np.array_equal(pred, before)
 
 
 # -- rendering ---------------------------------------------------------------

@@ -57,6 +57,7 @@ from ..perception.track import match_frames
 from ..types import Action, Transition
 from .rules import (
     ATTRIBUTES,
+    BECOME,
     RECOLOUR,
     STATIC,
     STATIC_EFFECT,
@@ -92,6 +93,11 @@ class TransitionObservation:
     n_moves: int = 0
     n_moves_deformed: int = 0
     n_blind: int = 0
+    shapes: dict = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.shapes is None:
+            self.shapes = {}
 
     @property
     def is_predictable_in_principle(self) -> bool:
@@ -150,10 +156,15 @@ def _effect_from_match(prev, nxt, same_colour: bool, before=None, after=None) ->
             m = prev.mask
             if not np.array_equal(before[m], after[m]):
                 blind = True
-        return STATIC_EFFECT, blind
-    # Deformed: the language cannot say this. Treated as static, which will
-    # simply fail the exact-frame check and be counted as a miss.
-    return STATIC_EFFECT, False
+        if blind:
+            # Same mask, same dominant colour, different pixels: a partial
+            # recolour. BECOME can state it, because the template carries the
+            # per-pixel colours rather than one colour.
+            return Effect(BECOME, dx=0, dy=0, shape=nxt.shape_key), True
+        return STATIC_EFFECT, False
+    # Moved and deformed, grew, shrank, or reshaped. All four are the same
+    # statement and BECOME is that statement (D-033).
+    return Effect(BECOME, dx=int(dx), dy=int(dy), shape=nxt.shape_key), False
 
 
 def observe_transition(
@@ -168,6 +179,7 @@ def observe_transition(
     matching = match_frames(seg_b, seg_a)
 
     events: list[ObjectEvent] = []
+    shapes: dict = {}
     n_moves = n_deformed = n_blind = 0
     by_prev = matching.by_prev()
     for i, comp in enumerate(seg_b.components):
@@ -177,6 +189,10 @@ def observe_transition(
         else:
             nxt = seg_a.components[m.next_index]
             effect, blind = _effect_from_match(comp, nxt, m.same_colour, before, after)
+            if effect.kind == BECOME and effect.shape not in shapes:
+                r = nxt.bbox
+                sub = nxt.mask[r.y0 : r.y1, r.x0 : r.x1]
+                shapes[effect.shape] = (sub, after[r.y0 : r.y1, r.x0 : r.x1])
             if blind:
                 n_blind += 1
             if (nxt.bbox.x0 - comp.bbox.x0) or (nxt.bbox.y0 - comp.bbox.y0):
@@ -194,6 +210,7 @@ def observe_transition(
         n_moves=n_moves,
         n_moves_deformed=n_deformed,
         n_blind=n_blind,
+        shapes=shapes,
     )
 
 
@@ -305,4 +322,7 @@ def induce(
             rules.append(Rule(action_id=action_id, selector=Selector(conditions), effect=effect))
 
     rules.sort(key=lambda r: -r.selector.arity)
-    return RuleSet(rules=tuple(rules), defaults=defaults)
+    shapes: dict = {}
+    for obs in observations:
+        shapes.update(obs.shapes)
+    return RuleSet(rules=tuple(rules), defaults=defaults, shapes=shapes)
