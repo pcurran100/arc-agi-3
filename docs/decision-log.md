@@ -2793,4 +2793,133 @@ kind of thing that costs a day at the wrong moment.
 
 ---
 
-<!-- Next entry: D-032. Copy the template from CLAUDE.md. -->
+## D-032 — Exploration does help the learner, and every cross-corpus comparison before this one was wrong
+
+- **Date:** 2026-09-25
+- **Status:** accepted
+- **Context:** D-031's revisit condition: *"a re-recorded corpus does not improve
+  the dynamics results, which would mean activity and learnability are less
+  related than assumed and the objective is wrong."* The explorer took the
+  number of games the agent cannot move from eight to one, and the corpus it
+  leaves behind is far richer — on the starved games, 3% activity and 2.5
+  distinct playfield events per game become **46% and 30.9**, with lp85 going
+  from 1 distinct event to 76 and vc33 from 0 to 88. Whether any of that reaches
+  the learner is a separate question and this entry answers it.
+
+### First, the confound, because it invalidates the obvious reading
+
+Re-running `eval_dynamics.py` on the explore corpus gave **3.8% mean exact
+against random's 4.8%**, with apparently catastrophic per-game losses: dc22
+44.4%→15.0%, m0r0 26.1%→4.8%, tr87 20.0%→6.7%. Read naively, exploration made
+the model worse.
+
+It did not. `eval_dynamics.py` splits each corpus into its own train and test
+halves, so **every driver is examined on transitions it generated itself**. A
+driver that produces a richer corpus therefore sets itself a harder exam: the
+explore corpus carries 42.3 distinct playfield events per game against random's
+30.4. Improving the explorer makes its own benchmark harder, which is a perverse
+property for a measurement to have, and it has been present in **every**
+cross-corpus comparison in this log — including D-026's.
+
+### Experiment — one neutral test set
+
+`scripts/eval_corpus_value.py`. For each game, build a single test set from the
+concatenation of the held-out tails of **all three** corpora, train a model on
+each corpus's own training split, and score all three on that same union. No new
+recording. A test set drawn from any one driver would favour that driver; a
+union favours none, and asks the better question: does this corpus teach a model
+that generalises to states the agent did not itself produce?
+
+`colour_4`, seed 0, 23 games (ft09 and lp85 reported separately per D-020), ~90
+common test transitions per game. **The run took 13 hours** — five models'
+worth of scoring per game — and is not a measurement to repeat casually.
+
+| corpus | mean exact | games >0 | starved games >0 |
+|---|---|---|---|
+| `random` | 3.8% | 7/23 | 1/6 |
+| `random_objects` | 3.8% | 7/23 | 0/6 |
+| **`explore`** | **4.5%** | **9/23** | 1/6 |
+
+- **Result 1 — exploration helps, modestly and really.** On a neutral test set
+  the explore corpus teaches a better model: 4.5% against 3.8%, and **nine games
+  modelled at all against seven**. The gains are cn04 (0%→6.6%) and g50t
+  (0%→**8.2%**), the latter a game no corpus had ever produced a non-zero score
+  on.
+
+- **Result 2 — the apparent losses were entirely artefacts.** On a common test
+  set, **dc22 scores 32.9% under all three corpora** and tr87 scores 15.6% under
+  all three. The "collapse" from 44.4% to 15.0% was the explore corpus asking
+  dc22 a harder set of questions, not a worse model answering them. m0r0 is
+  *better* on the explore corpus (16.4% against 14.9%), the reverse of what the
+  confounded comparison showed.
+
+  **This retroactively corrects D-026.** That entry reported the object-targeted
+  corpus as "flat on the headline" and read per-game deltas as real; its
+  per-game numbers are confounded the same way and its aggregate conclusion —
+  that the corpus fix did not convert — is **withdrawn as unsupported**. On a
+  neutral test `random_objects` is indeed no better than `random` in the mean,
+  so the conclusion happens to survive, but it was not established by the
+  evidence given for it.
+
+- **Result 3 — the starved games are still at exactly zero, and this is the
+  important finding.** vc33, s5i5, tn36, lf52 and sb26 all score **0%** on the
+  neutral test set despite their corpora now containing 27 to 88 distinct
+  playfield events each, where they previously had between 0 and 4. su15 scores
+  2.1%, the same as it did under random.
+
+  **A richer corpus does not rescue them.** The prediction was put on the record
+  before this run and for a stated reason: four of the eight have a **100%
+  deformed-move rate** under `colour_*` (D-025), meaning the effect vocabulary
+  cannot express a single motion those games produce, no matter how many it
+  observes. This is now measured rather than argued. **Their blocker is
+  representation, not evidence, and eight sessions of better driving will not
+  move them.**
+
+- **Did it change our mind? Yes, twice.** Exploration converts into learning,
+  which D-031 could not show and which its revisit condition demanded. And the
+  measurement methodology used throughout this log was producing false per-game
+  conclusions, one of which (dc22's collapse) I reported as a real cost of the
+  new driver in the previous session.
+
+- **Decision:**
+  1. **`explore` stays the default driver.** It is better on a neutral test and
+     strictly better at making games respond.
+  2. **Cross-corpus comparisons must use a common test set.** `eval_dynamics.py`
+     remains correct for comparing *carvings* or *learners* on a fixed corpus,
+     and must not be used to compare *drivers*. Recorded in its docstring.
+  3. **The next objective is representation, not exploration.** D-027's
+     objective 3 — the weighted hypothesis population with single-observation
+     generalisation — plus the effect vocabulary gaps D-024 listed. The starved
+     games are the test: five of them produce plenty of evidence and score zero.
+  4. **Do not spend further effort on driving.** The remaining known driver
+     improvements (hierarchical arm priors, a RESET policy, repetition) address
+     a bottleneck that is no longer binding on the learner.
+- **Options rejected:**
+  - *Read the 4.5% vs 3.8% as decisive* — it is two games and 0.7 percentage
+    points, on 23 games, with no error bars. The robust part of the result is
+    that two games went from literally zero to non-zero, which is harder to
+    achieve by chance than a shifted mean.
+  - *Re-run every prior cross-corpus claim on a common test set* — 13 hours per
+    run. The affected claims are identified here instead; the only one that
+    changes a decision is D-026's, and its decision stands for other reasons.
+  - *Use a fourth, independently generated corpus as the test set* — cleaner in
+    principle, since the union still contains each driver's own states. Rejected
+    as another 13-hour run for a refinement that would not change the ordering.
+  - *Conclude that the starved games are unwinnable* — they are unwinnable **by
+    this rule language**, which is a statement about D-024, not about the games.
+    vc33 now responds to the agent on 100% of actions; something is happening
+    there that we cannot yet write down.
+- **Consequences:** exploration is done as a line of work. The measurement
+  harness has a documented restriction. The project's attention moves to
+  representation with a concrete, measured test case: five games that produce
+  abundant evidence and cannot be modelled at all.
+- **Revisit if:** a richer effect vocabulary lands and the starved games stay at
+  zero, which would mean the problem is neither evidence nor expressiveness and
+  something more basic is wrong with the approach; or a common-test-set re-run
+  of the carving sweep reverses D-025's carving conclusions, which are
+  within-corpus and therefore *not* affected by this confound but have never
+  been checked against it.
+
+---
+
+<!-- Next entry: D-033. Copy the template from CLAUDE.md. -->

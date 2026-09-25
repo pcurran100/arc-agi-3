@@ -42,6 +42,18 @@ Three secondary figures, each earning its place by having caught a real error:
   27-48% under colour_8, so this is the dominant known loss, and comparing it
   across carvings is the main diagnostic for *why* a carving wins or loses.
 
+**Do not use this to compare drivers.** It splits each corpus into its own
+train and test halves, so a driver is examined on transitions it generated
+itself, and a driver that produces a *richer* corpus therefore sets itself a
+*harder* exam. Measured: the explore corpus scored 3.8% here against random's
+4.8%, and on a common test set it is **better** — 4.5% against 3.8% — with the
+apparent per-game collapses (dc22 44.4%->15.0%) turning out to be identical
+scores on identical questions (32.9% under all three corpora). See D-032 and
+`eval_corpus_value.py`.
+
+This script remains correct for comparing **carvings** or **learners** on a
+fixed corpus, which is what it was built for.
+
 Usage:
     python scripts/record_corpus.py            # once
     python scripts/eval_dynamics.py [--carvings colour_8,...] [--out FILE]

@@ -402,8 +402,8 @@ selection is worth about one and layer separation about two.
 |---|---|---|---|
 | 1 | ~~**Exploration: make the game move on purpose**~~ | **done (D-031).** Games the agent cannot move: **8 → 1**. Starved-game activity 3% → 47%. vc33 0% → 100%, lp85 1% → 77%. Three levels cleared that no other driver clears | **done** |
 | 2 | **Layer separation: model UI and playfield apart** | **2 games** (sp80 0%→100%, dc22 44%→100%). Half done: `OnlineBand` (D-031) separates the layers *for the explorer*; the **learner** still does not model the UI | partly done |
-| 2b | **Re-record the corpus with `explore`, re-run the dynamics sweep** | the learner has never seen a corpus in which the starved games do anything | **next** |
-| 3 | **Weighted hypothesis population with priors** | enables a hypothesis from a *single* observation, which the MDL point learner structurally cannot | after 2 |
+| 2b | ~~**Re-record with `explore`, re-run the sweep**~~ | **done (D-032).** On a *neutral* test set the explore corpus teaches a better model: 4.5% vs 3.8%, **9 games modelled vs 7**. But the starved games stay at **exactly 0%** | done |
+| 3 | **Representation: richer vocabulary + weighted hypothesis population** | **now the binding constraint (D-032).** Five starved games now produce 27–88 distinct events each and still score 0% — their blocker is expressiveness, not evidence. Four have a 100% deformed-move rate the vocabulary cannot express | **next** |
 | 4 | **Online loop: act on hypotheses, update from outcomes** | the actual agent | after 3 |
 | ~~5~~ | ~~Carving selection~~ | ~1 game | **closed, negative (D-029).** Beats doing nothing on 51% of game-splits — a coin flip. Revisit after layer separation, when residuals can be measured on the playfield alone |
 | 6 | **Multi-step rollout accuracy** | unmeasured, and planning depends on it entirely | any time |
@@ -427,6 +427,7 @@ which is about the thesis; this is about the machine.
 | **42-frame animations unread** | Up to 42 sub-transitions recorded per action; dynamics reads only resting endpoints | D-024 |
 | **Driver comparisons differ in train *and* test data** | D-026's two sweeps are different recordings, so per-game deltas mix better evidence with a harder test set. A clean rerun would hold the test set fixed | D-026 |
 | **Object-model quality does not convert to score** | The central puzzle. Click-game object accuracy rose +6.8pp in D-026 with no headline movement | objective 2 |
+| **Driver comparisons were confounded until D-032** | `eval_dynamics.py` examines each driver on its own transitions, so a richer corpus is a harder exam. dc22's apparent 44%→15% collapse was identical scores on different questions. Use `eval_corpus_value.py` for drivers | D-032 |
 | **Cannot choose a carving from 20 validation transitions** | The choice matters (oracle 7/23 vs fixed 5/23; s5i5 and tn36 swing 0%→100% object accuracy on carving alone) but no selection key is reliable. Mean residual looked like an 86% fix until a game-holdout showed 51%, i.e. chance | D-029 |
 
 ## Standing risks to the thesis
