@@ -87,3 +87,13 @@ def test_state_key_ignores_band_rows():
     assert state_key(a, band) != state_key(b, band)
     band[63, :] = True
     assert state_key(a, band) == state_key(b, band)
+
+
+def test_empty_observation_is_a_noop_not_a_reset():
+    """Zero frames means the action changed nothing; it must not trigger RESET."""
+    game = Corridor(6)
+    agent = GraphAgent(seed=0, use_model=False)
+    first = agent.act(game.obs())
+    empty = Observation(frames=(), state=GameState.NOT_FINISHED, levels_completed=0,
+                        win_levels=1, available_actions=(1, 2, 3), action=first)
+    assert not agent.act(empty).is_reset

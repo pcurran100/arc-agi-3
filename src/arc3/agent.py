@@ -84,6 +84,9 @@ MAX_CLICKS = 64
 PENALTY_KNOWN = 0.35   # predicted to reach a state already in the graph
 PENALTY_NOOP = 0.6     # predicted to change nothing at all
 
+#: Rows from the top or bottom edge a bookkeeping band may occupy (edge_band).
+EDGE_ROWS = 4
+
 #: How many of the arm-ranked untried actions the model is consulted on.
 MODEL_TOP_K = 8
 
@@ -125,6 +128,8 @@ class GraphAgent:
     #: Leave a state whose untried actions all belong to arms with a mean below
     #: this, if a frontier elsewhere offers better. 0 disables.
     local_min: float = 0.3
+    #: Restrict the bookkeeping band to the top and bottom EDGE_ROWS rows.
+    edge_band: float = 0.0
     _rng: random.Random = field(init=False)
     band: OnlineBand = field(default_factory=OnlineBand, init=False)
     _band_sig: bytes = field(default=b"", init=False)
@@ -157,7 +162,7 @@ class GraphAgent:
         Keys depend on the band, so a band change silently orphans every node.
         Rebuilding from stored frames is cheap and keeps the graph coherent.
         """
-        mask = self.band.mask()
+        mask = self._mask()
         sig = np.packbits(mask).tobytes()
         if sig == self._band_sig:
             return
@@ -183,8 +188,23 @@ class GraphAgent:
         self._path = []
         self._bump("rekeys")
 
+    def _mask(self) -> np.ndarray:
+        """The bookkeeping band, optionally restricted to the frame's edge rows.
+
+        The row-frequency estimate cannot tell a counter from a playfield
+        region that happens to change on about half of all actions. On tr87
+        it flips rows 48-60 in and out of the band every step and the graph is
+        re-keyed 489 times in 500 actions. Every counter measured so far sits
+        at an edge (sp80 row 0, ls20 rows 61-62), where the UI layer is drawn.
+        """
+        m = self.band.mask()
+        if self.edge_band:
+            m = m.copy()
+            m[EDGE_ROWS:-EDGE_ROWS, :] = False
+        return m
+
     def _key(self, frame: np.ndarray) -> bytes:
-        return state_key(frame, self.band.mask())
+        return state_key(frame, self._mask())
 
     def _node(self, key: bytes, frame: np.ndarray, available: tuple[int, ...]) -> _Node:
         n = self._nodes.get(key)
@@ -275,7 +295,7 @@ class GraphAgent:
         seg = None
         if self.use_model and self._ruleset is not None:
             seg = segment(node.frame, include=(MODEL_CARVING,))[MODEL_CARVING]
-        mask = self.band.mask()
+        mask = self._mask()
         scored = sorted(((self._arm(k).sample(self._rng), k, a) for k, a in untried),
                         key=lambda t: -t[0])
         out = []

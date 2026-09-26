@@ -1,0 +1,28 @@
+ar25-0c556536 graph          levels 0/8 score   0.0%  cleared_at []  89.9s  441 states, level 0, explore_steps=494, inductions=49, nav_steps=1, playfield_moves=467, playfield_still=27, rekeys=13
+bp35-0a0ad940 graph          levels 1/9 score   0.0%  cleared_at [465]  522.0s  23 states, level 1, explore_steps=491, inductions=48, levels=1, playfield_moves=334, playfield_still=155, rekeys=33
+cd82-fb555c5d graph          levels 1/6 score   0.8%  cleared_at [248]  91.8s  28 states, level 1, explore_steps=496, inductions=49, levels=1, playfield_moves=354, playfield_still=140, rekeys=13
+cn04-2fe56bfb graph          levels 0/6 score   0.0%  cleared_at []  85.2s  422 states, level 0, explore_steps=494, inductions=49, playfield_moves=467, playfield_still=26, rekeys=7
+dc22-fdcac232 graph          levels 0/6 score   0.0%  cleared_at []  134.5s  72 states, level 0, explore_steps=492, inductions=49, nav_steps=4, playfield_moves=198, playfield_still=297, rekeys=2
+ft09-0d8bbf25 graph          levels 0/6 score   0.0%  cleared_at []  132.5s  70 states, level 0, explore_steps=498, inductions=49, playfield_moves=85, playfield_still=412, rekeys=2
+g50t-5849a774 graph          levels 0/7 score   0.0%  cleared_at []  68.8s  336 states, level 0, explore_steps=492, inductions=49, nav_steps=5, playfield_moves=397, playfield_still=99, rekeys=1
+ka59-38d34dbb graph          levels 0/7 score   0.0%  cleared_at []  70.0s  191 states, level 0, explore_steps=493, inductions=49, nav_steps=3, playfield_moves=362, playfield_still=133, rekeys=2
+lf52-271a04aa graph          levels 0/10 score   0.0%  cleared_at []  102.3s  8 states, level 0, exhausted=249, explore_steps=245, inductions=49, nav_steps=1, playfield_moves=121, playfield_still=373, rekeys=2
+lp85-305b61c3 graph          levels 1/8 score   0.6%  cleared_at [80]  144.8s  116 states, level 1, explore_steps=497, inductions=49, levels=1, playfield_moves=138, playfield_still=357, rekeys=4
+ls20-9607627b graph          levels 0/7 score   0.0%  cleared_at []  80.7s  466 states, level 0, explore_steps=495, inductions=49, nav_steps=2, playfield_moves=495, playfield_still=1, rekeys=3
+m0r0-492f87ba graph          levels 0/6 score   0.0%  cleared_at []  107.7s  121 states, level 0, explore_steps=471, inductions=49, nav_steps=26, playfield_moves=367, playfield_still=129, rekeys=34
+r11l-495a7899 graph          levels 1/6 score   8.4%  cleared_at [31]  794.4s  437 states, level 1, explore_steps=488, inductions=48, levels=1, playfield_moves=485, playfield_still=1, rekeys=34
+re86-8af5384d graph          levels 0/8 score   0.0%  cleared_at []  76.8s  364 states, level 0, explore_steps=493, inductions=49, nav_steps=3, playfield_moves=461, playfield_still=34, rekeys=16
+s5i5-18d95033 graph          levels 0/8 score   0.0%  cleared_at []  104.2s  37 states, level 0, explore_steps=452, inductions=48, nav_steps=40, playfield_moves=257, playfield_still=232, rekeys=2
+sb26-7fbdac44 graph          levels 0/8 score   0.0%  cleared_at []  111.2s  146 states, level 0, explore_steps=498, inductions=49, playfield_moves=224, playfield_still=273, rekeys=1
+sc25-635fd71a graph          levels 0/6 score   0.0%  cleared_at []  130.1s  397 states, level 0, explore_steps=493, inductions=49, playfield_moves=398, playfield_still=94, rekeys=1
+sk48-d8078629 graph          levels 0/8 score   0.0%  cleared_at []  185.7s  284 states, level 0, explore_steps=498, inductions=49, playfield_moves=336, playfield_still=161, rekeys=36
+sp80-589a99af graph          levels 1/6 score   0.2%  cleared_at [367]  83.5s  130 states, level 1, explore_steps=451, inductions=48, levels=1, nav_steps=36, playfield_moves=386, playfield_still=99, rekeys=8
+su15-1944f8ab graph          levels 0/9 score   0.0%  cleared_at []  77.5s  18 states, level 0, exhausted=144, explore_steps=309, inductions=48, nav_steps=36, playfield_moves=123, playfield_still=361, rekeys=2
+tn36-ef4dde99 graph          levels 1/7 score  16.4%  cleared_at [21]  334.5s  167 states, level 1, explore_steps=493, inductions=49, levels=1, playfield_moves=186, playfield_still=305, rekeys=2
+tr87-cd924810 graph          levels 0/6 score   0.0%  cleared_at []  157.9s  299 states, level 0, explore_steps=495, inductions=49, nav_steps=2, playfield_moves=423, playfield_still=73, rekeys=489
+tu93-0768757b graph          levels 2/9 score   2.0%  cleared_at [375, 413]  106.9s  20 states, level 2, explore_steps=326, inductions=48, levels=2, nav_steps=163, playfield_moves=357, playfield_still=126, rekeys=2
+vc33-5430563c graph          levels 2/7 score   1.0%  cleared_at [29, 218]  114.7s  54 states, level 2, explore_steps=492, inductions=49, levels=2, nav_steps=2, playfield_moves=310, playfield_still=181, rekeys=5
+wa30-ee6fef47 graph          levels 0/9 score   0.0%  cleared_at []  66.1s  452 states, level 0, explore_steps=498, inductions=49, playfield_moves=472, playfield_still=25, rekeys=7
+
+== summary ==
+graph          levels 10/183  games with a level 8/25  mean RHAE 1.18%

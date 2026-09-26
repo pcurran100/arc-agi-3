@@ -50,7 +50,13 @@ class MyAgent(Agent):
         )
 
     def choose_action(self, frames: list[FrameData], latest_frame: FrameData) -> GameAction:
-        if latest_frame.state is GameState.NOT_PLAYED or not latest_frame.frame:
+        # Zero frames is a legal return meaning "the action changed nothing"
+        # (docs/benchmark.md), so an empty frame list is only a reason to RESET
+        # before any frame has ever been seen. GraphAgent carries the last grid
+        # forward through no-ops itself.
+        if latest_frame.state is GameState.NOT_PLAYED or (
+            not latest_frame.frame and not self._last_frames
+        ):
             self._pending_data = {}
             return GameAction.RESET
         try:

@@ -12,7 +12,7 @@ rerun, dummy parquet otherwise), so the only thing that differs from the
 official known-good submission is the agent body.
 
 Usage:
-    python scripts/build_kaggle.py [--max-actions 2000] [--no-model]
+    python scripts/build_kaggle.py [--max-actions 2000] [--model]
 Writes kaggle/build/my_agent.py and kaggle/build/submission.ipynb.
 """
 
@@ -180,10 +180,10 @@ def build_notebook(agent_body: str) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-actions", type=int, default=2000)
-    ap.add_argument("--no-model", action="store_true")
+    ap.add_argument("--model", action="store_true", help="enable the induced dynamics model")
     args = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
-    body = build_agent(args.max_actions, not args.no_model)
+    body = build_agent(args.max_actions, args.model)
     (OUT / "my_agent.py").write_text(body, encoding="utf-8")
     (OUT / "submission.ipynb").write_text(json.dumps(build_notebook(body), indent=1),
                                           encoding="utf-8")
