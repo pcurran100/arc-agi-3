@@ -40,6 +40,12 @@ next one spends more.
    dummy `submission.parquet`; that is expected.
 5. When it has finished: open the saved version → **Submit to Competition**.
    The real scoring happens in Kaggle's rerun.
+
+   Worth doing even if v1 will score badly: it is the only end-to-end test of
+   our packaging against the real gateway (which exists only in the rerun), it
+   gives the only unflattered hidden-game number, and it is the baseline v2 must
+   beat. It costs no GPU quota, only one submission (reportedly one per UTC
+   day). Check the Rules tab for how final submissions are selected.
 6. Milestone eligibility needs the code public under a permissive licence —
    **the repository still has no LICENSE file**; that choice is yours.
 
@@ -84,8 +90,15 @@ proves the pipeline.
 1. **Create** → **New Notebook** → **File** → **Import Notebook** →
    `bench_v2_t4.ipynb`.
 2. **Add Input** four times: the competition; the wheelhouse; the Qwen2.5-7B
-   AWQ model (from **Models**, choose Transformers / 7b-instruct-awq);
-   `arc3-public-games`.
+   AWQ model; `arc3-public-games`.
+
+   The model is a Kaggle **Model**, not a Dataset — Add Input's dataset search
+   will not find it. Either switch Add Input to **Models** and search
+   `qwen2.5` (publisher QwenLM → Transformers → 7b-instruct-awq), or open
+   https://www.kaggle.com/models/qwen-lm/qwen2.5/transformers/7b-instruct-awq
+   and start a notebook from its page (it opens with the model attached), then
+   **File → Import Notebook** → `bench_v2_t4.ipynb` and add the other three.
+   Check the right panel still lists the model after importing.
 3. **Session options**: Accelerator **GPU T4 x2**, Internet **Off**.
 4. Click **+ Code** above the first cell and paste:
 
