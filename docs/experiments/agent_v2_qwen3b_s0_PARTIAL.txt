@@ -1,0 +1,5 @@
+ar25-0c556536 v2             levels 0/8 score   0.0%  cleared_at []  341.6s  423 states, level 0, explore_steps=492, goal_detours=2, llm_calls=4, nav_steps=4, playfield_moves=437, playfield_still=56, rekeys=1, hyps=12 live=11
+bp35-0a0ad940 v2             levels 0/9 score   0.0%  cleared_at []  236.1s  161 states, level 0, explore_steps=329, goal_detours=93, llm_calls=4, nav_steps=171, playfield_moves=344, playfield_still=70, rekeys=4, hyps=12 live=7
+cd82-fb555c5d v2             levels 0/6 score   0.0%  cleared_at []  141.0s  112 states, level 0, explore_steps=485, llm_calls=4, nav_steps=11, playfield_moves=211, playfield_still=284, rekeys=6, hyps=12 live=9
+cn04-2fe56bfb v2             levels 0/6 score   0.0%  cleared_at []  98.2s  136 states, level 0, explore_steps=86, goal_detours=18, llm_calls=4, nav_steps=414, playfield_moves=483, playfield_still=10, rekeys=1, hyps=12 live=3
+dc22-fdcac232 v2             levels 0/6 score   0.0%  cleared_at []  311.9s  84 states, level 0, explore_steps=484, goal_detours=6, llm_calls=4, nav_steps=12, playfield_moves=214, playfield_still=281, rekeys=2, hyps=12 live=8
