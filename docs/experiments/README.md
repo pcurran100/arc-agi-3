@@ -19,6 +19,7 @@ Every file here is regenerable. None of it is an input to anything.
 | `agent_v0_model.*` | `scripts/eval_agent.py --actions 500 --agents graph`, same code, `MODEL_TOP_K=8` | D-034, 2026-09-26 |
 | `agent_v1_nomodel_2000.*` | `scripts/eval_agent.py --actions 2000 --agents graph_nomodel`, `local_min=0.3` | D-034, 2026-09-27 |
 | `agent_v1_seed{1,2}.*` | `scripts/eval_agent.py --actions 500 --seed N --agents "graph_nomodel;explore"`, `local_min=0.3` | D-034, 2026-09-27 |
+| `agent_v2_qwen3b_s0_PARTIAL.txt`, `llm_calls/qwen25coder3b/` | `eval_agent.py --agents v2 --llm-url` (local llama.cpp, Qwen2.5-Coder-3B Q4_K_M, CPU), seed 0 | D-035, 2026-09-27. **Incomplete: 5 of 25 games** (ar25, bp35, cd82, cn04, dc22; 0 levels). Stopped by the system for low memory; not a scoreboard row |
 
 The `agent_*` runs need no corpus: they play the live engine from a cold start
 and need only `environment_files/`.
