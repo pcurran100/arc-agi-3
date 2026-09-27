@@ -45,5 +45,3 @@ sturdier comparison.
 diagnostic and can be vacuous — if a game changes nothing outside the induced
 bookkeeping mask, "exact outside the mask" is satisfied by predicting nothing.
 Check the `vacuous` flag before quoting it. The headline metric is `exact`.
-
-| `agent_v2_qwen3b_s0_PARTIAL.txt`, `llm_calls/qwen25coder3b/` | `eval_agent.py --agents v2 --llm-url` (local llama.cpp, Qwen2.5-Coder-3B Q4_K_M, CPU), seed 0 | D-035, 2026-09-27. **Incomplete: 5 of 25 games** (ar25, bp35, cd82, cn04, dc22; 0 levels). The run was stopped by the system for low memory; not a scoreboard row. |
