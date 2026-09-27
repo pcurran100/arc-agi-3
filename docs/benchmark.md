@@ -263,6 +263,12 @@ github.com/arcprize/ARC-AGI-3-Agents):
 - `GameAction.ACTION6.set_data` mutates a shared enum member — a cross-thread
   race; our adapter sends per-instance coordinates instead.
 
+*[measured on Kaggle, 2026-09-27]* The competition's `arc_agi_3_wheels` ships
+**`arc-agi` 0.9.8** (we develop against 0.9.9) with the same **`arcengine`
+0.9.3**, installed into Kaggle's **Python 3.12** image. The engine, which is
+what plays the games, is identical; pip's warnings about `dopamine-rl` and
+`gradio` during that install concern preinstalled packages we do not use.
+
 Verified from Kaggle's docs: **30 GPU-hours per week** shared across P100 and
 2×T4, sessions up to 9 hours; RTX 6000 reserved for ARC-AGI-3 notebooks and
 "burns quota faster" (rate unpublished).
