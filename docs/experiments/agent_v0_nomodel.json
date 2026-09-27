@@ -1,0 +1,750 @@
+{
+ "args": {
+  "actions": 500,
+  "agents": "graph_nomodel,explore",
+  "games": null,
+  "seed": 0,
+  "env_dir": "C:/Users/Patrick/Documents/Patrick/ARC-AGI-3/environment_files",
+  "out": "docs/experiments/agent_v0_nomodel.json"
+ },
+ "rows": [
+  {
+   "game": "ar25-0c556536",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 8,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 24.2,
+   "detail": "414 states, level 0, explore_steps=494, nav_steps=1, playfield_moves=433, playfield_still=61, rekeys=6"
+  },
+  {
+   "game": "ar25-0c556536",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 8,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 56.2,
+   "detail": ""
+  },
+  {
+   "game": "bp35-0a0ad940",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 9,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 23.1,
+   "detail": "120 states, level 0, explore_steps=485, nav_steps=9, playfield_moves=167, playfield_still=320, rekeys=2"
+  },
+  {
+   "game": "bp35-0a0ad940",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 9,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 203.0,
+   "detail": ""
+  },
+  {
+   "game": "cd82-fb555c5d",
+   "agent": "graph_nomodel",
+   "levels": 1,
+   "total_levels": 6,
+   "score": 0.0022823298626829637,
+   "actions": 500,
+   "cleared_at": [
+    470
+   ],
+   "per_level": [
+    {
+     "i": 0,
+     "actions": 470,
+     "baseline": 55,
+     "score": 0.013693979176097782
+    }
+   ],
+   "seconds": 12.6,
+   "detail": "12 states, level 1, explore_steps=487, levels=1, nav_steps=9, playfield_moves=202, playfield_still=292, rekeys=7"
+  },
+  {
+   "game": "cd82-fb555c5d",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 6,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 59.6,
+   "detail": ""
+  },
+  {
+   "game": "cn04-2fe56bfb",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 6,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 25.8,
+   "detail": "413 states, level 0, explore_steps=494, playfield_moves=471, playfield_still=22, rekeys=1"
+  },
+  {
+   "game": "cn04-2fe56bfb",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 6,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 53.8,
+   "detail": ""
+  },
+  {
+   "game": "dc22-fdcac232",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 6,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 8.8,
+   "detail": "61 states, level 0, explore_steps=494, nav_steps=2, playfield_moves=192, playfield_still=303, rekeys=2"
+  },
+  {
+   "game": "dc22-fdcac232",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 6,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 80.6,
+   "detail": ""
+  },
+  {
+   "game": "ft09-0d8bbf25",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 6,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 8.7,
+   "detail": "60 states, level 0, explore_steps=498, playfield_moves=74, playfield_still=423, rekeys=4"
+  },
+  {
+   "game": "ft09-0d8bbf25",
+   "agent": "explore",
+   "levels": 1,
+   "total_levels": 6,
+   "score": 0.19166666666666665,
+   "actions": 500,
+   "cleared_at": [
+    27
+   ],
+   "per_level": [
+    {
+     "i": 0,
+     "actions": 27,
+     "baseline": 43,
+     "score": 1.15
+    }
+   ],
+   "seconds": 72.2,
+   "detail": ""
+  },
+  {
+   "game": "g50t-5849a774",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 7,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 2.8,
+   "detail": "360 states, level 0, explore_steps=496, nav_steps=1, playfield_moves=405, playfield_still=91, rekeys=1"
+  },
+  {
+   "game": "g50t-5849a774",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 7,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 2.3,
+   "detail": ""
+  },
+  {
+   "game": "ka59-38d34dbb",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 7,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 15.5,
+   "detail": "209 states, level 0, explore_steps=496, playfield_moves=326, playfield_still=169, rekeys=2"
+  },
+  {
+   "game": "ka59-38d34dbb",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 7,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 63.4,
+   "detail": ""
+  },
+  {
+   "game": "lf52-271a04aa",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 10,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 6.4,
+   "detail": "11 states, level 0, exhausted=85, explore_steps=371, nav_steps=41, playfield_moves=144, playfield_still=351, rekeys=2"
+  },
+  {
+   "game": "lf52-271a04aa",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 10,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 93.3,
+   "detail": ""
+  },
+  {
+   "game": "lp85-305b61c3",
+   "agent": "graph_nomodel",
+   "levels": 1,
+   "total_levels": 8,
+   "score": 0.03317263544536272,
+   "actions": 500,
+   "cleared_at": [
+    33
+   ],
+   "per_level": [
+    {
+     "i": 0,
+     "actions": 33,
+     "baseline": 17,
+     "score": 0.26538108356290174
+    }
+   ],
+   "seconds": 43.1,
+   "detail": "335 states, level 1, explore_steps=495, levels=1, playfield_moves=354, playfield_still=139, rekeys=2"
+  },
+  {
+   "game": "lp85-305b61c3",
+   "agent": "explore",
+   "levels": 1,
+   "total_levels": 8,
+   "score": 0.04955418381344308,
+   "actions": 500,
+   "cleared_at": [
+    27
+   ],
+   "per_level": [
+    {
+     "i": 0,
+     "actions": 27,
+     "baseline": 17,
+     "score": 0.3964334705075446
+    }
+   ],
+   "seconds": 102.0,
+   "detail": ""
+  },
+  {
+   "game": "ls20-9607627b",
+   "agent": "graph_nomodel",
+   "levels": 1,
+   "total_levels": 7,
+   "score": 0.00037049284734469917,
+   "actions": 500,
+   "cleared_at": [
+    432
+   ],
+   "per_level": [
+    {
+     "i": 0,
+     "actions": 432,
+     "baseline": 22,
+     "score": 0.002593449931412894
+    }
+   ],
+   "seconds": 2.2,
+   "detail": "19 states, level 1, explore_steps=389, levels=1, nav_steps=108, playfield_moves=381, playfield_still=113, rekeys=8"
+  },
+  {
+   "game": "ls20-9607627b",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 7,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 2.1,
+   "detail": ""
+  },
+  {
+   "game": "m0r0-492f87ba",
+   "agent": "graph_nomodel",
+   "levels": 1,
+   "total_levels": 6,
+   "score": 0.003275395231024543,
+   "actions": 500,
+   "cleared_at": [
+    214
+   ],
+   "per_level": [
+    {
+     "i": 0,
+     "actions": 214,
+     "baseline": 30,
+     "score": 0.01965237138614726
+    }
+   ],
+   "seconds": 12.0,
+   "detail": "29 states, level 1, explore_steps=472, levels=1, nav_steps=26, playfield_moves=240, playfield_still=256, rekeys=2"
+  },
+  {
+   "game": "m0r0-492f87ba",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 6,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 58.5,
+   "detail": ""
+  },
+  {
+   "game": "r11l-495a7899",
+   "agent": "graph_nomodel",
+   "levels": 1,
+   "total_levels": 6,
+   "score": 0.19166666666666665,
+   "actions": 500,
+   "cleared_at": [
+    20
+   ],
+   "per_level": [
+    {
+     "i": 0,
+     "actions": 20,
+     "baseline": 22,
+     "score": 1.15
+    }
+   ],
+   "seconds": 40.2,
+   "detail": "436 states, level 1, explore_steps=484, levels=1, playfield_moves=482, rekeys=23"
+  },
+  {
+   "game": "r11l-495a7899",
+   "agent": "explore",
+   "levels": 1,
+   "total_levels": 6,
+   "score": 0.19166666666666665,
+   "actions": 500,
+   "cleared_at": [
+    9
+   ],
+   "per_level": [
+    {
+     "i": 0,
+     "actions": 9,
+     "baseline": 22,
+     "score": 1.15
+    }
+   ],
+   "seconds": 81.4,
+   "detail": ""
+  },
+  {
+   "game": "re86-8af5384d",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 8,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 1.2,
+   "detail": "356 states, level 0, explore_steps=496, playfield_moves=486, playfield_still=9, rekeys=22"
+  },
+  {
+   "game": "re86-8af5384d",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 8,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 1.1,
+   "detail": ""
+  },
+  {
+   "game": "s5i5-18d95033",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 8,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 3.7,
+   "detail": "43 states, level 0, explore_steps=451, nav_steps=40, playfield_moves=267, playfield_still=222, rekeys=2"
+  },
+  {
+   "game": "s5i5-18d95033",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 8,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 54.0,
+   "detail": ""
+  },
+  {
+   "game": "sb26-7fbdac44",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 8,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 17.6,
+   "detail": "28 states, level 0, explore_steps=477, nav_steps=21, playfield_moves=275, playfield_still=222, rekeys=44"
+  },
+  {
+   "game": "sb26-7fbdac44",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 8,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 58.3,
+   "detail": ""
+  },
+  {
+   "game": "sc25-635fd71a",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 6,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 21.5,
+   "detail": "307 states, level 0, explore_steps=493, playfield_moves=325, playfield_still=167, rekeys=41"
+  },
+  {
+   "game": "sc25-635fd71a",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 6,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 65.4,
+   "detail": ""
+  },
+  {
+   "game": "sk48-d8078629",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 8,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 24.8,
+   "detail": "235 states, level 0, explore_steps=499, playfield_moves=334, playfield_still=164, rekeys=11"
+  },
+  {
+   "game": "sk48-d8078629",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 8,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 87.5,
+   "detail": ""
+  },
+  {
+   "game": "sp80-589a99af",
+   "agent": "graph_nomodel",
+   "levels": 2,
+   "total_levels": 6,
+   "score": 0.3168518518518519,
+   "actions": 500,
+   "cleared_at": [
+    45,
+    84
+   ],
+   "per_level": [
+    {
+     "i": 0,
+     "actions": 45,
+     "baseline": 39,
+     "score": 0.7511111111111112
+    },
+    {
+     "i": 1,
+     "actions": 39,
+     "baseline": 58,
+     "score": 1.15
+    }
+   ],
+   "seconds": 19.9,
+   "detail": "196 states, level 2, explore_steps=495, levels=2, playfield_moves=420, playfield_still=72, rekeys=6"
+  },
+  {
+   "game": "sp80-589a99af",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 6,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 58.0,
+   "detail": ""
+  },
+  {
+   "game": "su15-1944f8ab",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 9,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 5.0,
+   "detail": "14 states, level 0, exhausted=202, explore_steps=271, nav_steps=14, playfield_moves=108, playfield_still=378, rekeys=2"
+  },
+  {
+   "game": "su15-1944f8ab",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 9,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 80.0,
+   "detail": ""
+  },
+  {
+   "game": "tn36-ef4dde99",
+   "agent": "graph_nomodel",
+   "levels": 1,
+   "total_levels": 7,
+   "score": 0.16428571428571428,
+   "actions": 500,
+   "cleared_at": [
+    19
+   ],
+   "per_level": [
+    {
+     "i": 0,
+     "actions": 19,
+     "baseline": 32,
+     "score": 1.15
+    }
+   ],
+   "seconds": 24.3,
+   "detail": "165 states, level 1, explore_steps=493, levels=1, playfield_moves=214, playfield_still=277, rekeys=2"
+  },
+  {
+   "game": "tn36-ef4dde99",
+   "agent": "explore",
+   "levels": 1,
+   "total_levels": 7,
+   "score": 0.16428571428571428,
+   "actions": 500,
+   "cleared_at": [
+    24
+   ],
+   "per_level": [
+    {
+     "i": 0,
+     "actions": 24,
+     "baseline": 32,
+     "score": 1.15
+    }
+   ],
+   "seconds": 663.0,
+   "detail": ""
+  },
+  {
+   "game": "tr87-cd924810",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 6,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 8.5,
+   "detail": "343 states, level 0, explore_steps=495, nav_steps=2, playfield_moves=486, playfield_still=10, rekeys=489"
+  },
+  {
+   "game": "tr87-cd924810",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 6,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 2.4,
+   "detail": ""
+  },
+  {
+   "game": "tu93-0768757b",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 9,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 3.2,
+   "detail": "59 states, level 0, exhausted=127, explore_steps=212, nav_steps=152, playfield_moves=342, playfield_still=147, rekeys=2"
+  },
+  {
+   "game": "tu93-0768757b",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 9,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 1.5,
+   "detail": ""
+  },
+  {
+   "game": "vc33-5430563c",
+   "agent": "graph_nomodel",
+   "levels": 2,
+   "total_levels": 7,
+   "score": 0.15405714285714286,
+   "actions": 500,
+   "cleared_at": [
+    25,
+    43
+   ],
+   "per_level": [
+    {
+     "i": 0,
+     "actions": 25,
+     "baseline": 7,
+     "score": 0.07840000000000001
+    },
+    {
+     "i": 1,
+     "actions": 18,
+     "baseline": 18,
+     "score": 1.0
+    }
+   ],
+   "seconds": 19.0,
+   "detail": "147 states, level 2, explore_steps=490, levels=2, nav_steps=4, playfield_moves=274, playfield_still=217, rekeys=6"
+  },
+  {
+   "game": "vc33-5430563c",
+   "agent": "explore",
+   "levels": 2,
+   "total_levels": 7,
+   "score": 0.008483245149911816,
+   "actions": 500,
+   "cleared_at": [
+    70,
+    151
+   ],
+   "per_level": [
+    {
+     "i": 0,
+     "actions": 70,
+     "baseline": 7,
+     "score": 0.010000000000000002
+    },
+    {
+     "i": 1,
+     "actions": 81,
+     "baseline": 18,
+     "score": 0.04938271604938271
+    }
+   ],
+   "seconds": 86.5,
+   "detail": ""
+  },
+  {
+   "game": "wa30-ee6fef47",
+   "agent": "graph_nomodel",
+   "levels": 0,
+   "total_levels": 9,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 1.5,
+   "detail": "443 states, level 0, explore_steps=498, playfield_moves=471, playfield_still=26, rekeys=9"
+  },
+  {
+   "game": "wa30-ee6fef47",
+   "agent": "explore",
+   "levels": 0,
+   "total_levels": 9,
+   "score": 0.0,
+   "actions": 500,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 1.3,
+   "detail": ""
+  }
+ ]
+}

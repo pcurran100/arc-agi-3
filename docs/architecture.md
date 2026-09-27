@@ -855,3 +855,106 @@ gives 6-14.
   the values `bookkeeping_mask` already used, which makes them consistent rather
   than tuned — deliberately, after D-029 caught itself selecting a rule on test
   data.
+
+## 9. The agent loop
+
+`GraphAgent` (`src/arc3/agent.py`, D-034) is the first thing in the repository
+that plays a game end to end and gets a competition score. Everything above
+this section is either perception or a measurement instrument; this is the
+loop that consumes them.
+
+### 9.1 What it does
+
+The engine is byte-deterministic (§benchmark, D-009), so every transition the
+agent observes is a permanent, exact fact. The agent keeps those facts as a
+graph: a node is a resting frame with the bookkeeping band blanked
+(`state_key`), an edge is an action observed to lead from one node to another.
+On visited states that graph is a perfect dynamics model, and planning against
+it is shortest-path search.
+
+Each step:
+
+1. Record the edge just traversed, and update the explorer's arms (§8) with
+   whether the playfield moved.
+2. If the game is over, press `RESET` (it restarts the current level only).
+3. If a planned route is in progress and still consistent, take its next step.
+4. Otherwise rank the untried actions at this node by a Thompson sample from
+   their arm (`("act", id)` or `("click", colour)`), and take the best, unless
+   every untried action here belongs to an arm whose mean is below
+   `local_min` (0.3).
+5. Otherwise breadth-first search the graph, from here and from the level start
+   via `RESET`, for the node with untried actions that minimises
+   `path length + 4 × (1 − best arm mean)`, and walk there.
+
+Click candidates are the centre pixels of the 64 largest non-background
+`colour_8` components. Nodes are re-keyed whenever the band estimate changes,
+because a key computed under one band is meaningless under another.
+
+A worked example, sp80 (`scripts/eval_agent.py --games sp80 --agents
+graph_nomodel`, seed 0): 196 distinct states in 500 actions; level 1 cleared at
+action 45 against a human baseline of 39 (score 0.75), level 2 after 39 more
+actions against a baseline of 58 (score capped at 1.15). Of 500 actions, 495
+were exploratory and 420 moved the playfield.
+
+Four levels are cleared at or under the human baseline: r11l (20 vs 22), tn36
+(19 vs 32), sp80 level 2 (39 vs 58), vc33 level 2 (18 vs 18). Blind coverage
+can do this only where the win is close to the start, and those four levels
+are most of the score.
+
+### 9.2 What it measurably does
+
+`scripts/eval_agent.py`, 25 games, cold start, seed 0, offline RHAE from
+`client/budget.py` (score capped at 1.15 per level, mean over all levels):
+
+| | levels | games with a level | mean RHAE |
+|---|---|---|---|
+| `explore` driver + RESET on game over, 500 actions | 6/183 | 5/25 | 2.42% |
+| **`GraphAgent`, no model, 500 actions** | **10/183** | **8/25** | **3.46%** |
+| `GraphAgent`, with the induced model, 500 actions | 10/183 | 8/25 | 1.18% |
+| `GraphAgent`, no model, 2000 actions | 14/183 | 11/25 | 3.47% |
+
+**Seed 0 is the lucky seed.** On seeds 1 and 2 (`agent_v1_seed{1,2}.*`) the
+graph agent scores 1.68% and 2.11%, the explore driver 1.76% and 2.03%: means
+of **2.42% against 2.07%, a difference inside the noise**. sp80 scores 31.7% on
+seed 0 and 0.2% on the others; vc33 15.4% against 0.4%. Only r11l and tn36
+score on every seed, and the explore driver clears both too. Read every
+single-seed number in this section with that in mind.
+
+On seed 0, almost all the score comes from four games cleared quickly: sp80
+(31.7%), r11l (19.2%), tn36 (16.4%), vc33 (15.4%). The four extra levels bought by
+going from 500 to 2000 actions all arrive after action 230 and are worth almost
+nothing under the quadratic penalty.
+
+### 9.3 The induced model makes it worse
+
+With `use_model=True` the agent re-induces a rule set every ten transitions
+(§7, `colour_4`, last 150 transitions) and predicts the outcome of the top
+eight arm-ranked untried actions; an action predicted to change nothing is
+penalised 0.6, one predicted to reach a known state 0.35. Mean RHAE falls from
+3.46% to 1.18%: sp80's first level goes from 45 actions to 367, vc33's second
+from 43 to 218. It does open games the model-free agent does not (bp35 level 1,
+tu93 two levels, cd82 at 248 rather than 470), but each late.
+
+The likely mechanism, not yet isolated: a rule set that is exactly right on a
+minority of transitions (§7.4) is confidently wrong on the rest, and a wrong
+"this does nothing" prediction pushes the one productive action to the back of
+the queue. That is a one-step model used as a filter, which is the weakest way
+to use a model; it is not a test of planning with one.
+
+### 9.4 What this does not do
+
+- **No goal.** It explores until it stumbles on the win. Every level it clears
+  is cleared by coverage, and the score is dominated by games where the win is
+  a few actions from the start.
+- **No use of the dynamics model by default.** See §9.3.
+- **No transfer across levels** beyond arm statistics; the graph is discarded
+  on each level change.
+- **No hidden state.** Same masked frame plus same action is assumed to give
+  the same result; a contradicting observation overwrites the edge.
+- **The bookkeeping band is unstable on some games.** tr87 re-keys its graph on
+  489 of 500 actions because a playfield region changing on about half of all
+  actions is indistinguishable, by row frequency, from a counter. Restricting
+  the band to edge rows fixed the re-keying and changed no score on ten games
+  (D-034), so it is not what limits those games.
+- **Bounded click candidates.** 64 per state; a game whose productive click is
+  on a small object in a cluttered frame may never offer it.

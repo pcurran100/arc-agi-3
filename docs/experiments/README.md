@@ -15,6 +15,13 @@ Every file here is regenerable. None of it is an input to anything.
 | `carving_selection_exactkey.*` | first attempt, selecting on validation exact match | D-029, 2026-09-24 |
 | `carving_selection.*` | `scripts/eval_carving_selection.py`; records every candidate key so rules compare offline | D-029, 2026-09-24 |
 | `exploration.*` | `scripts/eval_exploration.py --actions 100` | D-031, 2026-09-24 |
+| `agent_v0_nomodel.*` | `scripts/eval_agent.py --actions 500 --agents "graph_nomodel;explore"` at commit b3ff9ff with `local_min` defaulting to 0 (agent names were comma-separated then) | D-034, 2026-09-26 |
+| `agent_v0_model.*` | `scripts/eval_agent.py --actions 500 --agents graph`, same code, `MODEL_TOP_K=8` | D-034, 2026-09-26 |
+| `agent_v1_nomodel_2000.*` | `scripts/eval_agent.py --actions 2000 --agents graph_nomodel`, `local_min=0.3` | D-034, 2026-09-27 |
+| `agent_v1_seed{1,2}.*` | `scripts/eval_agent.py --actions 500 --seed N --agents "graph_nomodel;explore"`, `local_min=0.3` | D-034, 2026-09-27 |
+
+The `agent_*` runs need no corpus: they play the live engine from a cold start
+and need only `environment_files/`.
 
 Both need the corpus, which is gitignored and rebuilt deterministically:
 
