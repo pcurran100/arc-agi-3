@@ -95,13 +95,19 @@ class BudgetExceeded(RuntimeError):
 def _budgeted(fn: Callable[[Scene], Any], scene: Scene, budget: int) -> Any:
     count = 0
 
-    def tracer(frame, event, arg):
+    # Only the hypothesis's own lines are counted. Tracing into numpy or the
+    # scene helpers charged the budget for trusted library code: one call to
+    # scene.colours() exceeded 20,000 steps inside np.unique.
+    def local(frame, event, arg):
         nonlocal count
         if event == "line":
             count += 1
             if count > budget:
                 raise BudgetExceeded(f"more than {budget} steps")
-        return tracer
+        return local
+
+    def tracer(frame, event, arg):
+        return local if frame.f_code.co_filename == "<hypothesis>" else None
 
     old = sys.gettrace()
     sys.settrace(tracer)
@@ -119,18 +125,31 @@ def compile_progress(source: str) -> Callable[[Scene], Any]:
     exec(compile(source, "<hypothesis>", "exec"), ns)
     fn = ns.get("progress")
     if not callable(fn):
-        raise ValueError("no progress(scene) function defined")
+        # Small models rename it (measured: Qwen2.5-Coder-3B wrote
+        # `progress_same_colour`). Accept one progress-prefixed function.
+        named = [v for k, v in ns.items() if k.startswith("progress") and callable(v)]
+        if len(named) != 1:
+            raise ValueError("no progress(scene) function defined")
+        fn = named[0]
     return fn
 
 
 def parse_hypotheses(text: str) -> list[tuple[str, str]]:
-    """``(goal statement, source)`` for each fenced code block that defines progress."""
+    """``(goal statement, source)`` per hypothesis in the fenced code blocks.
+
+    One block may hold several hypotheses (small models do this); it is split
+    at each ``# GOAL:`` line that is followed by a ``def progress...``.
+    """
     out = []
-    for src in _BLOCK.findall(text):
-        if "def progress" not in src:
-            continue
-        m = _GOAL.search(src)
-        out.append(((m.group(1).strip() if m else "(no GOAL line)"), src.strip()))
+    for block in _BLOCK.findall(text) or [text]:
+        starts = [m.start() for m in _GOAL.finditer(block)]
+        chunks = ([block[a:b] for a, b in zip(starts, [*starts[1:], len(block)])]
+                  if starts else [block])
+        for src in chunks:
+            if not re.search(r"def\s+progress\w*\s*\(", src):
+                continue
+            m = _GOAL.search(src)
+            out.append(((m.group(1).strip() if m else "(no GOAL line)"), src.strip()))
     return out
 
 

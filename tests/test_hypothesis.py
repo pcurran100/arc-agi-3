@@ -87,3 +87,16 @@ def test_flat_hypothesis_is_excluded_from_ranking_only():
     assert not h.informative
     assert pop.value(b"x", lambda: scene_with_red_at(0)) is None
     assert h in pop.hypotheses
+
+
+def test_small_model_format_one_block_renamed_functions():
+    """Measured output shape of Qwen2.5-Coder-3B on ls20 (2026-09-27)."""
+    text = ("```python\n# GOAL: all one colour\ndef progress_same(scene):\n"
+            "    return 1.0 if len(scene.colours()) == 1 else 0.0\n\n"
+            "# GOAL: few colours\ndef progress_few(scene):\n"
+            "    return 1.0 / len(scene.colours())\n```")
+    pop = Population()
+    hs = pop.add_from_text(text)
+    assert [h.goal for h in hs] == ["all one colour", "few colours"]
+    assert all(h.fn is not None for h in hs)
+    assert hs[1].value(b"k", lambda: scene_with_red_at(0)) == 0.5

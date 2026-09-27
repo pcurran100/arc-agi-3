@@ -363,7 +363,7 @@ class GraphAgent:
             if not u:
                 continue
             q = max(self._arm(ak).mean for ak, _ in u)
-            cost = len(p) + FRONTIER_WEIGHT * (1.0 - q)
+            cost = len(p) + FRONTIER_WEIGHT * (1.0 - q) - self.goal_weight * self._node_value(k)
             if best is None or cost < best[0]:
                 best = (cost, p)
         return best[1] if best else []
@@ -374,6 +374,8 @@ class GraphAgent:
 
         if obs.levels_completed > self._level:
             # New level: its states are all new. Keep arms and rules.
+            if self._last is not None:
+                self._on_level_won(self._last[0], self._last[1], self._last[2])
             self._level = obs.levels_completed
             self._nodes, self._start, self._path = {}, None, []
             self._bump("levels")
@@ -407,6 +409,7 @@ class GraphAgent:
             return self._emit(key, frame, Action.simple(RESET), None)
 
         self._maybe_induce()
+        self._on_state(key, frame, obs)
 
         # Follow a planned route while it still matches the graph.
         if self._path:
@@ -418,7 +421,8 @@ class GraphAgent:
 
         ranked = self._priority(key, node)
         local_best = max((self._arm(k).mean for _, k, _ in ranked), default=0.0)
-        if ranked and ranked[0][0] > -0.2 and local_best >= self.local_min:
+        if (ranked and ranked[0][0] > -0.2 and local_best >= self.local_min
+                and not self._prefer_frontier(key)):
             _, akey, a = ranked[0]
             self._bump("explore_steps")
             return self._emit(key, frame, a, akey)
@@ -439,6 +443,25 @@ class GraphAgent:
         self._bump("exhausted")
         akey, a = self._rng.choice(node.candidates) if node.candidates else (None, Action.simple(RESET))
         return self._emit(key, frame, a, akey)
+
+    # -- hooks for a goal layer (D-035). All inert here, so v1 is unchanged. --
+
+    #: Frontier cost per unit of state value. Irrelevant while values are 0.
+    goal_weight = 0.0
+
+    def _node_value(self, key: bytes) -> float:
+        """How close state ``key`` is to winning, in [0, 1]. v1 has no idea."""
+        return 0.0
+
+    def _prefer_frontier(self, here: bytes) -> bool:
+        """Leave this state for a better one even though it has untried actions?"""
+        return False
+
+    def _on_state(self, key: bytes, frame: np.ndarray, obs: Observation) -> None:
+        """A non-terminal state was reached and the level is still in play."""
+
+    def _on_level_won(self, key: bytes, frame: np.ndarray, action: Action) -> None:
+        """``action`` from state ``key`` completed the level."""
 
     def _emit(self, key: bytes, frame: np.ndarray, action: Action, akey: Any) -> Action:
         if akey is None and not action.is_reset:
