@@ -913,8 +913,15 @@ are most of the score.
 | `GraphAgent`, with the induced model, 500 actions | 10/183 | 8/25 | 1.18% |
 | `GraphAgent`, no model, 2000 actions | 14/183 | 11/25 | 3.47% |
 
-Almost all the score comes from four games cleared quickly: sp80 (31.7%),
-r11l (19.2%), tn36 (16.4%), vc33 (15.4%). The four extra levels bought by
+**Seed 0 is the lucky seed.** On seeds 1 and 2 (`agent_v1_seed{1,2}.*`) the
+graph agent scores 1.68% and 2.11%, the explore driver 1.76% and 2.03%: means
+of **2.42% against 2.07%, a difference inside the noise**. sp80 scores 31.7% on
+seed 0 and 0.2% on the others; vc33 15.4% against 0.4%. Only r11l and tn36
+score on every seed, and the explore driver clears both too. Read every
+single-seed number in this section with that in mind.
+
+On seed 0, almost all the score comes from four games cleared quickly: sp80
+(31.7%), r11l (19.2%), tn36 (16.4%), vc33 (15.4%). The four extra levels bought by
 going from 500 to 2000 actions all arrive after action 230 and are worth almost
 nothing under the quadratic penalty.
 

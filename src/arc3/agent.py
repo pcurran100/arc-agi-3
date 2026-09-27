@@ -124,12 +124,16 @@ class GraphAgent:
     """
 
     seed: int = 0
-    use_model: bool = True
+    use_model: bool = False  # the model lowers RHAE 3.46% -> 1.18% (D-034)
     #: Leave a state whose untried actions all belong to arms with a mean below
     #: this, if a frontier elsewhere offers better. 0 disables.
     local_min: float = 0.3
     #: Restrict the bookkeeping band to the top and bottom EDGE_ROWS rows.
     edge_band: float = 0.0
+    #: Priority bonus for repeating the arm of the last action, if it moved the
+    #: playfield. Biases exploration towards straight lines. 0 disables.
+    repeat: float = 0.0
+    _moved_key: Any = field(default=None, init=False)
     _rng: random.Random = field(init=False)
     band: OnlineBand = field(default_factory=OnlineBand, init=False)
     _band_sig: bytes = field(default=b"", init=False)
@@ -243,6 +247,7 @@ class GraphAgent:
             return
         self.band.update(pframe, after)
         moved = self.band.moved_playfield(pframe, after)
+        self._moved_key = akey if moved else None
         if akey is not None:
             self._arm(akey).update(moved)
             for arm in self._arms.values():
@@ -296,8 +301,13 @@ class GraphAgent:
         if self.use_model and self._ruleset is not None:
             seg = segment(node.frame, include=(MODEL_CARVING,))[MODEL_CARVING]
         mask = self._mask()
-        scored = sorted(((self._arm(k).sample(self._rng), k, a) for k, a in untried),
-                        key=lambda t: -t[0])
+        def base(k: Any) -> float:
+            p = self._arm(k).sample(self._rng)
+            if self.repeat and k is not None and k == self._moved_key:
+                p += self.repeat
+            return p
+
+        scored = sorted(((base(k), k, a) for k, a in untried), key=lambda t: -t[0])
         out = []
         for i, (p, akey, action) in enumerate(scored):
             # Predicting is the expensive part; only the front of the queue can

@@ -1,0 +1,54 @@
+ar25-0c556536 graph_nomodel  levels 1/8 score   0.1%  cleared_at [348]  26.5s  134 states, level 1, explore_steps=496, levels=1, playfield_moves=435, playfield_still=59, rekeys=4
+ar25-0c556536 explore        levels 1/8 score   0.5%  cleared_at [164]  60.2s  
+bp35-0a0ad940 graph_nomodel  levels 0/9 score   0.0%  cleared_at []  33.2s  209 states, level 0, explore_steps=453, nav_steps=44, playfield_moves=312, playfield_still=164, rekeys=2
+bp35-0a0ad940 explore        levels 0/9 score   0.0%  cleared_at []  175.7s  
+cd82-fb555c5d graph_nomodel  levels 0/6 score   0.0%  cleared_at []  9.8s  117 states, level 0, explore_steps=485, nav_steps=11, playfield_moves=197, playfield_still=298, rekeys=2
+cd82-fb555c5d explore        levels 0/6 score   0.0%  cleared_at []  60.3s  
+cn04-2fe56bfb graph_nomodel  levels 0/6 score   0.0%  cleared_at []  26.5s  413 states, level 0, explore_steps=494, playfield_moves=470, playfield_still=23, rekeys=3
+cn04-2fe56bfb explore        levels 0/6 score   0.0%  cleared_at []  53.5s  
+dc22-fdcac232 graph_nomodel  levels 0/6 score   0.0%  cleared_at []  7.8s  56 states, level 0, explore_steps=488, nav_steps=8, playfield_moves=203, playfield_still=292, rekeys=2
+dc22-fdcac232 explore        levels 0/6 score   0.0%  cleared_at []  82.5s  
+ft09-0d8bbf25 graph_nomodel  levels 0/6 score   0.0%  cleared_at []  10.9s  55 states, level 0, explore_steps=481, nav_steps=19, playfield_moves=80, playfield_still=411, rekeys=14
+ft09-0d8bbf25 explore        levels 0/6 score   0.0%  cleared_at []  129.7s  
+g50t-5849a774 graph_nomodel  levels 0/7 score   0.0%  cleared_at []  3.2s  302 states, level 0, explore_steps=481, nav_steps=16, playfield_moves=385, playfield_still=111, rekeys=5
+g50t-5849a774 explore        levels 0/7 score   0.0%  cleared_at []  3.4s  
+ka59-38d34dbb graph_nomodel  levels 0/7 score   0.0%  cleared_at []  20.7s  196 states, level 0, explore_steps=489, nav_steps=7, playfield_moves=319, playfield_still=176, rekeys=6
+ka59-38d34dbb explore        levels 0/7 score   0.0%  cleared_at []  76.2s  
+lf52-271a04aa graph_nomodel  levels 0/10 score   0.0%  cleared_at []  7.3s  11 states, level 0, exhausted=61, explore_steps=374, nav_steps=61, playfield_moves=180, playfield_still=313, rekeys=2
+lf52-271a04aa explore        levels 0/10 score   0.0%  cleared_at []  112.9s  
+lp85-305b61c3 graph_nomodel  levels 1/8 score   6.8%  cleared_at [23]  46.4s  336 states, level 1, explore_steps=495, levels=1, playfield_moves=351, playfield_still=142, rekeys=6
+lp85-305b61c3 explore        levels 1/8 score   1.9%  cleared_at [44]  130.5s  
+ls20-9607627b graph_nomodel  levels 0/7 score   0.0%  cleared_at []  3.4s  112 states, level 0, explore_steps=390, nav_steps=107, playfield_moves=401, playfield_still=94, rekeys=12
+ls20-9607627b explore        levels 0/7 score   0.0%  cleared_at []  3.4s  
+m0r0-492f87ba graph_nomodel  levels 1/6 score   0.2%  cleared_at [251]  19.1s  33 states, level 1, explore_steps=435, levels=1, nav_steps=63, playfield_moves=307, playfield_still=189, rekeys=4
+m0r0-492f87ba explore        levels 1/6 score   0.2%  cleared_at [290]  123.1s  
+r11l-495a7899 graph_nomodel  levels 2/6 score  17.9%  cleared_at [22, 141]  47.0s  309 states, level 2, explore_steps=478, levels=2, playfield_moves=475, rekeys=23
+r11l-495a7899 explore        levels 1/6 score  19.2%  cleared_at [10]  104.5s  
+re86-8af5384d graph_nomodel  levels 0/8 score   0.0%  cleared_at []  1.9s  383 states, level 0, explore_steps=494, nav_steps=2, playfield_moves=491, playfield_still=4, rekeys=10
+re86-8af5384d explore        levels 0/8 score   0.0%  cleared_at []  1.6s  
+s5i5-18d95033 graph_nomodel  levels 0/8 score   0.0%  cleared_at []  6.5s  58 states, level 0, exhausted=18, explore_steps=440, nav_steps=33, playfield_moves=303, playfield_still=186, rekeys=2
+s5i5-18d95033 explore        levels 0/8 score   0.0%  cleared_at []  77.8s  
+sb26-7fbdac44 graph_nomodel  levels 0/8 score   0.0%  cleared_at []  24.7s  34 states, level 0, explore_steps=478, nav_steps=20, playfield_moves=278, playfield_still=219, rekeys=47
+sb26-7fbdac44 explore        levels 0/8 score   0.0%  cleared_at []  83.8s  
+sc25-635fd71a graph_nomodel  levels 0/6 score   0.0%  cleared_at []  30.2s  269 states, level 0, explore_steps=493, playfield_moves=321, playfield_still=171, rekeys=21
+sc25-635fd71a explore        levels 0/6 score   0.0%  cleared_at []  79.4s  
+sk48-d8078629 graph_nomodel  levels 0/8 score   0.0%  cleared_at []  23.6s  206 states, level 0, explore_steps=498, nav_steps=1, playfield_moves=300, playfield_still=198, rekeys=12
+sk48-d8078629 explore        levels 0/8 score   0.0%  cleared_at []  98.7s  
+sp80-589a99af graph_nomodel  levels 1/6 score   0.2%  cleared_at [397]  16.3s  101 states, level 1, explore_steps=442, levels=1, nav_steps=44, playfield_moves=343, playfield_still=140, rekeys=2
+sp80-589a99af explore        levels 0/6 score   0.0%  cleared_at []  63.7s  
+su15-1944f8ab graph_nomodel  levels 0/9 score   0.0%  cleared_at []  4.7s  15 states, level 0, exhausted=219, explore_steps=252, nav_steps=17, playfield_moves=103, playfield_still=384, rekeys=2
+su15-1944f8ab explore        levels 0/9 score   0.0%  cleared_at []  87.7s  
+tn36-ef4dde99 graph_nomodel  levels 1/7 score  16.4%  cleared_at [23]  21.1s  121 states, level 1, explore_steps=492, levels=1, nav_steps=1, playfield_moves=194, playfield_still=297, rekeys=2
+tn36-ef4dde99 explore        levels 1/7 score  16.4%  cleared_at [19]  131.2s  
+tr87-cd924810 graph_nomodel  levels 0/6 score   0.0%  cleared_at []  9.7s  355 states, level 0, explore_steps=495, nav_steps=2, playfield_moves=485, playfield_still=11, rekeys=483
+tr87-cd924810 explore        levels 0/6 score   0.0%  cleared_at []  2.2s  
+tu93-0768757b graph_nomodel  levels 0/9 score   0.0%  cleared_at []  1.9s  51 states, level 0, exhausted=237, explore_steps=179, nav_steps=75, playfield_moves=281, playfield_still=209, rekeys=2
+tu93-0768757b explore        levels 0/9 score   0.0%  cleared_at []  1.6s  
+vc33-5430563c graph_nomodel  levels 2/7 score   0.4%  cleared_at [42, 398]  43.9s  48 states, level 2, explore_steps=493, levels=2, playfield_moves=468, playfield_still=22, rekeys=9
+vc33-5430563c explore        levels 2/7 score   5.7%  cleared_at [22, 55]  89.8s  
+wa30-ee6fef47 graph_nomodel  levels 0/9 score   0.0%  cleared_at []  1.4s  443 states, level 0, explore_steps=498, playfield_moves=465, playfield_still=32, rekeys=9
+wa30-ee6fef47 explore        levels 0/9 score   0.0%  cleared_at []  1.2s  
+
+== summary ==
+graph_nomodel  levels 9/183  games with a level 7/25  mean RHAE 1.69%
+explore        levels 7/183  games with a level 6/25  mean RHAE 1.75%

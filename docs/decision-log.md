@@ -2922,4 +2922,136 @@ worth of scoring per game — and is not a measurement to repeat casually.
 
 ---
 
-<!-- Next entry: D-033. Copy the template from CLAUDE.md. -->
+
+
+## D-034 — Build the end-to-end agent now, and ship it to Milestone #2
+
+- **Date:** 2026-09-26 to 2026-09-27
+- **Status:** accepted
+- **Numbering note:** D-033 is reserved by the representation work in progress
+  (commit deec09e, "close 86% of the vocabulary gap"), which had not yet been
+  written up when this entry was made. This entry is appended after D-032 and
+  D-033 will follow it.
+- **Context:** State-of-play recorded Milestone #2 (30 Sep) as "out of reach",
+  and D-027/D-028 ordered the work representation → hypothesis population →
+  online loop → score. Nothing in either document argued the milestone was
+  infeasible; the judgement rested on the roadmap order and on an assumption
+  that available time falls sharply at the start of Michaelmas term. The user
+  corrected that assumption (time goes *up* in October) and asked for the loop
+  to be built at once. Every number in the repository was an offline proxy;
+  objective 7 ("end-to-end agent producing a real RHAE score") had not started.
+- **Decision:** Reverse the order for one step. Build the simplest agent that
+  plays every game end to end and produces a real offline RHAE, package it as a
+  Kaggle submission, and use it as the baseline every later subsystem must beat.
+
+  The agent (`src/arc3/agent.py`, `GraphAgent`) keeps the level's state graph:
+  node = resting frame with the bookkeeping band blanked, edge = observed
+  action. It takes untried actions ranked by the explorer's arms (D-031), and
+  when none are worth taking walks the shortest known route (or RESET plus a
+  route from the level start) to a node that has some. Because the engine is
+  deterministic, the graph is an exact dynamics model on visited states and the
+  navigation is planning against it. The induced rule set (D-024/D-033) can
+  rank untried actions by one-step prediction; it is **off** by default, for the
+  reason below.
+
+  Submission: `scripts/build_kaggle.py` embeds `arc3` into one `my_agent.py`
+  with an in-memory importer and builds the notebook to the official starter's
+  cell structure; `kaggle/local_harness.py` runs it through the real
+  ARC-AGI-3-Agents `Agent.main()` loop. Model off, 2000 actions per game.
+
+### Experiment — does it score, and does the model help?
+
+`scripts/eval_agent.py`, 25 public games, cold start, one attempt, offline RHAE
+from `client/budget.py` (per-level score capped at 1.15, mean over all levels).
+Raw output: `docs/experiments/agent_*`.
+
+| run | levels | games with a level | mean RHAE |
+|---|---|---|---|
+| `explore` driver + RESET on game over, 500 actions, seed 0 | 6/183 | 5/25 | 2.42% |
+| **`GraphAgent`, no model, 500 actions, seed 0** | **10/183** | **8/25** | **3.46%** |
+| `GraphAgent`, with the model, 500 actions, seed 0 | 10/183 | 8/25 | **1.18%** |
+| `GraphAgent`, no model, 2000 actions, seed 0 | 14/183 | 11/25 | 3.47% |
+
+- **Result 1 — it scores.** The first real RHAE in the project. Four levels are
+  cleared at or under the human baseline (r11l 20 vs 22, tn36 19 vs 32, sp80
+  level 2 39 vs 58, vc33 level 2 18 vs 18).
+- **Result 2 — the induced model makes it worse, by two thirds.** Used as a
+  one-step filter (predicted no-op −0.6, predicted known state −0.35, top eight
+  candidates), it slows the levels the model-free agent clears fast — sp80
+  level 1 from 45 actions to 367, vc33 level 2 from 43 to 218 — while opening
+  bp35, tu93 and an earlier cd82, all late. Likely mechanism, not isolated: a
+  rule set exact on a minority of transitions (D-025) is confidently wrong on
+  the rest, and a wrong "does nothing" buries the productive action. **This is
+  a negative result for D-002 in its weakest form** — one-step prediction as an
+  action filter — and says nothing yet about multi-step planning, which remains
+  unmeasured (objective 6).
+- **Result 3 — more actions buy levels, not score.** 500 → 2000 actions adds
+  four levels, all after action 230, worth almost nothing under the quadratic
+  penalty.
+
+### Experiment — how much of that is luck? Most of it.
+
+Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
+
+| seed | `GraphAgent` | `explore` |
+|---|---|---|
+| 0 | 3.46% | 2.42% |
+| 1 | 1.68% | 1.76% |
+| 2 | 2.11% | 2.03% |
+| **mean** | **2.42%** | **2.07%** |
+
+- **Seed 0 was lucky.** sp80 scores 31.7% on seed 0 and 0.2% on seeds 1 and 2;
+  vc33 15.4% against 0.4%. Only r11l and tn36 score reliably, and the explore
+  driver clears both too. **Against the explore driver the graph agent's edge is
+  0.35 points on three seeds — within noise.** It clears slightly more levels
+  on every seed (10, 9, 10 against 6, 7, 9), mostly late and worthless.
+- **The consequence for method:** single-seed comparisons on a handful of games
+  are measuring the luck of exploration order. Two tuning decisions this
+  session were made that way and must be read as unvalidated:
+  - `local_min = 0.3` (leave a state whose untried actions all belong to arms
+    with mean < 0.3): adopted on five games, seed 0, where it added ft09. On
+    all 25 games at seed 0 it is neutral (3.46% either way) and it costs cd82
+    heavily (470 → 1047 actions). Kept only because the seed 1/2 runs used it.
+  - A "repeat the last productive action" bonus: on twelve games it halved
+    several first-level times (lp85 33 → 18, vc33 25 → 13) and lost the second
+    levels of sp80 and vc33, net 4.3% against ~7.2%. Rejected, but on evidence
+    of the same quality.
+
+  Two further variants were measured and rejected: a monotone ("sticky")
+  bookkeeping band (five games, 10.15% → 7.68%) and restricting the band to
+  edge rows (ten games, identical scores; fixes tr87's 489 re-keys and changes
+  nothing else).
+
+- **Options rejected:**
+  - *Keep the roadmap order (representation first)* — every result in the
+    repository would stay an offline proxy until November, and the first real
+    score would arrive with no time to act on it. The model's negative effect in
+    Result 2 is exactly the kind of fact that was invisible without a loop.
+  - *Ship with the model on, because the thesis says model-based wins* — it
+    measurably lowers the score. The thesis is the hypothesis, not the policy.
+  - *Ship the explore driver instead* — statistically tied, but the graph agent
+    clears more levels on every seed and is the structure a goal and a planner
+    plug into; the explore driver has no memory of consequences.
+  - *Raise the action cap for more levels* — Result 3: late levels are worth
+    nothing, and each action costs runtime in the Kaggle rerun (GIL-bound
+    threads, ~65 ms/step on the heaviest games).
+  - *Report the seed-0 3.46% as the score* — it is the best of three seeds. The
+    honest expectation on public games is about 2.4%.
+- **Consequences:** The project has a baseline and a submission path. The
+  expected public-game score of ~2.4% is, per `benchmark.md`, above the 1.5%
+  and <1% recorded for frontier LLM systems — but those are semi-private
+  figures and ours is on the 25 public games the agent was developed on, so the
+  comparison flatters us. Every future change is evaluated on **at least three
+  seeds and all 25 games**; `eval_agent.py --seed` exists for that. The model is
+  off until something shows it helps.
+- **Revisit if:** a goal or value signal exists to rank frontier states (the
+  agent currently has none, and the score is dominated by where exploration
+  happens to look first); multi-step rollout accuracy is measured and is high
+  on some subset of games, which would make a planner worth trying where the
+  one-step filter failed; or the Kaggle rerun score differs sharply from ~2%,
+  which would mean the public games are unrepresentative or the adapter is
+  wrong.
+
+---
+
+<!-- Next entry: D-035 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->

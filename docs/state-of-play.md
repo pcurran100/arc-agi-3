@@ -4,15 +4,21 @@
 currently doing.** Read this first every session. Update it before the session
 ends if anything below is stale.
 
-- **Last updated:** 2026-09-24, session 4
-- **Status:** **the go/no-go on D-002 has been run. It is a weak pass.**
-  Held-out exact-frame prediction is non-zero on 7 of 23 games where chance is
-  exactly 0%, reaching 44% on dc22, and the object-level model works on 14 of
-  23. Perception layer built, measured and audited; click space mapped against
-  ground truth; design thesis §8 re-derived. Still no goal, no planner, no
-  agent loop, no score.
-- **Days to Milestone #2 (30 Sep):** **6** — out of reach
-- **Days to final submission (2 Nov):** **39** — the real target
+- **Last updated:** 2026-09-27, session 5
+- **Status:** **there is an agent, a score and a Kaggle submission (D-034).**
+  `GraphAgent` plays all 25 games end to end: **~2.4% mean offline RHAE over
+  three seeds** (3.46% on the lucky seed 0), 9–10 levels of 183. That is
+  statistically tied with the explore driver (2.07%). **The induced dynamics
+  model, used as a one-step action filter, cuts the score by two thirds**
+  (3.46% → 1.18%), so it ships switched off. The agent has no goal; its score
+  is where blind exploration happens to look first. Earlier status, still true:
+  the D-002 go/no-go was a weak pass (D-025), perception is built and audited.
+- **Days to Milestone #2 (30 Sep):** **3** — a submission is built
+  (`kaggle/README.md`); uploading it, making the notebook public and choosing
+  a licence are the user's steps
+- **Days to final submission (2 Nov):** **36**. Available time goes **up** from
+  October, not down (corrected 2026-09-25; the Timeline section below had it
+  backwards)
 
 ---
 
@@ -149,6 +155,7 @@ alternatives in `decision-log.md`.
 | D-029 | Carving selection is a coin flip; **closed, negative** | high |
 | D-030 | `foreground_*`'s low deformed-move rate is **blindness**; object accuracy needs `blind_rate` beside it | high |
 | D-031 | **Exploration policy works.** Games the agent cannot move: 8 → 1. `explore` is the default driver | high — measured, 25 games |
+| D-034 | **End-to-end agent built and packaged for Kaggle.** ~2.4% RHAE over 3 seeds; the model-as-filter lowers it to a third, so it is off; single-seed tuning is noise | high on the model result, low on every tuned constant |
 
 ---
 
@@ -173,7 +180,12 @@ src/arc3/
     rules.py        the rule language and what it cannot say           (D-024)
     induce.py       observation extraction, and MDL rule selection
     predict.py      rendering a prediction, scoring, baselines
+  explore.py        Thompson-sampling exploration, online band        (D-031)
+  agent.py          GraphAgent: the end-to-end loop, state graph      (D-034)
   oracle/           TEST-ONLY ground truth from engine sprites        (D-010)
+kaggle/             agent_shim.py (MyAgent adapter), local_harness.py,
+                    README.md (how to submit)                         (D-034)
+                    build with scripts/build_kaggle.py; score with scripts/eval_agent.py
 scripts/            fetch_environments, record_fixtures, eval_geometry, eval_tracking,
                     size_pipeline, eval_baseline, eval_drivers,
                     eval_clickmap, eval_click_liveness                (D-021)
@@ -379,6 +391,11 @@ this the default rather than an afterthought.
 
 ## Timeline reality
 
+*Corrected 2026-09-27 (D-034): the paragraph below was wrong on two counts.
+Milestone #2 was reachable — a submission was built in one session — and the
+user's available time goes up, not down, once term starts. Kept as written
+because the error shaped the plan.*
+
 Milestone #2 on 30 September is **13 days** away and is not a realistic target.
 The real deadline is **2 November**, **46 days** away. Between those sits the start of Michaelmas
 term, so assume available time drops sharply from early October — front-load
@@ -404,10 +421,11 @@ selection is worth about one and layer separation about two.
 | 2 | **Layer separation: model UI and playfield apart** | **2 games** (sp80 0%→100%, dc22 44%→100%). Half done: `OnlineBand` (D-031) separates the layers *for the explorer*; the **learner** still does not model the UI | partly done |
 | 2b | ~~**Re-record with `explore`, re-run the sweep**~~ | **done (D-032).** On a *neutral* test set the explore corpus teaches a better model: 4.5% vs 3.8%, **9 games modelled vs 7**. But the starved games stay at **exactly 0%** | done |
 | 3 | **Representation: richer vocabulary + weighted hypothesis population** | **now the binding constraint (D-032).** Five starved games now produce 27–88 distinct events each and still score 0% — their blocker is expressiveness, not evidence. Four have a 100% deformed-move rate the vocabulary cannot express | **next** |
-| 4 | **Online loop: act on hypotheses, update from outcomes** | the actual agent | after 3 |
+| 4 | **Online loop: act on hypotheses, update from outcomes** | the actual agent | **loop built (D-034)**, pulled ahead of 3. `GraphAgent` acts, observes and navigates; it does not yet act *on hypotheses* — the rule set is off because it hurt |
 | ~~5~~ | ~~Carving selection~~ | ~1 game | **closed, negative (D-029).** Beats doing nothing on 51% of game-splits — a coin flip. Revisit after layer separation, when residuals can be measured on the playfield alone |
 | 6 | **Multi-step rollout accuracy** | unmeasured, and planning depends on it entirely | any time |
-| 7 | **End-to-end agent producing a real RHAE score** | every number here is an offline proxy | before 2 Nov |
+| 7 | ~~**End-to-end agent producing a real RHAE score**~~ | **done (D-034).** ~2.4% over three seeds on the public games; Kaggle notebook built | **done**; the Kaggle rerun score is still unknown |
+| 8 | **A goal or value signal to rank frontier states** | **now the binding constraint.** The score is dominated by the luck of exploration order (seed 0 3.46%, seeds 1–2 ~1.9%) | next |
 
 ## Current issues, named
 
