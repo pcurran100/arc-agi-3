@@ -3135,7 +3135,7 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 ## D-036 — The v2 model: Qwen3.6-27B FP8 on the RTX 6000, thinking off first
 
 - **Date:** 2026-09-27
-- **Status:** accepted
+- **Status:** accepted for serving and sampling; the model choice is superseded by D-037
 - **Context:** v2 (D-035) needs an offline model on Kaggle. Verified: the
   Milestone #1 winner ran Qwen3.6-27B FP8 under vLLM on the RTX 6000
   (Tufalabs/duck-harness); a third party measured that stack at 351 s load,
@@ -3176,4 +3176,43 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 
 ---
 
-<!-- Next entry: D-037 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->
+## D-037 — Benchmark Qwen3.8-27B against Qwen3.6-27B before choosing
+
+- **Date:** 2026-09-27
+- **Status:** accepted
+- **Context:** D-036 chose Qwen3.6-27B FP8 because it won Milestone #1. A survey
+  of current open models (sources in this entry) found Qwen3.8-27B (Aug 2026,
+  Apache-2.0) — same architecture and vLLM path, better vendor numbers:
+  LiveCodeBench v6 90.3 vs 83.9, SWE-bench Pro 61.7 vs 53.5, GPQA 89.2 vs 87.8
+  (huggingface.co/Qwen/Qwen3.8-27B). The gains are post-training and largest on
+  agentic benchmarks; it defaults to maximum reasoning effort. No open model is
+  on the ARC-AGI-3 leaderboard; Tufa's Qwen3.6 harness scored 1.60 ± 0.45 on
+  the public games (tufalabs.ai/research/duck-harness). Reports that public
+  notebooks moved to Qwen3.8 are unverified.
+- **Decision:** Treat the model as an experimental variable. The first Kaggle
+  benchmark runs **both** Qwen3.8-27B-FP8 and Qwen3.6-27B-FP8, thinking off,
+  same seeds; the better one on offline RHAE (outside seed noise) becomes the
+  submission model. `ARC3_MODEL_MATCH` selects among attached models. D-036
+  stands for serving, sampling and thinking-off; only its choice of model
+  becomes provisional.
+- **Options rejected:**
+  - *Switch to 3.8 on vendor numbers alone* — its gains are agentic and our task
+    is not; one comparison costs one GPU session and removes the guess.
+  - *MoE (Qwen3.6-35B-A3B, gpt-oss-120b)* — 3–4× faster decode, which our
+    budget (~50 tok/s aggregate without thinking) does not need, at a
+    measured reasoning cost. Revisit on a measured time overrun.
+  - *ARC fine-tunes (NVARC, ARChitects, TRM)* — static-puzzle solvers, not
+    instruction models that write Python.
+  - *U4AR/qwen38-arc3-rl* (an ARC-AGI-3 RL LoRA) — results unpublished; the
+    Terse-Coder LoRA it starts from is the relevant idea if 3.8 overthinks with
+    thinking on.
+  - *Gemma-4-31B, Muse Glimmer 30B* — open vLLM prefill issues at our prompt
+    size, and too new to trust, respectively. Third place in the queue.
+- **Consequences:** The first benchmark costs two model loads (~6 min each) and
+  two runs; run one seed per model first if quota is short.
+- **Revisit if:** the two are inside the seed-to-seed spread (then prefer 3.6,
+  proven and terser); or thinking mode is tested and changes the ranking.
+
+---
+
+<!-- Next entry: D-038 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->

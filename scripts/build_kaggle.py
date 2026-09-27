@@ -114,8 +114,13 @@ os.environ.setdefault('ARC3_LLM_TEMPERATURE', '0.7')
 os.environ.setdefault('ARC3_LLM_MAX_TOKENS', '900')
 
 def _model_dir():
+    # With several models attached (e.g. Qwen3.6 and Qwen3.8 for a comparison),
+    # set ARC3_MODEL_MATCH to a substring of the wanted directory path.
+    want = os.environ.get('ARC3_MODEL_MATCH', '').lower()
     for cfg in sorted(glob.glob('/kaggle/input/**/config.json', recursive=True)):
         d = os.path.dirname(cfg)
+        if want and want not in d.lower():
+            continue
         if glob.glob(os.path.join(d, '*.safetensors')) and os.path.exists(os.path.join(d, 'tokenizer_config.json')):
             return d
     return None
@@ -139,7 +144,11 @@ def _start_llm():
     if 'qwen3' in model.lower():
         # Keeps any reasoning out of the answer text our parser reads.
         args += ['--reasoning-parser', 'qwen3']
-    subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
+    env = dict(os.environ)
+    # Reported workaround for a vLLM startup crash on SM120 (RTX Pro 6000)
+    # with Qwen3.8 (recipes.vllm.ai/Qwen/Qwen3.8-27B). Harmless elsewhere.
+    env.setdefault('VLLM_USE_FLASHINFER_SAMPLER', '0')
+    subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, env=env)
     for _ in range(240):   # up to 20 minutes; a 27B model measured ~6 min to load
         try:
             with urllib.request.urlopen(f'http://127.0.0.1:{LLM_PORT}/health', timeout=5) as h:

@@ -83,6 +83,18 @@ vLLM is launched with `--max-model-len 16384 --gpu-memory-utilization 0.90
 name contains "qwen3". Another model can be attached instead; nothing else
 names Qwen.
 
+**Comparing models (D-037).** Attach several model snapshots and put this in
+a cell before the vLLM cell, one session per model:
+
+```python
+import os; os.environ['ARC3_MODEL_MATCH'] = 'qwen3-8'   # substring of the model dir
+```
+
+Qwen3.8 defaults to maximum reasoning effort; `enable_thinking: false` (the
+default above) is the documented way off. The cell sets
+`VLLM_USE_FLASHINFER_SAMPLER=0`, the reported workaround for a startup crash on
+the RTX Pro 6000.
+
 Accelerator: **RTX 6000** (the builder sets it). It is reserved for ARC-AGI-3
 and burns quota faster than T4; the rate is not published.
 
