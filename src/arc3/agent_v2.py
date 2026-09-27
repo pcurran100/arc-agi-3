@@ -151,6 +151,10 @@ class HypothesisAgent(GraphAgent):
         self._available = obs.available_actions
         self._level_actions += 1
         self._since_call += 1
+        if self.llm is None:
+            # Scenes and effect lines are prompt material; without a model they
+            # are pure cost, and the no-LLM fallback should run at v1's speed.
+            return
         if self._prev is not None and self._prev[2] is not None and not self._prev[2].is_reset:
             pkey = self._prev[0]
             if pkey in self._nodes:
