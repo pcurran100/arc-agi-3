@@ -286,17 +286,52 @@ def build_eval_notebook(seeds: str, actions: int, llm_hours: float, accelerator:
         agents = ('v2:temperature=' + os.environ.get('ARC3_LLM_TEMPERATURE', '0.7')
                   + ',max_tokens=' + os.environ.get('ARC3_LLM_MAX_TOKENS', '900')) if url else 'graph_nomodel'
         print('LLM:', url or 'none -- scoring v1 only')
-        for seed in [{seeds}]:
-            cmd = [sys.executable, '-c',
-                   "import sys; sys.path.insert(0, '/tmp'); import arc3_bundle, runpy; "
-                   "sys.argv = ['eval_agent.py'] + sys.argv[1:]; "
-                   "runpy.run_path('/tmp/eval_agent.py', run_name='__main__')",
-                   '--actions', '{actions}', '--seed', str(seed), '--agents', agents,
-                   '--env-dir', env_dir, '--calls-dir', '/kaggle/working/results/llm_calls',
-                   '--out', f'/kaggle/working/results/eval_s{{seed}}.json']
-            if url:
-                cmd += ['--llm-url', url, '--llm-extra', os.environ.get('ARC3_LLM_EXTRA', '{{}}')]
-            subprocess.run(cmd, check=False)
+
+        # Games run in parallel shards so the LLM server sees many requests at
+        # once: vLLM's throughput comes from batching, and one game at a time
+        # would take ~3 h per seed at single-stream decode speed.
+        # ARC3_BENCH_GAMES="tn36 sp80" restricts the games (a cheap smoke test);
+        # ARC3_BENCH_SEEDS overrides the seeds; ARC3_BENCH_SHARDS the parallelism.
+        import json, time
+        games = os.environ.get('ARC3_BENCH_GAMES', '').split() or sorted(os.listdir(env_dir))
+        seeds = [int(s) for s in os.environ.get('ARC3_BENCH_SEEDS', '{seeds}').split(',')]
+        shards = max(1, min(len(games), int(os.environ.get('ARC3_BENCH_SHARDS', '8'))))
+        R = '/kaggle/working/results'
+        t0 = time.time()
+        procs = []
+        for seed in seeds:
+            for k in range(shards):
+                part = games[k::shards]
+                cmd = [sys.executable, '-c',
+                       "import sys; sys.path.insert(0, '/tmp'); import arc3_bundle, runpy; "
+                       "sys.argv = ['eval_agent.py'] + sys.argv[1:]; "
+                       "runpy.run_path('/tmp/eval_agent.py', run_name='__main__')",
+                       '--actions', '{actions}', '--seed', str(seed), '--agents', agents,
+                       '--env-dir', env_dir, '--calls-dir', R + '/llm_calls',
+                       '--games', *part, '--out', f'{{R}}/eval_s{{seed}}_k{{k}}.json']
+                if url:
+                    cmd += ['--llm-url', url, '--llm-extra', os.environ.get('ARC3_LLM_EXTRA', '{{}}')]
+                log = open(f'{{R}}/log_s{{seed}}_k{{k}}.txt', 'w')
+                procs.append(subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT))
+        print(f'{{len(procs)}} processes: {{len(games)}} games x {{len(seeds)}} seeds in {{shards}} shards')
+        while any(p.poll() is None for p in procs):
+            time.sleep(60)
+            done = sum(p.poll() is not None for p in procs)
+            print(f'{{(time.time() - t0) / 60:.0f}} min: {{done}}/{{len(procs)}} shards finished', flush=True)
+
+        # Merge shards into one file per seed, in the local eval_agent format.
+        for seed in seeds:
+            rows = []
+            for k in range(shards):
+                p = f'{{R}}/eval_s{{seed}}_k{{k}}.json'
+                if os.path.exists(p):
+                    rows += json.load(open(p))['rows']
+            json.dump({{'rows': rows, 'seed': seed, 'agents': agents}},
+                      open(f'{{R}}/eval_s{{seed}}.json', 'w'), indent=1)
+            sc = sum((r['score'] or 0) for r in rows) / max(1, len(rows))
+            lv = sum(r['levels'] for r in rows)
+            print(f'seed {{seed}}: {{len(rows)}} games, {{lv}} levels, mean RHAE {{100 * sc:.2f}}%')
+        print(f'total {{(time.time() - t0) / 60:.0f}} min')
         """)
     cells = [
         {"cell_type": "markdown", "metadata": {}, "source":

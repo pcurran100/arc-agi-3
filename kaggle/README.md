@@ -126,6 +126,14 @@ python scripts/build_kaggle.py --agent bench --seeds 0,1,2 --max-actions 500
    response). Put the calls in `docs/experiments/llm_calls/<model>/` and the
    whole run can be replayed offline for free with `eval_agent.py --replay`.
 
+Games run in parallel shards (default 8 per seed, all seeds at once) so vLLM
+can batch requests; one game at a time would take ~3 hours per seed at
+single-stream speed. Knobs, set in a cell before the last one:
+`ARC3_BENCH_GAMES="tn36 sp80"` (subset, for a cheap smoke test),
+`ARC3_BENCH_SEEDS="0"`, `ARC3_BENCH_SHARDS="8"`. The run cell was executed
+locally with Kaggle paths remapped (3 games, 2 shards, no LLM): it reproduces
+v1's seed-0 levels and merges shards into `eval_s{seed}.json`.
+
 Checked locally: the benchmark's `arc3` bundle and script run with nothing
 from `src/` on the path and reproduce the repository's numbers (tn36 level at
 19, sp80 at 45, seed 0). The vLLM cell is the untested part.
