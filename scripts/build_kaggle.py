@@ -145,6 +145,19 @@ def _start_llm():
         # Keeps any reasoning out of the answer text our parser reads.
         args += ['--reasoning-parser', 'qwen3']
     env = dict(os.environ)
+    # Pre-Ampere GPUs (T4 is compute capability 7.5): no bf16 and no
+    # FlashAttention 2. The settings validated on Kaggle's 2xT4 by
+    # github.com/kaggle-vllm/kaggle-vllm: fp16, eager mode, Triton attention.
+    try:
+        q = subprocess.run(['nvidia-smi', '--query-gpu=compute_cap,name', '--format=csv,noheader'],
+                           capture_output=True, text=True).stdout.strip().splitlines()
+        major = int(q[0].split('.')[0]) if q else 0
+    except (OSError, ValueError):
+        q, major = [], 0
+    print('GPU:', q)
+    if 0 < major < 8:
+        args += ['--dtype', 'float16', '--enforce-eager']
+        env.setdefault('VLLM_ATTENTION_BACKEND', 'TRITON_ATTN')
     # Reported workaround for a vLLM startup crash on SM120 (RTX Pro 6000)
     # with Qwen3.8 (recipes.vllm.ai/Qwen/Qwen3.8-27B). Harmless elsewhere.
     env.setdefault('VLLM_USE_FLASHINFER_SAMPLER', '0')
@@ -360,6 +373,25 @@ def build_eval_notebook(seeds: str, actions: int, llm_hours: float, accelerator:
     }
 
 
+#: The committed notebooks, so they can be downloaded from GitHub and imported
+#: into Kaggle without building. Regenerate with --all after any code change.
+NOTEBOOKS = ROOT / "kaggle" / "notebooks"
+
+
+def build_all() -> None:
+    NOTEBOOKS.mkdir(parents=True, exist_ok=True)
+
+    def dump(name: str, nb: dict) -> None:
+        (NOTEBOOKS / name).write_text(json.dumps(nb, indent=1), encoding="utf-8")
+        print("wrote", NOTEBOOKS / name)
+
+    dump("submission_v1.ipynb", build_notebook(build_agent(2000, False, "v1"), "v1", "none"))
+    dump("submission_v2.ipynb",
+         build_notebook(build_agent(1000, False, "v2"), "v2", "nvidiaRtx6000", 6.5))
+    dump("bench_v2_rtx6000.ipynb", build_eval_notebook("0,1,2", 500, 6.5, "nvidiaRtx6000"))
+    dump("bench_v2_t4.ipynb", build_eval_notebook("0", 500, 6.5, "nvidiaTeslaT4"))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-actions", type=int, default=2000)
@@ -367,12 +399,17 @@ def main() -> None:
     ap.add_argument("--agent", choices=("v1", "v2", "bench"), default="v1",
                     help="bench: the public-games benchmark notebook for v2")
     ap.add_argument("--seeds", default="0,1,2", help="bench: seeds to run")
+    ap.add_argument("--all", action="store_true",
+                    help="build every notebook into kaggle/notebooks/ (the committed copies)")
     ap.add_argument("--accelerator", default=None,
                     help="Kaggle accelerator id; v2 defaults to the RTX 6000 (nvidiaRtx6000)")
     ap.add_argument("--llm-hours", type=float, default=6.5,
                     help="v2: stop calling the LLM this long after the notebook starts")
     args = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
+    if args.all:
+        build_all()
+        return
     accel = args.accelerator or ("none" if args.agent == "v1" else "nvidiaRtx6000")
     if args.agent == "bench":
         nb = build_eval_notebook(args.seeds, args.max_actions, args.llm_hours, accel)
