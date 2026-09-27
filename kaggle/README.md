@@ -41,6 +41,40 @@ check the gateway, which only exists inside Kaggle's competition rerun.
    Kaggle's rerun, where the gateway plays every hidden game and writes the real
    `submission.parquet`.
 
+## v2: the LLM-steered agent (D-035)
+
+```bash
+python scripts/build_kaggle.py --agent v2 --max-actions 1000   # -> kaggle/build/submission_v2.ipynb
+```
+
+Same notebook plus one cell that installs vLLM from an attached wheelhouse,
+starts its OpenAI-compatible server on an attached model, waits for it to be
+healthy (up to 20 minutes), and exports `ARC3_LLM_URL` for the agent. It
+searches `/kaggle/input` for a directory with `vllm-*.whl` files and for a model
+directory (`config.json` + `*.safetensors` + `tokenizer_config.json`), so no
+dataset name is hard-coded. **If either is missing or the server does not come
+up, the agent plays exactly as v1** — a serving failure cannot zero the run.
+The LLM is not called after `--llm-hours` (default 6.5) from notebook start.
+
+What to attach (Add input), following the Milestone #1 winner's verified stack
+(github.com/Tufalabs/duck-harness):
+
+- a **vLLM wheelhouse** built for Kaggle's Python 3.12 / CUDA 12.8 image.
+  Tufa's public one is `driessmit1/arc3-vllm-h100-wheelhouse-v3`; or build your
+  own in a CPU notebook with internet on (`pip download vllm==0.19.* -d wheels`,
+  save as a dataset) — CPU sessions do not use GPU quota.
+- a **model snapshot** (Hugging Face format). Tufa's is
+  `driessmit1/vrfai-qwen3-6-27b-fp8-hf-snapshot` (Qwen3.6-27B FP8, Apache 2.0).
+  FP8 needs the RTX 6000 (Blackwell); on a T4 use a 7B AWQ model instead.
+
+Accelerator: **RTX 6000** (the builder sets it). It is reserved for ARC-AGI-3
+and burns quota faster than T4; the rate is not published.
+
+Tested locally (2026-09-27) through the real framework loop against llama.cpp
+on this laptop: the agent finds the server by `ARC3_LLM_URL`, calls and records,
+and with the server absent plays as v1 with no errors. **Not tested: the vLLM
+cell itself**, which only runs on Kaggle.
+
 ## What is known and not known about the harness
 
 Verified from the official starter

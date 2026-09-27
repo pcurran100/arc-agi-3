@@ -9,6 +9,7 @@ Usage:
     python kaggle/local_harness.py <path to ARC-AGI-3-Agents checkout> <environment_files> [games...]
 """
 import importlib.util
+import os
 import logging
 import sys
 import time
@@ -28,7 +29,7 @@ import arc_agi
 from arc_agi import OperationMode
 
 spec = importlib.util.spec_from_file_location(
-    "my_agent", Path(__file__).parent / "build" / "my_agent.py")
+    "my_agent", Path(__file__).parent / "build" / os.environ.get("AGENT_FILE", "my_agent.py"))
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)
 

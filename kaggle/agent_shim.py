@@ -12,9 +12,66 @@ from arcengine import FrameData, GameAction, GameState
 
 from agents.agent import Agent
 
+import os
+import time
+
 from arc3.agent import GraphAgent
 from arc3.types import Action, Observation
 from arc3.types import GameState as A3State
+
+#: "v1" (GraphAgent) or "v2" (HypothesisAgent + local LLM server). Set at build.
+AGENT_VERSION = "__AGENT_VERSION__"
+
+_llm_lock = threading.Lock()
+_llm_ok = None  # checked once per process: is the local server up?
+
+
+class _DeadlineLLM:
+    """Stops calling the model after ARC3_LLM_DEADLINE (epoch seconds).
+
+    Past the deadline every call returns "", which proposes nothing, so the
+    agent continues exactly as v1 would and the run finishes inside Kaggle's
+    time limit instead of being killed mid-game.
+    """
+
+    def __init__(self, inner, deadline):
+        self.inner, self.deadline = inner, deadline
+
+    @property
+    def name(self):
+        return self.inner.name
+
+    def complete(self, messages, **kw):
+        if self.deadline and time.time() > self.deadline:
+            return ""
+        try:
+            return self.inner.complete(messages, **kw)
+        except Exception:
+            return ""
+
+
+def _make_agent(game_id: str):
+    global _llm_ok
+    if AGENT_VERSION != "v2":
+        return GraphAgent(seed=0, use_model=__USE_MODEL__)
+    from arc3.agent_v2 import HypothesisAgent
+    from arc3.llm import OpenAIChatLLM, RecordingLLM
+
+    url = os.environ.get("ARC3_LLM_URL", "")
+    llm = None
+    if url:
+        live = OpenAIChatLLM(base_url=url, model=os.environ.get("ARC3_LLM_MODEL", "local"))
+        with _llm_lock:
+            if _llm_ok is None:
+                _llm_ok = live.ready()
+        if _llm_ok:
+            inner = live
+            calls_dir = os.environ.get("ARC3_CALLS_DIR", "")
+            if calls_dir:
+                inner = RecordingLLM(live, os.path.join(calls_dir, f"{game_id}.jsonl"))
+            llm = _DeadlineLLM(inner, float(os.environ.get("ARC3_LLM_DEADLINE", "0") or 0))
+    # llm None -> HypothesisAgent is v1 with the edge-row band (no LLM, no harm).
+    return HypothesisAgent(seed=0, llm=llm)
 
 
 class MyAgent(Agent):
@@ -24,13 +81,13 @@ class MyAgent(Agent):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._agent = GraphAgent(seed=0, use_model=__USE_MODEL__)
+        self._agent = _make_agent(self.game_id)
         self._last_frames: tuple = ()
         self._pending_data: dict = {}
 
     @property
     def name(self) -> str:
-        return f"{super().name}.graph.{self.MAX_ACTIONS}"
+        return f"{super().name}.{AGENT_VERSION}.{self.MAX_ACTIONS}"
 
     def is_done(self, frames: list[FrameData], latest_frame: FrameData) -> bool:
         return latest_frame.state is GameState.WIN
@@ -64,7 +121,7 @@ class MyAgent(Agent):
         except Exception:  # never let one bad step end the game
             import logging
             logging.getLogger().exception("GraphAgent failed; sending RESET")
-            self._agent = GraphAgent(seed=0, use_model=__USE_MODEL__)
+            self._agent = _make_agent(self.game_id)
             self._pending_data = {}
             return GameAction.RESET
         action = GameAction.from_id(a.id)
