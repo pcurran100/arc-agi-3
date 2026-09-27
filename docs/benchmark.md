@@ -269,6 +269,13 @@ github.com/arcprize/ARC-AGI-3-Agents):
 what plays the games, is identical; pip's warnings about `dopamine-rl` and
 `gradio` during that install concern preinstalled packages we do not use.
 
+*[measured on Kaggle, 2026-09-27, 2xT4]* The wheelhouse dataset
+`driessmit1/arc3-vllm-h100-wheelhouse-v3` installs offline and provides
+**vLLM 0.19.0** (with transformers 4.57.6, flashinfer 0.6.6). The first engine
+start failed at `Engine core initialization failed`; the model attached was
+the full-precision base `qwen2.5/transformers/7b` (~15 GB) rather than
+`7b-instruct-awq`, the likely cause on a 16 GB T4 — not yet confirmed.
+
 Verified from Kaggle's docs: **30 GPU-hours per week** shared across P100 and
 2×T4, sessions up to 9 hours; RTX 6000 reserved for ARC-AGI-3 notebooks and
 "burns quota faster" (rate unpublished).

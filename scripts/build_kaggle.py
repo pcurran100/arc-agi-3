@@ -131,6 +131,11 @@ def _start_llm():
     print('vllm wheel dirs:', wheel_dirs, '| model:', model)
     if not wheel_dirs or not model:
         print('LLM unavailable: playing as v1'); return
+    if not any(t in model.lower() for t in ('instruct', 'chat', 'qwen3', 'gemma-4', '-it')):
+        # Measured 2026-09-27: attaching the 'qwen2.5/transformers/7b' variation
+        # (a full-precision base model) instead of '7b-instruct-awq' failed on a
+        # T4 at engine start. A base model would not follow the prompt anyway.
+        print('WARNING: this does not look like an instruction-tuned model:', model)
     links = sum((['--find-links', d] for d in wheel_dirs), [])
     r = subprocess.run([sys.executable, '-m', 'pip', 'install', '--no-index', *links, 'vllm'],
                        capture_output=True, text=True)
@@ -170,7 +175,14 @@ def _start_llm():
                     print(f'LLM up after {time.time() - T0:.0f}s'); return
         except Exception:
             time.sleep(5)
-    print('LLM did not come up: playing as v1'); print(open('/tmp/vllm.log').read()[-3000:])
+    print('LLM did not come up: playing as v1')
+    # The root cause is usually far above the final traceback, so print the
+    # lines that name an error first, then the tail.
+    text = open('/tmp/vllm.log', errors='replace').read()
+    keys = ('error', 'out of memory', 'exception', 'not supported', 'insufficient', 'cannot')
+    hits = [ln for ln in text.splitlines() if any(k in ln.lower() for k in keys)]
+    print('--- lines naming an error ---'); print('\\n'.join(hits[:40]))
+    print('--- end of log ---'); print(text[-2000:])
 
 if os.getenv('KAGGLE_IS_COMPETITION_RERUN') or os.getenv('ARC3_FORCE_LLM'):
     _start_llm()

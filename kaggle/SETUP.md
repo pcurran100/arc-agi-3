@@ -99,6 +99,12 @@ proves the pipeline.
    and start a notebook from its page (it opens with the model attached), then
    **File → Import Notebook** → `bench_v2_t4.ipynb` and add the other three.
    Check the right panel still lists the model after importing.
+
+   **Pick the variation `7b-instruct-awq`, not the default `7b`.** The `7b`
+   variation is a full-precision *base* model (~15 GB): it does not fit a 16 GB
+   T4 with room to run, and it is not trained to follow instructions. The vLLM
+   cell prints the model path it found — it must end in `7b-instruct-awq/…` —
+   and warns if the folder does not look like an instruction model.
 3. **Session options**: Accelerator **GPU T4 x2**, Internet **Off**.
 4. Click **+ Code** above the first cell and paste:
 
