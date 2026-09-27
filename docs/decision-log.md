@@ -3054,4 +3054,82 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 
 ---
 
-<!-- Next entry: D-035 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->
+## D-035 — v2: a small offline LLM proposes hypotheses as code; our machinery tests them
+
+- **Date:** 2026-09-27
+- **Status:** accepted
+- **Context:** v1 (`v1-graph`, D-034) has no hypothesis forming and no
+  decision making beyond "try what has not been tried". It has no goal, and its
+  score (~2.4% over three seeds) is the luck of exploration order. The induced
+  rule language (D-024) is the only hypothesis-former in the repository, it
+  keeps one hypothesis rather than a population (against Guardrail 1), and
+  used as an action filter it lowered the score by two thirds. Every podium
+  entry at Milestone #1 is a harness around a small open LLM, and the winner's
+  LLM *writes and runs code* rather than picking actions (field-review §1). The
+  design thesis already assigns the LLM exactly one job: proposing goals.
+  Compute is constrained: no NVIDIA GPU locally (Snapdragon X Elite, 32 GB RAM,
+  CPU only), no API credits, and Kaggle's free allowance is 30 GPU-hours a week
+  on P100 or 2×T4, sessions up to 9 hours, RTX 6000 at a higher unstated rate.
+- **Decision:** Build v2 on branch `v2-llm`, keeping `GraphAgent` as the
+  acting and navigating substrate, and add a hypothesis layer:
+
+  1. **Hypotheses are code.** The LLM is shown a symbolic scene (object list
+     from segmentation, a compact grid, the action mask, what changed recently,
+     what has been tried) and asked for small Python functions: a **goal
+     predicate / progress score** over the scene, and optionally **predicted
+     effects** of actions. It never chooses an action directly.
+  2. **A weighted population, soft updates** (Guardrail 1). Each hypothesis has
+     a weight. Evidence moves weights: a dynamics hypothesis gains when its
+     prediction matches the next frame and loses when it does not; a goal
+     hypothesis gains when a level is won in a state it scored highly, loses
+     when states it scores as "goal reached" are reached without a win. Nothing
+     is deleted on one failure.
+  3. **Decisions come from the population.** The frontier choice in
+     `GraphAgent` is ranked by weighted goal progress instead of arm means
+     alone, so exploration heads towards states the live hypotheses think are
+     closer to winning. When no hypothesis is informative, v1 behaviour is the
+     fallback, so v2 cannot do worse by construction than v1 minus the cost of
+     the actions its hypotheses waste.
+  4. **The LLM is called sparsely**: at level start, on a surprise (the
+     population predicted wrongly), when stuck, and after a win. Dozens of calls
+     per game, not thousands, so a mid-sized model fits the runtime.
+  5. **Every call is recorded** (prompt, response, model, seed) to JSONL and
+     can be replayed offline, so one GPU run's LLM output is reusable for tuning
+     everything downstream at zero GPU cost.
+
+  Development: build and test with a scripted fake LLM (unit tests) and a
+  small model on the laptop CPU via llama.cpp's OpenAI-compatible server; run
+  real evaluations on Kaggle 2×T4 with a quantised 7–14B model; consider larger
+  only if the small one shows signal. Progress is tracked in
+  `docs/experiments/scoreboard.md` under D-034's rule: all 25 games, at least
+  three seeds.
+- **Options rejected:**
+  - *LLM chooses actions directly (JSON-action harness)* — the Milestone #1
+    podium's weaker variant; needs a call per action, which the runtime cannot
+    afford at 2,000 actions over ~55 games, and it has no queryable model to
+    plan against, which is the gap this project exists to fill.
+  - *Keep improving v1's heuristics* — D-034 showed tuning is inside the noise;
+    the binding constraint is the absence of a goal, which heuristics on
+    exploration order do not supply.
+  - *Develop against a frontier API and port later* — no credits, and prompts
+    tuned on a far stronger model may not transfer to what can run offline.
+  - *Fine-tune a model on the public games* — 25 games is a validation set,
+    not a training set (benchmark.md), and the quota would buy very little.
+  - *Replace the graph and the perception with the LLM* — the exact state
+    graph and exact perception are the parts that measurably work; the LLM is
+    added where we have nothing, not where we have something.
+- **Consequences:** The LLM becomes a dependency of the submission: weights
+  must be attached to the notebook as a Kaggle model or dataset, and an offline
+  inference stack must be vendored. Runtime per game rises. Hypotheses as
+  executable code need a sandbox (time limit, no imports beyond the scene API).
+  v1 stays tagged and remains the fallback submission.
+- **Revisit if:** v2 does not beat v1 by more than the seed-to-seed spread on
+  three seeds after the first real Kaggle-GPU evaluation (then the LLM is not
+  earning its runtime and the goal signal must come from elsewhere, e.g. win
+  states of earlier levels); or the LLM's goal hypotheses are rarely executable
+  or never gain weight (the prompt or the scene representation is the problem,
+  not the architecture); or runtime makes 2,000 actions per game infeasible.
+
+---
+
+<!-- Next entry: D-036 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->
