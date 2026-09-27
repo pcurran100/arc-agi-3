@@ -75,6 +75,33 @@ on this laptop: the agent finds the server by `ARC3_LLM_URL`, calls and records,
 and with the server absent plays as v1 with no errors. **Not tested: the vLLM
 cell itself**, which only runs on Kaggle.
 
+## Benchmarking v2 on Kaggle's GPU (do this before submitting v2)
+
+The submission notebook returns one opaque number for hidden games. To learn
+whether the LLM helps, score it on the 25 public games with the real model:
+
+```bash
+python scripts/build_kaggle.py --agent bench --seeds 0,1,2 --max-actions 500
+# -> kaggle/build/eval_v2.ipynb
+```
+
+1. Upload the local `environment_files/` directory as a **private** Kaggle
+   dataset (it is downloadable anonymously anyway; D-008 only forbids
+   committing it to git).
+2. Import `eval_v2.ipynb`, attach: the competition dataset, the vLLM
+   wheelhouse, the model snapshot, and the environment-files dataset.
+3. Accelerator RTX 6000 (or T4 with a 7B AWQ model), internet off, Save & Run
+   All. Each seed plays 25 games; budget roughly 1–2 hours per seed, most of it
+   the model's thinking.
+4. Download `/kaggle/working/results/`: `eval_s{N}.json` (scores, same format
+   as `docs/experiments/agent_*.json`) and `llm_calls/` (every prompt and
+   response). Put the calls in `docs/experiments/llm_calls/<model>/` and the
+   whole run can be replayed offline for free with `eval_agent.py --replay`.
+
+Checked locally: the benchmark's `arc3` bundle and script run with nothing
+from `src/` on the path and reproduce the repository's numbers (tn36 level at
+19, sp80 at 45, seed 0). The vLLM cell is the untested part.
+
 ## What is known and not known about the harness
 
 Verified from the official starter
