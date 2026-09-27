@@ -958,3 +958,104 @@ to use a model; it is not a test of planning with one.
   (D-034), so it is not what limits those games.
 - **Bounded click candidates.** 64 per state; a game whose productive click is
   on a small object in a cluttered frame may never offer it.
+
+## 10. The hypothesis layer (v2)
+
+v1 (§9) acts, remembers and navigates, and has no idea where to go. v2
+(`src/arc3/agent_v2.py`, D-035) adds the missing part: an LLM proposes **goal
+hypotheses as code**, a population holds them with weights that evidence
+moves, and the population's opinion of each known state steers the search. The
+LLM never chooses an action.
+
+### 10.1 The pieces
+
+- **`arc3.llm`** — one `complete(messages)` interface. Backends: `ScriptedLLM`
+  (tests), `OpenAIChatLLM` (any OpenAI-compatible server; refuses non-local
+  hosts, Guardrail 5), `RecordingLLM` / `ReplayLLM` (every call to JSONL, and
+  exact offline replay keyed on the full request).
+- **`arc3.scene`** — a frame as objects (`colour_8` components: colour, size,
+  box, centre) plus the non-background crop as hex rows. The same object is
+  rendered into the prompt and passed to the hypothesis code, so the model
+  writes code against exactly what it was shown.
+- **`arc3.propose`** — the prompt: the scene API, what each action has been
+  observed to do (`describe_effect`), what won the previous level, and how the
+  existing hypotheses have fared. It describes the interface only, never kinds
+  of game (Guardrail 2).
+- **`arc3.hypothesis`** — parsing (tolerant of small-model formatting), a
+  sandbox (whitelisted builtins, no imports or dunders, a step budget counting
+  only the hypothesis's own lines), and the `Population`:
+
+  | evidence | effect on weight |
+  |---|---|
+  | level won from state *s* | × (0.5 + 1.5·progress(*s*)) — ×2 if it said 1.0, ×0.5 if 0 |
+  | a state it calls reached (≥ 0.99) that did not end the level | × 0.7, once per state |
+  | an exception or bad return | × 0.8, at most five times |
+  | identical output on ≥ 20 states | marked *flat*: excluded from ranking, kept |
+
+  Weights floor at 0.01; nothing is deleted (Guardrail 1).
+- **`HypothesisAgent`** — fills four inert hooks added to `GraphAgent`: a state
+  value (the population's weighted progress), a best-first "leave for a better
+  state" test (`goal_weight` = 100 value-units per step of walking), and
+  on-state / on-win callbacks that feed the population. It calls the LLM 10
+  actions into a level, then every 150 actions without a win, at most 4 times
+  per level and 16 per game. Hypotheses that gained weight on a win carry to
+  the next level at their earned weight (capped at 4).
+
+With no LLM, or before the first proposal, every value is 0 and v2 *is* v1
+with the band confined to edge rows (tested: `test_no_llm_is_exactly_v1`).
+
+### 10.2 What it does with a right hypothesis — the synthetic room
+
+`tests/test_agent_v2.py`: a 12×12 room of 4-pixel cells, ACTION1–4 move a
+block, the level is won when it reaches a square in the far corner; two levels.
+
+| agent | level 1 at | both levels |
+|---|---|---|
+| v1, blind (edge-row band) | not within 600 | not within 600 |
+| v2, correct hypothesis | 17 | **61** |
+| v2, correct then three wrong | 17 | 61 |
+| v2, wrong hypotheses only | not within 600 | not within 600 |
+
+Three things this test found, each now fixed and commented where it lives: the
+unconfined band masked the rows the block moves in as a "counter", hiding it
+from the hypotheses; a fixed value margin (0.15) for leaving a state let the
+agent drift away from a goal one move off, which is what forced the
+best-first value-against-distance trade; and a carried hypothesis entering at
+the prior weight tied with a fresh wrong guess and stalled level 2.
+
+### 10.3 What it does with a real small model — vc33
+
+`scripts/eval_agent.py --agents v2 --games vc33 --llm-url …`, seed 0, Qwen2.5-
+Coder-3B-Instruct Q4_K_M on llama.cpp, CPU (Snapdragon X Elite). Five calls at
+36–80 s each; 9 hypotheses, 4 still informative at the end. Score **identical
+to v1** (levels at actions 25 and 43, 15.4%). The hypotheses, verbatim goal
+lines, with their final state:
+
+```
+H0 w=1.00 : maximize the number of cells of the largest colour.
+H7 w=1.00 : maximize the number of cells of the most frequent colour.
+H8 w=1.00 : maximize the number of cells of the largest connected region.
+H1 w=0.01 [flat] false=151 : minimize the number of cells of the smallest colour.
+H4 w=0.01 [flat] false=111 : minimize the number of cells of the smallest colour.
+```
+
+The evidence rules worked: "minimise the smallest colour" returns ≥ 0.99 on
+almost every state, so it collected 151 false goals and sank to the floor.
+What did not work is the model: every hypothesis is a colour-count statistic,
+none refers to an object's position or to what the actions do, and several
+blocks used `from collections import Counter`, which the sandbox rejects.
+
+### 10.4 What this does not do
+
+- **Goal hypotheses only.** The LLM is shown what actions did but never asked
+  to predict effects; the state graph is still the only dynamics model.
+- **Values exist only for visited states.** An untried action's outcome is
+  unknown, so within a state the choice among untried actions is still v1's.
+  The search is best-first over the known graph, not planning through
+  predictions.
+- **No credit for partial progress.** Only wins and false goals move weights.
+- **Tested with a 3B model on a CPU only.** The Kaggle vLLM cell has not run;
+  whether a 27B model's hypotheses are good enough to steer is the open
+  question (D-035's revisit condition).
+- **Runtime grows.** v2 builds a scene per visited state; per-step cost on the
+  heaviest games has not been measured yet.

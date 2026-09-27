@@ -249,6 +249,29 @@ measure.
   ARC-AGI-2 track or the Verified Testing policy. **Do not plan against it**
   until confirmed from the ARC-AGI-3 Kaggle rules page.
 
+### Harness and compute facts added 2026-09-26/27 (D-034, D-035)
+
+Verified from source (github.com/arcprize/ARC-AGI-3-Kaggle-Starter,
+github.com/arcprize/ARC-AGI-3-Agents):
+
+- The agent class must be `MyAgent(agents.agent.Agent)`; the loop runs while
+  `not is_done(...) and action_counter <= MAX_ACTIONS` (framework default 80,
+  ours set at build time). RESET counts as an action.
+- The Swarm plays all games concurrently in **threads**; the gateway sidecar
+  (`http://gateway:8001`) writes the real `submission.parquet`. Competition mode
+  allows level resets only.
+- `GameAction.ACTION6.set_data` mutates a shared enum member — a cross-thread
+  race; our adapter sends per-instance coordinates instead.
+
+Verified from Kaggle's docs: **30 GPU-hours per week** shared across P100 and
+2×T4, sessions up to 9 hours; RTX 6000 reserved for ARC-AGI-3 notebooks and
+"burns quota faster" (rate unpublished).
+
+*Unverified* (community README github.com/anandsingh8687/arc-prize-2026-arc-agi-3-agent
+and a search snippet; the Kaggle rules page could not be read): the rerun plays
+**110 hidden games in 9 hours on one 96 GB Blackwell GPU**, one submission per
+UTC day. Plan against it, but confirm before depending on the number.
+
 ### The sibling track, for context
 
 ARC Prize 2026 also runs a separate **ARC-AGI-2** track ($700K): $275K progress

@@ -38,6 +38,27 @@ Same architecture as Reki, packaged as a configurable framework. Gemma-4-31B,
 JSON actions, reflection memory, optional confidence prompts for conservative
 moves.
 
+### How the winner served its model offline *(added 2026-09-27, D-035)*
+
+Read from Tufa's public repository (github.com/Tufalabs/duck-harness, notebook
+`taaf-duck-harness-kaggle-share.ipynb`, `ARC3-Inference/README.md`) and writeup
+(tufalabs.ai/research/duck-harness/):
+
+- **Qwen3.6-27B in FP8, served by vLLM** as an OpenAI-compatible HTTP server
+  inside the notebook (`http://127.0.0.1:1234/v1`), chosen for "Kaggle's
+  single-GPU constraint". FP8 implies the Ada/Blackwell RTX 6000.
+- The wheelhouse and the model snapshot are **attached Kaggle datasets**
+  (`driessmit1/arc3-vllm-h100-wheelhouse-v3`,
+  `driessmit1/vrfai-qwen3-6-27b-fp8-hf-snapshot`), installed with
+  `pip install --no-index --find-links`.
+- The harness checks `KAGGLE_IS_COMPETITION_RERUN` and keeps a soft deadline
+  before the time limit.
+
+A third party measured the same stack (github.com/leejianrong/solve-arc-agi-3,
+`docs/baselines/qwen36-vllm-artifact.md`): 35.9 GB snapshot, 5.1 GB wheelhouse,
+**351 s to load, 1,819 tok/s prefill, 38.7 tok/s decode** at concurrency 1 on
+the RTX Pro 6000. Our v2 packaging copies this stack (`kaggle/README.md`).
+
 ### What we take from this
 
 - The **agent-writes-code** entry beat both **agent-picks-JSON-action** entries.

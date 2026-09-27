@@ -13,6 +13,15 @@ ends if anything below is stale.
   (3.46% → 1.18%), so it ships switched off. The agent has no goal; its score
   is where blind exploration happens to look first. Earlier status, still true:
   the D-002 go/no-go was a weak pass (D-025), perception is built and audited.
+- **v2 in progress (D-035, branch `v2-llm`; v1 frozen as tag `v1-graph`).** An
+  LLM proposes goal hypotheses as code; a weighted population tests them
+  against visited states and wins; their values steer best-first search over
+  v1's state graph. Built and tested: with a correct scripted hypothesis a
+  synthetic two-level game falls from unsolved-in-600 to **61 actions**. With
+  a real 3B model on CPU the plumbing works but its hypotheses are shallow
+  colour counts (vc33: identical to v1). Packaged for Kaggle on the Milestone
+  #1 winner's stack (vLLM + attached model on the RTX 6000); **the Kaggle GPU
+  run is the next step and needs the user** (no Kaggle credentials here).
 - **Days to Milestone #2 (30 Sep):** **3** — a submission is built
   (`kaggle/README.md`); uploading it, making the notebook public and choosing
   a licence are the user's steps
@@ -425,7 +434,7 @@ selection is worth about one and layer separation about two.
 | ~~5~~ | ~~Carving selection~~ | ~1 game | **closed, negative (D-029).** Beats doing nothing on 51% of game-splits — a coin flip. Revisit after layer separation, when residuals can be measured on the playfield alone |
 | 6 | **Multi-step rollout accuracy** | unmeasured, and planning depends on it entirely | any time |
 | 7 | ~~**End-to-end agent producing a real RHAE score**~~ | **done (D-034).** ~2.4% over three seeds on the public games; Kaggle notebook built | **done**; the Kaggle rerun score is still unknown |
-| 8 | **A goal or value signal to rank frontier states** | **now the binding constraint.** The score is dominated by the luck of exploration order (seed 0 3.46%, seeds 1–2 ~1.9%) | next |
+| 8 | **A goal or value signal to rank frontier states** | **now the binding constraint.** The score is dominated by the luck of exploration order (seed 0 3.46%, seeds 1–2 ~1.9%) | **in progress (D-035)**: LLM goal hypotheses as code, built and packaged; awaiting a real model on Kaggle GPU |
 
 ## Current issues, named
 
