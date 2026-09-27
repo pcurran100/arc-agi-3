@@ -90,6 +90,11 @@ class OpenAIChatLLM:
     model: str = "local"
     timeout: float = 600.0
     allow_remote: bool = False
+    #: Extra fields merged into every request body, for server-specific options.
+    #: Qwen3.6 thinks by default; ``{"chat_template_kwargs": {"enable_thinking":
+    #: false}}`` turns that off in vLLM, and the model card's non-thinking
+    #: sampling (top_p, top_k, presence_penalty) goes here too.
+    extra: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         host = urlparse(self.base_url).hostname or ""
@@ -104,13 +109,15 @@ class OpenAIChatLLM:
         return f"openai-chat:{self.model}@{self.base_url}"
 
     def complete(self, messages, *, max_tokens=512, temperature=0.0, seed=0) -> str:
-        body = json.dumps({
+        req_body = {
             "model": self.model,
             "messages": list(messages),
             "max_tokens": max_tokens,
             "temperature": temperature,
             "seed": seed,
-        }).encode("utf-8")
+        }
+        req_body.update(self.extra)
+        body = json.dumps(req_body).encode("utf-8")
         req = urllib.request.Request(
             self.base_url.rstrip("/") + "/v1/chat/completions",
             data=body,

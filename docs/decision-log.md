@@ -3132,4 +3132,48 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 
 ---
 
-<!-- Next entry: D-036 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->
+## D-036 — The v2 model: Qwen3.6-27B FP8 on the RTX 6000, thinking off first
+
+- **Date:** 2026-09-27
+- **Status:** accepted
+- **Context:** v2 (D-035) needs an offline model on Kaggle. Verified: the
+  Milestone #1 winner ran Qwen3.6-27B FP8 under vLLM on the RTX 6000
+  (Tufalabs/duck-harness); a third party measured that stack at 351 s load,
+  1,819 tok/s prefill, 38.7 tok/s decode at concurrency 1. The model card
+  (huggingface.co/Qwen/Qwen3.6-27B-FP8): 27B hybrid Gated-DeltaNet/attention,
+  262k context, Apache 2.0, **thinking on by default**, non-thinking sampling
+  temperature 0.7 / top_p 0.8 / top_k 20 / presence_penalty 1.5. Unverified:
+  the rerun is ~110 games in 9 h on a 96 GB Blackwell GPU. The local 3B model
+  (D-035) produced only colour-count hypotheses.
+- **Decision:** Benchmark and submit v2 with **Qwen3.6-27B FP8**, served by vLLM
+  on the RTX 6000, **thinking disabled** for the first benchmark (900-token cap,
+  model-card sampling). A thinking-mode benchmark is the second run, not the
+  first. The client gained an `extra` request field so these are configuration,
+  not code; the notebook sets them by environment variable.
+- **Options rejected:**
+  - *Gemma-4-31B* — used by the 2nd and 3rd place entries, so also proven, but
+    as a vision/JSON-action policy, not as a code writer; and a vLLM Triton bug
+    breaks its head_dim=512 layers on Turing (vllm issue 57712), which rules
+    out T4 development. Kept as the first alternative to test.
+  - *A larger model (e.g. ~70B in FP8)* — would fit 96 GB for weights but leave
+    little KV cache for ~110 concurrent games, and nothing on this stack has been
+    measured at that size. Revisit only if the 27B's hypotheses are close.
+  - *Newer Qwen3.8-27B* — Kaggle mirrors exist, but it is unmeasured on this
+    stack; swapping it in later is a dataset change, not a code change.
+  - *Thinking mode first* — roughly 5–10× the tokens per call; with ~110 games
+    and 16 calls each that risks the 9-hour limit before we know whether
+    non-thinking hypotheses already help. Cheaper question first.
+  - *7B AWQ on 2×T4* — free-quota friendly and viable for development, but a
+    weaker proposer than the model the winner used; a negative result there
+    would not tell us whether the idea or the model failed.
+- **Consequences:** Every benchmark row names the model, quantisation, thinking
+  mode and sampling. RTX 6000 time burns quota faster (rate unpublished), so a
+  three-seed benchmark should be one session, not several.
+- **Revisit if:** non-thinking hypotheses are mostly flat or false-goal-sunk on
+  the benchmark (try thinking mode next); thinking mode helps but overruns the
+  time budget (cut calls per game before cutting the model); or a model with a
+  measured better ARC-AGI-3 result on this hardware appears.
+
+---
+
+<!-- Next entry: D-037 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->

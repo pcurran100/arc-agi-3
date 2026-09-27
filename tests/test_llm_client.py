@@ -48,3 +48,33 @@ def test_http_backend_refuses_remote_hosts():
     with pytest.raises(ValueError):
         OpenAIChatLLM(base_url="https://api.example.com")
     OpenAIChatLLM(base_url="http://127.0.0.1:8080")  # local is fine
+
+
+def test_http_backend_sends_extra_fields_and_reads_content():
+    """Qwen3.6 needs chat_template_kwargs to switch thinking off; it must reach the server."""
+    import json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    seen = {}
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            seen.update(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+            out = json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(out)
+
+        def log_message(self, *a):
+            pass
+
+    srv = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=srv.handle_request, daemon=True).start()
+    llm = OpenAIChatLLM(base_url=f"http://127.0.0.1:{srv.server_port}",
+                        extra={"chat_template_kwargs": {"enable_thinking": False}, "top_k": 20})
+    assert llm.complete(MSG, temperature=0.7) == "ok"
+    assert seen["chat_template_kwargs"] == {"enable_thinking": False}
+    assert seen["top_k"] == 20 and seen["temperature"] == 0.7
+    srv.server_close()

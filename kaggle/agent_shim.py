@@ -60,7 +60,9 @@ def _make_agent(game_id: str):
     url = os.environ.get("ARC3_LLM_URL", "")
     llm = None
     if url:
-        live = OpenAIChatLLM(base_url=url, model=os.environ.get("ARC3_LLM_MODEL", "local"))
+        import json
+        live = OpenAIChatLLM(base_url=url, model=os.environ.get("ARC3_LLM_MODEL", "local"),
+                             extra=json.loads(os.environ.get("ARC3_LLM_EXTRA", "{}") or "{}"))
         with _llm_lock:
             if _llm_ok is None:
                 _llm_ok = live.ready()
@@ -71,7 +73,10 @@ def _make_agent(game_id: str):
                 inner = RecordingLLM(live, os.path.join(calls_dir, f"{game_id}.jsonl"))
             llm = _DeadlineLLM(inner, float(os.environ.get("ARC3_LLM_DEADLINE", "0") or 0))
     # llm None -> HypothesisAgent is v1 with the edge-row band (no LLM, no harm).
-    return HypothesisAgent(seed=0, llm=llm)
+    return HypothesisAgent(
+        seed=0, llm=llm,
+        temperature=float(os.environ.get("ARC3_LLM_TEMPERATURE", "0.0")),
+        max_tokens=float(os.environ.get("ARC3_LLM_MAX_TOKENS", "900")))
 
 
 class MyAgent(Agent):

@@ -37,6 +37,7 @@ LLM_URL = ""
 CALLS_DIR = "docs/experiments/llm_calls"
 REPLAY = False
 REPLAY_ONLY = False
+LLM_EXTRA: dict = {}
 
 
 def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: str) -> dict:
@@ -62,7 +63,7 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
             llm = None
             if LLM_URL:
                 calls = Path(CALLS_DIR) / f"{agent_name.replace(':', '_')}_s{seed}_{gid}.jsonl"
-                live = OpenAIChatLLM(base_url=LLM_URL)
+                live = OpenAIChatLLM(base_url=LLM_URL, extra=LLM_EXTRA)
                 llm = (ReplayLLM(calls, fallback=live if not REPLAY_ONLY else None) if REPLAY
                        else RecordingLLM(live, calls))
             agent = HypothesisAgent(seed=seed, llm=llm, **kw)
@@ -104,7 +105,7 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
 
 
 def main() -> None:
-    global LLM_URL, CALLS_DIR, REPLAY, REPLAY_ONLY
+    global LLM_URL, CALLS_DIR, REPLAY, REPLAY_ONLY, LLM_EXTRA
     ap = argparse.ArgumentParser()
     ap.add_argument("--actions", type=int, default=500)
     ap.add_argument("--agents", default="graph;graph_nomodel;explore")
@@ -116,11 +117,13 @@ def main() -> None:
     ap.add_argument("--calls-dir", default=CALLS_DIR)
     ap.add_argument("--replay", action="store_true", help="serve v2's LLM calls from --calls-dir")
     ap.add_argument("--replay-only", action="store_true", help="with --replay: never call the live model")
+    ap.add_argument("--llm-extra", default="{}", help="JSON merged into every LLM request body")
     args = ap.parse_args()
     logging.basicConfig(level=logging.WARNING)
 
     LLM_URL, CALLS_DIR = args.llm_url, args.calls_dir
     REPLAY, REPLAY_ONLY = args.replay, args.replay_only
+    LLM_EXTRA = json.loads(args.llm_extra)
 
     arcade = make_arcade(environments_dir=args.env_dir)
     games = args.games or available_environments(args.env_dir)

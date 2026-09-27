@@ -67,6 +67,12 @@ CARRY_CAP = 4.0
 @dataclass
 class HypothesisAgent(GraphAgent):
     llm: Optional[LLM] = None
+    #: Sampling for proposals. 0.0 suits small local models; Qwen3.6's card
+    #: recommends 0.7 in non-thinking mode (set from the Kaggle notebook).
+    temperature: float = 0.0
+    #: Output cap per call. Thinking mode needs far more than the 900 that
+    #: suffices for three short functions.
+    max_tokens: float = MAX_TOKENS
     #: Value units worth one step of walking (the frontier trades them off).
     goal_weight: float = 100.0
     #: v2 needs the band confined to edge rows. Unconfined, a player moving
@@ -205,8 +211,8 @@ class HypothesisAgent(GraphAgent):
                       level=self._level, actions_used=self._level_actions,
                       previous_win=self._previous_win, hypotheses=ranked)
         try:
-            text = self.llm.complete(goal_messages(ev), max_tokens=MAX_TOKENS,
-                                     temperature=0.0, seed=self.seed + len(self.calls))
+            text = self.llm.complete(goal_messages(ev), max_tokens=int(self.max_tokens),
+                                     temperature=self.temperature, seed=self.seed + len(self.calls))
         except Exception:
             self._bump("llm_errors")
             text = ""

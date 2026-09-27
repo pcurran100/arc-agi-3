@@ -103,6 +103,16 @@ LLM_BUDGET_HOURS = __LLM_HOURS__   # stop calling the model after this; play on 
 os.environ['ARC3_LLM_DEADLINE'] = str(T0 + LLM_BUDGET_HOURS * 3600)
 os.environ['ARC3_CALLS_DIR'] = '/tmp/llm_calls'   # /tmp: not a submission candidate
 
+# Sampling, per the Qwen3.6 model card's NON-thinking recommendation. Thinking
+# is on by default in Qwen3.x and would spend the token cap on reasoning, so it
+# is switched off per request. For a thinking run: set enable_thinking True,
+# ARC3_LLM_TEMPERATURE 0.6, top_p 0.95, presence_penalty 0, and raise
+# ARC3_LLM_MAX_TOKENS to ~8000 (roughly 5-10x the tokens and time per call).
+os.environ.setdefault('ARC3_LLM_EXTRA', '{"chat_template_kwargs": {"enable_thinking": false}, '
+                      '"top_p": 0.8, "top_k": 20, "presence_penalty": 1.5}')
+os.environ.setdefault('ARC3_LLM_TEMPERATURE', '0.7')
+os.environ.setdefault('ARC3_LLM_MAX_TOKENS', '900')
+
 def _model_dir():
     for cfg in sorted(glob.glob('/kaggle/input/**/config.json', recursive=True)):
         d = os.path.dirname(cfg)
@@ -121,11 +131,15 @@ def _start_llm():
                        capture_output=True, text=True)
     print(r.stdout[-2000:], r.stderr[-2000:])
     log = open('/tmp/vllm.log', 'w')
-    subprocess.Popen([sys.executable, '-m', 'vllm.entrypoints.openai.api_server',
-                      '--model', model, '--served-model-name', 'local',
-                      '--host', '127.0.0.1', '--port', str(LLM_PORT),
-                      '--max-model-len', '16384', '--gpu-memory-utilization', '0.90',
-                      '--max-num-seqs', '32'], stdout=log, stderr=subprocess.STDOUT)
+    args = [sys.executable, '-m', 'vllm.entrypoints.openai.api_server',
+            '--model', model, '--served-model-name', 'local',
+            '--host', '127.0.0.1', '--port', str(LLM_PORT),
+            '--max-model-len', '16384', '--gpu-memory-utilization', '0.90',
+            '--max-num-seqs', '32']
+    if 'qwen3' in model.lower():
+        # Keeps any reasoning out of the answer text our parser reads.
+        args += ['--reasoning-parser', 'qwen3']
+    subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT)
     for _ in range(240):   # up to 20 minutes; a 27B model measured ~6 min to load
         try:
             with urllib.request.urlopen(f'http://127.0.0.1:{LLM_PORT}/health', timeout=5) as h:
@@ -260,7 +274,8 @@ def build_eval_notebook(seeds: str, actions: int, llm_hours: float, accelerator:
         print('environment_files:', env_dir)
         os.makedirs('/kaggle/working/results', exist_ok=True)
         url = os.environ.get('ARC3_LLM_URL', '')
-        agents = 'v2' if url else 'graph_nomodel'
+        agents = ('v2:temperature=' + os.environ.get('ARC3_LLM_TEMPERATURE', '0.7')
+                  + ',max_tokens=' + os.environ.get('ARC3_LLM_MAX_TOKENS', '900')) if url else 'graph_nomodel'
         print('LLM:', url or 'none -- scoring v1 only')
         for seed in [{seeds}]:
             cmd = [sys.executable, '-c',
@@ -271,7 +286,7 @@ def build_eval_notebook(seeds: str, actions: int, llm_hours: float, accelerator:
                    '--env-dir', env_dir, '--calls-dir', '/kaggle/working/results/llm_calls',
                    '--out', f'/kaggle/working/results/eval_s{{seed}}.json']
             if url:
-                cmd += ['--llm-url', url]
+                cmd += ['--llm-url', url, '--llm-extra', os.environ.get('ARC3_LLM_EXTRA', '{{}}')]
             subprocess.run(cmd, check=False)
         """)
     cells = [

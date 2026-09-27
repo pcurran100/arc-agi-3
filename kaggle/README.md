@@ -67,6 +67,22 @@ What to attach (Add input), following the Milestone #1 winner's verified stack
   `driessmit1/vrfai-qwen3-6-27b-fp8-hf-snapshot` (Qwen3.6-27B FP8, Apache 2.0).
   FP8 needs the RTX 6000 (Blackwell); on a T4 use a 7B AWQ model instead.
 
+**Model settings (D-036).** Qwen3.6 *thinks by default*, which would spend the
+900-token cap on reasoning. The vLLM cell therefore defaults to the model
+card's non-thinking settings, all overridable by setting the environment
+variable in an earlier cell:
+
+| variable | default | thinking-mode run |
+|---|---|---|
+| `ARC3_LLM_EXTRA` | `{"chat_template_kwargs": {"enable_thinking": false}, "top_p": 0.8, "top_k": 20, "presence_penalty": 1.5}` | `enable_thinking: true`, `top_p` 0.95, `presence_penalty` 0 |
+| `ARC3_LLM_TEMPERATURE` | `0.7` | `0.6` |
+| `ARC3_LLM_MAX_TOKENS` | `900` | ~`8000` (5–10× tokens and time per call) |
+
+vLLM is launched with `--max-model-len 16384 --gpu-memory-utilization 0.90
+--max-num-seqs 32`, plus `--reasoning-parser qwen3` when the model directory
+name contains "qwen3". Another model can be attached instead; nothing else
+names Qwen.
+
 Accelerator: **RTX 6000** (the builder sets it). It is reserved for ARC-AGI-3
 and burns quota faster than T4; the rate is not published.
 
