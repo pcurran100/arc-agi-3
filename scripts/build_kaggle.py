@@ -337,7 +337,12 @@ def build_eval_notebook(seeds: str, actions: int, llm_hours: float, accelerator:
                 if url:
                     cmd += ['--llm-url', url, '--llm-extra', os.environ.get('ARC3_LLM_EXTRA', '{{}}')]
                 log = open(f'{{R}}/log_s{{seed}}_k{{k}}.txt', 'w')
-                procs.append(subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT))
+                # arc-agi 0.9.8 lets OPERATION_MODE=competition in the
+                # environment override the OFFLINE mode our client requests,
+                # and competition mode needs the gateway. This benchmark plays
+                # the public games locally, so force offline for it only.
+                penv = dict(os.environ, OPERATION_MODE='offline')
+                procs.append(subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, env=penv))
         print(f'{{len(procs)}} processes: {{len(games)}} games x {{len(seeds)}} seeds in {{shards}} shards')
         while any(p.poll() is None for p in procs):
             time.sleep(60)
@@ -351,6 +356,10 @@ def build_eval_notebook(seeds: str, actions: int, llm_hours: float, accelerator:
                 p = f'{{R}}/eval_s{{seed}}_k{{k}}.json'
                 if os.path.exists(p):
                     rows += json.load(open(p))['rows']
+                else:
+                    # A shard that wrote nothing crashed; show why, never hide it.
+                    print(f'--- shard s{{seed}} k{{k}} produced no results; end of its log:')
+                    print(open(f'{{R}}/log_s{{seed}}_k{{k}}.txt', errors='replace').read()[-3000:])
             json.dump({{'rows': rows, 'seed': seed, 'agents': agents}},
                       open(f'{{R}}/eval_s{{seed}}.json', 'w'), indent=1)
             sc = sum((r['score'] or 0) for r in rows) / max(1, len(rows))
