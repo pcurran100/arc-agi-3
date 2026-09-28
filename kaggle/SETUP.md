@@ -51,7 +51,11 @@ next one spends more.
 
 ## C. Upload the inputs (~30 min, free)
 
-**C1. The public games (your own private dataset).**
+**C1. The public games — not needed.** Measured 2026-09-28: the competition
+dataset already contains them (`.../arc-prize-2026-arc-agi-3/environment_files`)
+and the notebook finds them there. The upload below is only a fallback.
+
+**C1 (fallback). The public games as your own private dataset.**
 
 1. On your machine, zip the folder `environment_files` (right-click →
    Compress). It holds 25 game folders.

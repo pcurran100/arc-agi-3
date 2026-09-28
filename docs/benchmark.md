@@ -275,6 +275,16 @@ what plays the games, is identical; pip's warnings about `dopamine-rl` and
 start failed at `Engine core initialization failed`; the model attached was
 the full-precision base `qwen2.5/transformers/7b` (~15 GB) rather than
 `7b-instruct-awq`, the likely cause on a 16 GB T4 — not yet confirmed.
+Retried with `7b-instruct-awq`: **the same failure on 2xT4**, so the model was
+not the cause; the root-cause lines were not captured. The wheelhouse is named
+for H100-class GPUs and T4 is treated as unsupported by it until shown
+otherwise.
+
+*[measured on Kaggle, 2026-09-28, RTX Pro 6000]* The same wheelhouse and
+Qwen2.5-7B-Instruct-AWQ **start and serve** (`ARC3_LLM_URL` set after the
+health check). The competition dataset **contains the public games** at
+`/kaggle/input/competitions/arc-prize-2026-arc-agi-3/environment_files`, so no
+separate upload is needed.
 
 Verified from Kaggle's docs: **30 GPU-hours per week** shared across P100 and
 2×T4, sessions up to 9 hours; RTX 6000 reserved for ARC-AGI-3 notebooks and
