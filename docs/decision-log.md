@@ -3057,7 +3057,7 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 ## D-035 — v2: a small offline LLM proposes hypotheses as code; our machinery tests them
 
 - **Date:** 2026-09-27
-- **Status:** accepted
+- **Status:** superseded by D-039 (the LLM's role and call schedule); its machinery is reused
 - **Context:** v1 (`v1-graph`, D-034) has no hypothesis forming and no
   decision making beyond "try what has not been tried". It has no goal, and its
   score (~2.4% over three seeds) is the luck of exploration order. The induced
@@ -3257,4 +3257,67 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 
 ---
 
-<!-- Next entry: D-039 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->
+## D-039 — v3: the LLM is the reasoner in the loop; exact code is its senses, tools and referee
+
+- **Date:** 2026-09-30
+- **Status:** accepted. Supersedes D-035's "the LLM never chooses actions" and
+  its sparse call schedule; D-035's machinery (scene, sandbox, population,
+  recording/replay) is reused.
+- **Context:** The user reviewed v2 and rejected it: the LLM proposed goal
+  guesses at most 16 times a game and took no part in any decision, which
+  "will never yield results". That judgement matches the measurements: on the
+  first end-to-end Kaggle run v2 was *identical* to v1 (tn36 + sp80, 24.06%),
+  and the budget arithmetic says v2 used under a tenth of the thinking the
+  9-hour limit allows. The limitation was written into `CLAUDE.md` ("calling an
+  LLM only for … proposing candidate goals") and into D-035; both were design
+  choices, not measurements, and are reversed here at the user's direction.
+  The target, as agreed with the user: the model assesses the state, forms
+  hypotheses about dynamics and goal, chooses actions to test or advance them,
+  and revises from exactly checked outcomes; our code executes, verifies and
+  computes paths.
+- **Decision:** Build v3 (`src/arc3/v3/`) around five parts:
+  1. **Facts (deterministic, every step).** Tracked objects with stable ids;
+     same-colour and same-shape groups; static vs changed objects; objects that
+     move in tandem; transformations (moved, recoloured, grew, shrank,
+     reshaped, appeared, vanished); per-action effect statistics; controllable
+     "player" candidates. Exact, never guessed (D-006).
+  2. **Hypotheses (from the LLM, typed and checkable).** Player, static
+     objects, object roles, action effects, goal — and a **world model as
+     code**: `predict(state, action) -> state` over a simple object state, plus
+     `goal(state)`. This is the code-world-model approach (learn a program,
+     check it against every recorded transition, repair it from
+     counterexamples).
+  3. **Verifier (deterministic, every step).** Replays the world model on all
+     recorded transitions of the level, scores it, and turns every mismatch into
+     an exact counterexample. Weights move softly (Guardrail 1).
+  4. **Planner (deterministic).** Breadth-/best-first search over the LLM's own
+     world model to the shortest action sequence satisfying `goal`, executed
+     step by step with each predicted state checked on arrival.
+  5. **Controller.** Narrow, structured LLM calls, each with one job —
+     *assess* (form or revise the full hypothesis set and the next
+     experiment), *repair* (fix the world model from counterexamples) — called
+     at level start after a short dynamics probe (Guardrail 4), on every
+     surprise, when a plan ends without a win, after each win, and at least
+     every N actions; under a per-game call budget and a clock deadline. v1's
+     explorer and state graph remain as tools the controller falls back to.
+- **Options rejected:**
+  - *LLM picks every action with no world model (the Milestone #1 podium's
+    style)* — no queryable model, so no internal planning and no exact
+    counterexamples; and one call per action exceeds the 9-hour budget ~2×.
+  - *Keep v2 and raise its call rate* — the model would still decide nothing;
+    the gap is its role, not its frequency.
+  - *Let the LLM also do perception (render and describe frames)* — CLAUDE.md
+    rule and D-006: the grid is symbolic; exact facts beat a model's reading.
+  - *A hand-written catalogue of game types or object roles* — Guardrail 2.
+    The fact layer computes generic relations (colour, shape, co-motion,
+    transformation); roles are the model's hypotheses, not our enumeration.
+- **Consequences:** `CLAUDE.md`'s thesis paragraph is rewritten (user
+  approved). Runtime per game rises sharply; every row on the scoreboard must
+  state calls per game. The world-model interface becomes a seam we commit to.
+- **Revisit if:** the model's world models rarely pass verification on the
+  public games (then the state abstraction or the model size is wrong); or v3
+  does not beat v1 outside seed noise on three seeds.
+
+---
+
+<!-- Next entry: D-040 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->

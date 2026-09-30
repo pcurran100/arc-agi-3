@@ -16,9 +16,16 @@ against a human baseline, with a quadratic penalty for extra actions, and
 explicitly does not count internal reasoning as actions. That makes the exchange
 rate between thinking and acting effectively infinite, which is exactly the
 condition under which model-based methods beat model-free ones. We are building
-an agent that **induces a symbolic model of the environment's dynamics from
-observed transitions and plans against it internally**, calling an LLM only for
-the narrow job its world prior is actually good for — proposing candidate goals.
+an agent in which **an LLM is the reasoner in the loop**: it forms and revises
+hypotheses about the game — what the goal is, which object is the player, what
+each action does, which objects are static and what the others are for — and
+writes them as a **checkable world model in code**. Exact deterministic code is
+its senses, its tools and its referee: it computes every fact about the frames
+(objects, identity, same colour and shape, co-motion, transformations), checks
+every prediction against what actually happened, and **plans the shortest path
+to the hypothesised goal internally** against the model's own world model.
+Thinking is spent lavishly; actions are spent to test hypotheses or to win.
+(Rewritten 2026-09-30, D-039; it previously limited the LLM to proposing goals.)
 
 Full argument in `docs/design-thesis.md`. Verified benchmark facts in
 `docs/benchmark.md`. What everyone else has tried in `docs/field-review.md`.
