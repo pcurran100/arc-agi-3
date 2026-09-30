@@ -330,6 +330,10 @@ class Tracker:
     def active_tracks(self) -> list[Track]:
         return [t for t in self.tracks.values() if t.is_active]
 
+    def current_ids(self) -> dict[int, int]:
+        """Component index in the last segmentation fed -> its track id."""
+        return dict(self._prev_track_of)
+
     @property
     def live_tracks(self) -> list[Track]:
         """Active tracks plus dormant ones still above the reacquisition floor."""
