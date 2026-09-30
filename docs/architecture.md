@@ -1004,6 +1004,19 @@ LLM never chooses an action.
 With no LLM, or before the first proposal, every value is 0 and v2 *is* v1
 with the band confined to edge rows (tested: `test_no_llm_is_exactly_v1`).
 
+**One hypothesis at a time (D-038).** The value that steers is not the
+population's average but the *focused* hypothesis's own progress. The focus is
+drawn by weight; after 40 states without improving its best value it has
+stalled, pays ×0.8, and another is drawn. Averaging was the first design and
+failed outright when a right and a wrong hypothesis arrived together: they
+cancelled to a flat landscape (synthetic room, 0 levels in 300 actions, against
+2 levels with focus).
+
+**Diagnosis.** `scripts/diagnose_v2.py RESULTS_DIR` splits a run into five
+links — format, informative, steering, correct, net against v1 — and names the
+first weak one. It reads the per-level population snapshots
+(`HypothesisAgent.level_report`) that every results row now carries.
+
 ### 10.2 What it does with a right hypothesis — the synthetic room
 
 `tests/test_agent_v2.py`: a 12×12 room of 4-pixel cells, ACTION1–4 move a

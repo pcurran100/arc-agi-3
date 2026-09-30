@@ -95,6 +95,16 @@ def test_right_hypothesis_beats_blind_exploration():
     assert guided_agent.stats.get("carried_hypotheses", 0) >= 1
 
 
+def test_rival_hypotheses_in_one_response_still_win():
+    """Averaging a right and a wrong hypothesis cancelled to a flat value and
+    never won in 300 actions (measured 2026-09-30); following one at a time must."""
+    first, total = play(HypothesisAgent(seed=0, llm=ScriptedLLM([RIGHT + "\n" + WRONG])), cap=300)
+    assert first is not None and total < 300
+    averaged = play(HypothesisAgent(seed=0, llm=ScriptedLLM([RIGHT + "\n" + WRONG]),
+                                    focus_mode=False), cap=300)
+    assert averaged[1] == 300  # the failure the focus rule exists to fix
+
+
 def test_wrong_hypothesis_is_down_weighted_by_the_win():
     agent = HypothesisAgent(seed=0, llm=ScriptedLLM([RIGHT + "\n" + WRONG]))
     game = Room()

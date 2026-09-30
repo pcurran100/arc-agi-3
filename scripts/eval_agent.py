@@ -101,6 +101,8 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
         # and the population as it stood at the end.
         "llm_calls": getattr(agent, "calls", None),
         "hypotheses": agent.pop.describe() if hasattr(agent, "pop") else None,
+        "level_report": agent.level_report() if hasattr(agent, "level_report") else None,
+        "stats": dict(agent.stats) if agent else None,
     }
 
 

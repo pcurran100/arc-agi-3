@@ -3215,4 +3215,46 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 
 ---
 
-<!-- Next entry: D-038 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->
+## D-038 — Follow one sampled hypothesis at a time, not the weighted average
+
+- **Date:** 2026-09-30
+- **Status:** accepted
+- **Context:** D-035 steered the search by the population's *weighted mean*
+  progress. Building the five-link diagnosis (`scripts/diagnose_v2.py`) needed
+  test data, so the synthetic room (tests/test_agent_v2.py) was played with a
+  right and a wrong hypothesis arriving **in the same response** — the normal
+  case for a real model asked for three different guesses.
+- **Experiment:** room, two levels, cap 300 actions, seed 0, scripted LLM
+  returning `RIGHT + WRONG` once. Averaging: **0 levels**. The two progress
+  functions ("block to the far corner", "block to the near corner") sum to a
+  constant, so the value landscape was flat and nothing steered; and the wrong
+  one peaks at 0.97, under the 0.99 "reached" line, so the false-goal rule
+  never fired and its weight never fell. The failure is structural: any two
+  hypotheses pulling in opposite directions cancel.
+- **Decision:** `HypothesisAgent.focus_mode` (default on): follow **one**
+  hypothesis at a time, drawn with probability proportional to weight. If 40
+  consecutive states pass without improving its best value, it has *stalled*:
+  weight ×0.8 (soft, Guardrail 1) and another is drawn. Same experiment:
+  **2 levels** inside 300 actions. Kept as a regression test
+  (`test_rival_hypotheses_in_one_response_still_win`), which also asserts the
+  averaged variant still fails, so the reason for the rule stays demonstrable.
+- **Options rejected:**
+  - *Keep averaging, add more evidence rules* — no evidence rule helps while
+    the agent never acts on either hypothesis; the cancellation happens before
+    evidence can accumulate.
+  - *Max over hypotheses instead of mean* — follows whichever claims most
+    progress anywhere, so an optimistic wrong hypothesis captures the search;
+    it also never tests the others.
+  - *Deterministic best-weight hypothesis* — with equal priors it is an
+    arbitrary tie-break and never explores the rest; sampling by weight is
+    Thompson-style exploration at the hypothesis level.
+- **Consequences:** a new soft evidence type (stall), recorded per hypothesis
+  (`stalls`) in the level snapshots the diagnosis reads. `FOCUS_STALL` and
+  `STALL_PENALTY` are unfitted constants.
+- **Revisit if:** on real games hypotheses stall constantly (40 is too short
+  for slow games) or a right hypothesis is abandoned before it pays off
+  (visible in the diagnosis as confirmed wins on hypotheses with many stalls).
+
+---
+
+<!-- Next entry: D-039 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->

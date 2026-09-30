@@ -63,6 +63,11 @@ MAX_TOKENS = 900
 #: Weight ceiling for a hypothesis carried into the next level.
 CARRY_CAP = 4.0
 
+#: States followed under one hypothesis without improving its best value
+#: before it is judged stalled, and the soft penalty for stalling.
+FOCUS_STALL = 40
+STALL_PENALTY = 0.8
+
 
 @dataclass
 class HypothesisAgent(GraphAgent):
@@ -92,6 +97,15 @@ class HypothesisAgent(GraphAgent):
     _previous_win: Optional[str] = field(default=None, init=False)
     _available: tuple = field(default=(), init=False)
     calls: list = field(default_factory=list, init=False)  # (level, actions, n hyps, n compiled)
+    #: One population snapshot per won level, taken after the win is scored and
+    #: before the population is rebuilt — the evidence a later reader needs.
+    levels_log: list = field(default_factory=list, init=False)
+    #: Follow one sampled hypothesis at a time (True) or the weighted average of
+    #: all of them (False, the first design; kept for comparison).
+    focus_mode: bool = True
+    _focus: Optional[Hypothesis] = field(default=None, init=False)
+    _focus_best: float = field(default=-1.0, init=False)
+    _focus_since: int = field(default=0, init=False)
 
     # -- scenes ------------------------------------------------------------
 
@@ -110,8 +124,55 @@ class HypothesisAgent(GraphAgent):
     # -- hooks -------------------------------------------------------------
 
     def _node_value(self, key: bytes) -> float:
+        if self.focus_mode:
+            if self._focus is None:
+                return 0.0
+            return self._focus.value(key, lambda: self._scene(key))
         v = self.pop.value(key, lambda: self._scene(key))
         return 0.0 if v is None else v
+
+    # -- focus: follow one hypothesis at a time ----------------------------------
+
+    def _choose_focus(self) -> None:
+        """Pick a live hypothesis to follow, with probability proportional to weight.
+
+        Averaging rivals was the first design and failed on the synthetic room:
+        "go to the far corner" and "go to the near corner" summed to a constant,
+        so nothing steered, and the wrong one (max 0.97) was never called
+        "reached" and so never lost weight. Following one at a time lets each
+        be tested; a stalled one pays a soft penalty and another is drawn.
+        """
+        live = self.pop.live()
+        if not live:
+            self._focus = None
+            return
+        total = sum(h.weight for h in live)
+        r = self._rng.random() * total
+        for h in live:
+            r -= h.weight
+            if r <= 0:
+                break
+        self._focus, self._focus_best, self._focus_since = h, -1.0, 0
+        self._bump("focus_switches")
+
+    def _track_focus(self, key: bytes) -> None:
+        live = self.pop.live()
+        if not live:
+            self._focus = None
+            return
+        if self._focus is None or self._focus not in live:
+            self._choose_focus()
+        v = self._focus.value(key, lambda: self._scene(key))
+        if v > self._focus_best + 1e-9:
+            self._focus_best, self._focus_since = v, 0
+            return
+        self._focus_since += 1
+        if self._focus_since >= FOCUS_STALL:
+            # Followed for FOCUS_STALL states without reaching a better one:
+            # soft evidence against it (Guardrail 1: scaled, never removed).
+            self._focus._scale(STALL_PENALTY)
+            self._focus.stalls += 1
+            self._choose_focus()
 
     def _prefer_frontier(self, here: bytes) -> bool:
         """Best-first: leave if a known state beats this one by more than the walk.
@@ -169,11 +230,34 @@ class HypothesisAgent(GraphAgent):
                     self._effects.append(line)
                     self._effects = self._effects[-40:]
         self.pop.observe_state(key, lambda: self._scene(key))
+        if self.focus_mode:
+            self._track_focus(key)
         self._maybe_propose(key)
+
+    def _snapshot(self, won: bool) -> dict:
+        """The level's population as data, for diagnosis (scripts/diagnose_v2.py)."""
+        return {
+            "level": self._level, "won": won, "actions": self._level_actions,
+            "calls": sum(1 for c in self.calls if c[0] == self._level),
+            "hypotheses": [{
+                "id": h.id, "goal": h.goal, "origin": h.origin, "weight": round(h.weight, 3),
+                "compiled": h.fn is not None, "compile_error": h.compile_error,
+                "informative": h.informative, "errors": h.n_errors,
+                "false_goals": h.false_goals, "stalls": h.stalls,
+                "wins_confirmed": h.wins_confirmed,
+                "wins_missed": h.wins_missed, "states_scored": len(h._seen),
+                "distinct_values": len(set(h._seen.values())),
+            } for h in self.pop.hypotheses],
+        }
+
+    def level_report(self) -> list[dict]:
+        """One snapshot per finished level plus the level in progress."""
+        return [*self.levels_log, self._snapshot(won=False)]
 
     def _on_level_won(self, key: bytes, frame: np.ndarray, action: Action) -> None:
         scene = make_scene(frame, self._mask())
         self.pop.observe_win(key, lambda: scene)
+        self.levels_log.append(self._snapshot(won=True))
         self._previous_win = (f"{action} was taken from a state with "
                               + scene.describe(with_grid=False).replace("\n", "; "))
         keep = [h for h in self.pop.hypotheses if h.fn is not None and h.weight > PRIOR_WEIGHT]
@@ -190,6 +274,7 @@ class HypothesisAgent(GraphAgent):
         for _ in keep:
             self._bump("carried_hypotheses")
         self._scenes, self._effects = {}, []
+        self._focus = None
         self._level_actions = self._level_calls = self._since_call = 0
 
     # -- proposing -----------------------------------------------------------

@@ -163,6 +163,7 @@ class Hypothesis:
     weight: float = PRIOR_WEIGHT
     compile_error: Optional[str] = None
     n_errors: int = 0
+    stalls: int = 0
     wins_confirmed: int = 0
     wins_missed: int = 0
     false_goals: int = 0
