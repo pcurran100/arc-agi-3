@@ -111,6 +111,10 @@ class Step:
     after: dict[int, Obj]
     changes: list[Change]
     reset: bool = False
+    #: The frame and exact object masks before the action, for world-model
+    #: collision queries (`world.State`). Masks are cropped to each box.
+    grid_before: Optional[np.ndarray] = None
+    masks_before: Optional[dict] = None
 
     @property
     def noop(self) -> bool:
@@ -134,6 +138,8 @@ class FactBook:
     steps: list[Step] = field(default_factory=list)
     objects: dict[int, Obj] = field(default_factory=dict)
     background: int = 0
+    grid: Optional[np.ndarray] = None       # the current frame
+    masks: dict = field(default_factory=dict)  # id -> cropped bool mask, current frame
     _t: int = 0
 
     # -- observing ---------------------------------------------------------
@@ -154,21 +160,27 @@ class FactBook:
                                          cell=seg.cell, background_colour=bg))
         ids = self.tracker.current_ids()
         out = {}
+        masks = {}
         for c in comps:
             tid = ids.get(c.index)
             if tid is None:
                 continue
+            r = c.bbox
+            masks[tid] = c.mask[r.y0:r.y1, r.x0:r.x1].copy()
             out[tid] = Obj(id=tid, colour=int(c.dominant_colour), x=int(c.bbox.x0),
                            y=int(c.bbox.y0), w=int(c.bbox.x1 - c.bbox.x0),
                            h=int(c.bbox.y1 - c.bbox.y0), size=int(c.size),
                            shape=_shape_id(c.shape_key))
+        self._last_masks = masks
         return out
 
     def observe(self, frame: np.ndarray, action: Optional[Action] = None) -> Optional[Step]:
         """Record the frame that followed ``action`` (None for the first frame)."""
-        before = self.objects
+        before, grid_before, masks_before = self.objects, self.grid, self.masks
         after = self._objects_of(frame)
         self.objects = after
+        self.grid = np.asarray(frame).copy()
+        self.masks = self._last_masks
         if action is None:
             return None
         changes = diff_objects(before, after)
@@ -176,7 +188,8 @@ class FactBook:
         if action.is_click:
             clicked = object_at(before, action.x, action.y)
         step = Step(t=self._t, action=action_name(action), clicked=clicked, before=before,
-                    after=after, changes=changes, reset=action.is_reset)
+                    after=after, changes=changes, reset=action.is_reset,
+                    grid_before=grid_before, masks_before=masks_before)
         self._t += 1
         self.steps.append(step)
         return step
