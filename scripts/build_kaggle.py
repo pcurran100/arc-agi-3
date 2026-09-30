@@ -167,7 +167,11 @@ def _start_llm():
     # with Qwen3.8 (recipes.vllm.ai/Qwen/Qwen3.8-27B). Harmless elsewhere.
     env.setdefault('VLLM_USE_FLASHINFER_SAMPLER', '0')
     subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, env=env)
-    for _ in range(240):   # up to 20 minutes; a 27B model measured ~6 min to load
+    # Up to 30 minutes: install + a 27B load (~6 min measured) + kernel
+    # compilation and CUDA-graph capture reached 10+ minutes on Kaggle. Print
+    # the latest log line every minute so a slow load is visibly not a hang.
+    last_print = time.time()
+    for _ in range(360):
         try:
             with urllib.request.urlopen(f'http://127.0.0.1:{LLM_PORT}/health', timeout=5) as h:
                 if h.status == 200:
@@ -175,6 +179,11 @@ def _start_llm():
                     print(f'LLM up after {time.time() - T0:.0f}s'); return
         except Exception:
             time.sleep(5)
+        if time.time() - last_print > 60:
+            last_print = time.time()
+            tail = [ln for ln in open('/tmp/vllm.log', errors='replace').read().splitlines() if ln.strip()]
+            print(f'[{(time.time() - T0) / 60:.0f} min] waiting for vLLM: '
+                  + (tail[-1][-160:] if tail else '(no log yet)'), flush=True)
     print('LLM did not come up: playing as v1')
     # The root cause is usually far above the final traceback, so print the
     # lines that name an error first, then the tail.
