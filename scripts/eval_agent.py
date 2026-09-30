@@ -28,6 +28,7 @@ from arc3.agent import GraphAgent
 from arc3.client.budget import ActionBudget
 from arc3.client.env import EnvClient, available_environments, make_arcade
 from arc3.agent_v2 import HypothesisAgent
+from arc3.v3.agent import V3Agent
 from arc3.explore import ExploringDriver
 from arc3.llm import OpenAIChatLLM, RecordingLLM, ReplayLLM
 from arc3.types import RESET, Action, GameState
@@ -57,16 +58,20 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
         # "graph_nomodel:local_min=0.2" -> GraphAgent(use_model=False, local_min=0.2)
         base, _, opts = agent_name.partition(":")
         kw = {k: float(v) for k, v in (o.split("=") for o in opts.split(",") if o)}
-        if base == "v2":
-            # v2 with the LLM at LLM_URL; every call recorded under CALLS_DIR,
-            # or replayed from there when REPLAY is set (then no model is needed).
+        if base in ("v2", "v3"):
+            # The LLM at LLM_URL; every call recorded under CALLS_DIR, or
+            # replayed from there when REPLAY is set (then no model is needed).
             llm = None
             if LLM_URL:
                 calls = Path(CALLS_DIR) / f"{agent_name.replace(':', '_')}_s{seed}_{gid}.jsonl"
                 live = OpenAIChatLLM(base_url=LLM_URL, extra=LLM_EXTRA)
                 llm = (ReplayLLM(calls, fallback=live if not REPLAY_ONLY else None) if REPLAY
                        else RecordingLLM(live, calls))
-            agent = HypothesisAgent(seed=seed, llm=llm, **kw)
+            if base == "v3":
+                agent = V3Agent(seed=seed, llm=llm, baselines=meta.baseline_actions,
+                                temperature=float(kw.pop("temperature", 0.0)))
+            else:
+                agent = HypothesisAgent(seed=seed, llm=llm, **kw)
         else:
             agent = GraphAgent(seed=seed, use_model=(base == "graph"), **kw)
         choose = agent.act

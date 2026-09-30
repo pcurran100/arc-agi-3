@@ -52,7 +52,7 @@ class _DeadlineLLM:
 
 def _make_agent(game_id: str):
     global _llm_ok
-    if AGENT_VERSION != "v2":
+    if AGENT_VERSION not in ("v2", "v3"):
         return GraphAgent(seed=0, use_model=__USE_MODEL__)
     from arc3.agent_v2 import HypothesisAgent
     from arc3.llm import OpenAIChatLLM, RecordingLLM
@@ -72,6 +72,11 @@ def _make_agent(game_id: str):
             if calls_dir:
                 inner = RecordingLLM(live, os.path.join(calls_dir, f"{game_id}.jsonl"))
             llm = _DeadlineLLM(inner, float(os.environ.get("ARC3_LLM_DEADLINE", "0") or 0))
+    if AGENT_VERSION == "v3":
+        from arc3.v3.agent import V3Agent
+        # llm None -> V3Agent probes and explores with v1's graph (no LLM, no harm).
+        return V3Agent(seed=0, llm=llm,
+                       temperature=float(os.environ.get("ARC3_LLM_TEMPERATURE", "0.7")))
     # llm None -> HypothesisAgent is v1 with the edge-row band (no LLM, no harm).
     return HypothesisAgent(
         seed=0, llm=llm,
