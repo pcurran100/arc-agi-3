@@ -59,6 +59,33 @@ A third party measured the same stack (github.com/leejianrong/solve-arc-agi-3,
 **351 s to load, 1,819 tok/s prefill, 38.7 tok/s decode** at concurrency 1 on
 the RTX Pro 6000. Our v2 packaging copies this stack (`kaggle/README.md`).
 
+### The Duck, read from source *(added 2026-09-30)*
+
+From `github.com/Tufalabs/duck-harness` (`ARC3-Inference/inference/agent/{prompts,tool_agent,python_tool_sandbox}.py`,
+`configs/inference.json`, `example-run/summary.txt`):
+
+- **Loop.** Every turn is a tool-calling loop with one tool, `python`
+  (sandboxed, 30 s CPU, stdlib only, no numpy). The model inspects as much as it
+  likes; the turn ends when its code calls `action([...])`, which may batch
+  actions and stops early on a level change or game over. Each turn shows a 4×
+  upscaled **PNG** of the grid, a status line and the carried text "working
+  world model"; the grid itself is read through Python objects
+  (`current_frame.ascii`, `.segmentation` with shape hashes, boundaries,
+  containment and adjacency; `history`, `transitions`).
+- **Memory is text.** Lines tagged `World model:`, `Goal model:`, `Action
+  model:`, `Plan:`, `Cross-level notes:` are regex-extracted and re-injected;
+  code does not persist between calls; everything but `Cross-level notes` is
+  wiped at a level change; the last 30 turns are kept, older ones evicted.
+- **No verification, no simulator.** The world model is prose. The prompt asks
+  for BFS once dynamics are understood; in sampled transcripts BFS was written
+  over ASCII cells with guessed walkable symbols, not over a checked model.
+- **Engineering.** Qwen3.6-27B FP8, vLLM 0.19, thinking **on**, 64k context,
+  temperature 0.6, prefix caching; 32 concurrent games per GPU in the public run.
+- **Results.** 25 public games × 20 passes: **mean 1.60, median 0.07**, about
+  137 actions and 59k tokens per game; best ft09 10.28, r11l 3.71, vc33 3.33.
+  No ablations are in the repository; "hand-crafted tools hurt" is from the
+  blog only.
+
 ### What we take from this
 
 - The **agent-writes-code** entry beat both **agent-picks-JSON-action** entries.
