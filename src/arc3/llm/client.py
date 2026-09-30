@@ -33,6 +33,7 @@ class LLM(Protocol):
         max_tokens: int = 512,
         temperature: float = 0.0,
         seed: int = 0,
+        schema: Optional[dict] = None,
     ) -> str: ...
 
 
@@ -65,7 +66,7 @@ class ScriptedLLM:
     def name(self) -> str:
         return "scripted"
 
-    def complete(self, messages, *, max_tokens=512, temperature=0.0, seed=0) -> str:
+    def complete(self, messages, *, max_tokens=512, temperature=0.0, seed=0, schema=None) -> str:
         self.calls.append(list(messages))
         if callable(self.responses):
             return self.responses(messages)
@@ -108,7 +109,8 @@ class OpenAIChatLLM:
     def name(self) -> str:
         return f"openai-chat:{self.model}@{self.base_url}"
 
-    def complete(self, messages, *, max_tokens=512, temperature=0.0, seed=0) -> str:
+    def complete(self, messages, *, max_tokens=512, temperature=0.0, seed=0,
+                 schema: Optional[dict] = None) -> str:
         req_body = {
             "model": self.model,
             "messages": list(messages),
@@ -117,6 +119,13 @@ class OpenAIChatLLM:
             "seed": seed,
         }
         req_body.update(self.extra)
+        if schema is not None:
+            # Constrained decoding: the server only emits JSON matching the
+            # schema (vLLM via xgrammar; llama.cpp via its grammar support).
+            req_body["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": schema.get("title", "output"), "schema": schema},
+            }
         body = json.dumps(req_body).encode("utf-8")
         req = urllib.request.Request(
             self.base_url.rstrip("/") + "/v1/chat/completions",
@@ -160,10 +169,10 @@ class RecordingLLM:
     def name(self) -> str:
         return self.inner.name
 
-    def complete(self, messages, *, max_tokens=512, temperature=0.0, seed=0) -> str:
+    def complete(self, messages, *, max_tokens=512, temperature=0.0, seed=0, schema=None) -> str:
         t0 = time.time()
         out = self.inner.complete(messages, max_tokens=max_tokens,
-                                  temperature=temperature, seed=seed)
+                                  temperature=temperature, seed=seed, schema=schema)
         dt = time.time() - t0
         self.n_calls += 1
         self.seconds += dt
@@ -213,7 +222,7 @@ class ReplayLLM:
     def name(self) -> str:
         return f"replay:{self.path.name}"
 
-    def complete(self, messages, *, max_tokens=512, temperature=0.0, seed=0) -> str:
+    def complete(self, messages, *, max_tokens=512, temperature=0.0, seed=0, schema=None) -> str:
         key = call_key(messages, max_tokens, temperature, seed)
         if key in self._table:
             self.hits += 1
@@ -222,4 +231,4 @@ class ReplayLLM:
         if self.fallback is None:
             raise ReplayMiss(key)
         return self.fallback.complete(messages, max_tokens=max_tokens,
-                                      temperature=temperature, seed=seed)
+                                      temperature=temperature, seed=seed, schema=schema)
