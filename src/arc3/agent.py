@@ -444,6 +444,18 @@ class GraphAgent:
         akey, a = self._rng.choice(node.candidates) if node.candidates else (None, Action.simple(RESET))
         return self._emit(key, frame, a, akey)
 
+    def took(self, action: Action) -> None:
+        """Another controller acted instead of this agent (v3 uses the graph as a
+        tool). Rewrite the last emitted action so the next observation is
+        recorded as the edge that was really taken."""
+        if self._last is None:
+            return
+        key, frame, planned, _ = self._last
+        if action != planned:
+            self._path = []
+        self._last = None
+        self._emit(key, frame, action, None)
+
     # -- hooks for a goal layer (D-035). All inert here, so v1 is unchanged. --
 
     #: Frontier cost per unit of state value. Irrelevant while values are 0.
