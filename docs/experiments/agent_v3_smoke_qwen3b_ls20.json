@@ -1,0 +1,70 @@
+{
+ "args": {
+  "actions": 30,
+  "agents": "v3",
+  "games": [
+   "ls20"
+  ],
+  "seed": 0,
+  "env_dir": "C:/Users/Patrick/Documents/Patrick/ARC-AGI-3/environment_files",
+  "out": "C:/Users/Patrick/.claude/jobs/ca249f67/tmp/v3_smoke.json",
+  "llm_url": "http://127.0.0.1:8093",
+  "calls_dir": "C:/Users/Patrick/.claude/jobs/ca249f67/tmp/v3calls",
+  "replay": false,
+  "replay_only": false,
+  "llm_extra": "{}"
+ },
+ "rows": [
+  {
+   "game": "ls20",
+   "agent": "v3",
+   "levels": 0,
+   "total_levels": 7,
+   "score": 0.0,
+   "actions": 30,
+   "cleared_at": [],
+   "per_level": [],
+   "seconds": 229.9,
+   "detail": "level 0, calls 3, calls_assess=1, calls_repair=2, explore_handoffs=3, explore_steps=26, src_explore=26, src_probe=4",
+   "llm_calls": [
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 4,
+     "ok": true,
+     "seconds": 145.21,
+     "prompt": "v3-1",
+     "accuracy": 0.0
+    },
+    {
+     "kind": "repair",
+     "level": 0,
+     "at": 4,
+     "ok": true,
+     "seconds": 48.84,
+     "prompt": "v3-1",
+     "accuracy": 0.0
+    },
+    {
+     "kind": "repair",
+     "level": 0,
+     "at": 4,
+     "ok": true,
+     "seconds": 33.62,
+     "prompt": "v3-1",
+     "accuracy": 0.0
+    }
+   ],
+   "hypotheses": null,
+   "level_report": null,
+   "stats": {
+    "src_probe": 4,
+    "calls_assess": 1,
+    "calls_repair": 2,
+    "explore_handoffs": 3,
+    "explore_steps": 26,
+    "src_explore": 26
+   }
+  }
+ ]
+}

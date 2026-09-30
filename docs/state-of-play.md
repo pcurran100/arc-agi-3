@@ -13,6 +13,17 @@ ends if anything below is stale.
   (3.46% → 1.18%), so it ships switched off. The agent has no goal; its score
   is where blind exploration happens to look first. Earlier status, still true:
   the D-002 go/no-go was a weak pass (D-025), perception is built and audited.
+- **v3 built (D-039, branch `v2-llm`): the LLM is the reasoner in the loop.**
+  It forms hypotheses (goal, player, action effects, static objects, roles)
+  as an executable world model; exact code computes the facts (tracked
+  objects, groups, co-motion, transformations), verifies every prediction
+  and plans the shortest path in the model. Synthetic two-level game with a
+  scripted model: **41 actions, 2 calls, vs 364 for blind v1**. On real ls20
+  data a correct world model predicts 18/18 steps. The real-LLM loop runs end
+  to end (3B on CPU: schema-valid answers, wrong models, correctly not
+  trusted). **Next: the Kaggle benchmark with Qwen3.6-27B** (`bench_rtx6000`,
+  now v3 by default). `CLAUDE.md`'s thesis was rewritten to match (user
+  approved). v2 below is superseded as the direction.
 - **v2 in progress (D-035, branch `v2-llm`; v1 frozen as tag `v1-graph`).** An
   LLM proposes goal hypotheses as code; a weighted population tests them
   against visited states and wins; their values steer best-first search over

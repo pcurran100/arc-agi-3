@@ -1072,3 +1072,120 @@ blocks used `from collections import Counter`, which the sandbox rejects.
   question (D-035's revisit condition).
 - **Runtime grows.** v2 builds a scene per visited state; per-step cost on the
   heaviest games has not been measured yet.
+
+## 11. v3: the LLM reasons in the loop (D-039)
+
+v2 (§10) let the LLM guess goals and decide nothing; on the first Kaggle run
+it was identical to v1. v3 inverts the roles. The LLM holds the hypotheses —
+what the goal is, which object is the player, what each action does, which
+objects are static, counters or tools — and writes them as a **world model in
+code**. Exact code is its senses (the fact layer), its referee (the verifier)
+and its hands (the planner and the explorer). Code: `src/arc3/v3/`.
+
+### 11.1 The loop
+
+Per step (`v3/agent.py`, `V3Agent.act`):
+
+1. **Observe.** The fact layer ingests the resting frame.
+2. **Check.** If the last action was taken under a prediction (a planned or
+   experimental step), the predicted objects are compared with the observed
+   ones. A mismatch is a *surprise*: the rest of the queue is dropped and the
+   exact counterexample goes into the next prompt.
+3. **Act** on the queue if one exists; otherwise **decide**:
+   - *carried plan* — at a new level, the previous level's model is tried
+     first (planned with, every step still checked);
+   - *probe* — each simple action once, and clicks on a few differently
+     coloured objects (Guardrail 4: dynamics first);
+   - *assess* (LLM) — on a trigger (start, surprise, game over, goal refuted,
+     no plan) or every 30 actions; then the returned `predict` is verified on
+     the last 80 recorded steps, and *repair* (LLM) is called with the
+     counterexamples until it explains them or two repairs are spent;
+   - then the model's *next*: **plan** (search its model for the shortest path
+     to its goal; only if the model verifies at ≥ 90%), **experiment** (its
+     test actions, each with a predicted outcome), or **explore** (12 steps
+     of v1's graph explorer, used as a tool via `GraphAgent.took`).
+4. A plan that runs exactly as predicted into a state its goal scores 1.0,
+   without the level ending, **refutes that goal**; refuted goals are listed
+   in every later prompt.
+
+### 11.2 The fact layer, on real data
+
+`v3/facts.py`. Tracked `colour_8` objects (background removed) with stable ids;
+typed changes per step; same-colour and same-shape groups; static objects;
+co-moving pairs; per-action effect tallies (clicks keyed by clicked colour);
+controllable-looking objects. After 12 scripted moves on ls20
+(`facts_demo.py`-style run, seed 0), an excerpt of what the model is shown:
+
+```
+MOVE TOGETHER: #7 and #8 (11 times)
+CONTROLLED-LOOKING objects (moved by several actions):
+  #7: ACTION1->(+0,-5), ACTION2->(+0,+5), ACTION3->(-5,+0), ACTION4->(+5,+0) (consistency 1.0)
+  #8: ACTION1->(+0,-5), ACTION2->(+0,+5), ACTION3->(-5,+0), ACTION4->(+5,+0) (consistency 1.0)
+  #13: ACTION1->(+1,+0), ACTION2->(+1,+0), ACTION3->(+1,+0), ACTION4->(+1,+0) (consistency 1.0)
+LAST STEPS:
+  t11 ACTION1: #1 reshaped; #7 moved (+0,-5); #8 moved (+0,-5); #13 moved (+1,+0), shrank 62->60; #17 grew 22->24
+```
+
+The two-part player (#7 colour 12 on #8 colour 9) is isolated without being
+named; #13 is a bar losing two cells per action — a budget, if the model so
+judges. Counters are deliberately *not* hidden in v3: whether they matter is a
+hypothesis.
+
+### 11.3 World model, verifier, planner
+
+`v3/world.py`. `State` holds the frame's objects as dicts plus the frame for
+collision queries (`colours_in_box`, `free`, which discount the moving
+objects' own original cells). `WorldModel.compile` runs the LLM's `predict`
+and `goal` in the §10 sandbox. `verify` replays `predict` on recorded steps and
+returns exact mismatches ("#7 predicted at x20 y11 -> actually x20 y16").
+`plan` is breadth-first to the nearest goal state (optimal in actions), then
+best-first on the goal's value when the space is too large.
+
+On real ls20 data, a hand-written model of the kind the LLM should produce
+(two-part player, 5-pixel moves blocked unless the destination is maze floor,
+counters ignored) predicts **18/18** recorded steps exactly, including the
+wall-blocked ones (`world_demo.py`, seed 0).
+
+### 11.4 What it does end to end — the synthetic walled room
+
+`tests/test_v3_agent.py`: 8×8 cells, a wall with one gap, goal in the far
+corner, two identical levels; a scripted model whose first `predict` ignores
+walls and whose second is right.
+
+| agent | level 1 at | both levels | LLM calls |
+|---|---|---|---|
+| v1, blind | 241 | 364 | 0 |
+| **v3** | **24** | **41** | **2** |
+
+The trace: 4 probe actions; first assessment (its wall-less model explains
+the probe steps 100%); the plan hits the wall — surprise, counterexample;
+second assessment adds walls; the optimal 17-move route wins; level 2 is
+planned with the carried model, 17 moves, no call.
+
+### 11.5 What this does not do
+
+- **Tested end to end only with a scripted model** and one short real-model
+  smoke run (§11.6). Whether a 27B model writes world models good enough to
+  plan with is the open question; the Kaggle benchmark answers it.
+- **One live world model.** Rivals exist only as stated hypotheses and the
+  refuted-goal list; there is no population of competing `predict`s.
+- **Object-level checking** (boxes, colours, existence), not cell-exact.
+- **Clicks in plans target object centres only.**
+- **Cost.** The fact layer segments and tracks every frame (~0.1–0.2 s per step
+  on this laptop, `eval_agent.py --agents v3`, tn36/sp80/ls20); with ~110 games
+  in 9 h this needs optimising before large runs.
+- **No learning across games.** Each game starts from nothing but the prompt.
+
+### 11.6 First real-model run
+
+`eval_agent.py --agents v3 --games ls20 --actions 30 --llm-url …`, seed 0,
+Qwen2.5-Coder-3B-Instruct Q4_K_M on llama.cpp (CPU), prompt `v3-1`, JSON-schema
+constrained output. The loop ran as designed: 4 probe actions; *assess*
+(145 s) returned schema-valid JSON — hypotheses, `predict`, `goal`, a plan
+request; the verifier scored its `predict` **0%**; two *repair* calls (49 s,
+34 s) stayed at 0%; the untrusted model was not planned with, and the explorer
+took over. 0 levels in 30 actions. The model's content was poor: goal "reduce
+the number of objects to 1", and `predict` called `state.move(7, 0)` with the
+wrong arity. That led to prompt `v3-2`, which adds a neutral syntax example of
+the helper API (it demonstrates calls, not a kind of game — Guardrail 2).
+Whether a 27B model writes plannable world models is still unmeasured.

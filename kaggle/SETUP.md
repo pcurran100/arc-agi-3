@@ -8,9 +8,9 @@ this repository. Nothing needs building locally: the notebooks in
 | notebook | what it is | accelerator |
 |---|---|---|
 | `submission_v1.ipynb` | the v1 agent, no LLM — the safe Milestone #2 entry | none (CPU) |
-| `bench_v2_t4.ipynb` | smoke test of the LLM pipeline on the free T4s, 1 seed | GPU T4 x2 |
-| `bench_v2_rtx6000.ipynb` | the real benchmark: v2 on the 25 public games, 3 seeds | GPU RTX Pro 6000 |
-| `submission_v2.ipynb` | the v2 submission, once the benchmark says it wins | GPU RTX Pro 6000 |
+| `bench_t4.ipynb` | smoke test of the LLM pipeline on the free T4s, 1 seed (T4s fail to start vLLM with the shared wheelhouse, measured) | GPU T4 x2 |
+| `bench_rtx6000.ipynb` | the real benchmark: **v3** on the 25 public games, 3 seeds (`ARC3_BENCH_AGENT=v2` for v2) | GPU RTX Pro 6000 |
+| `submission_v3.ipynb` | the v3 submission, once the benchmark says it wins (`submission_v2.ipynb` likewise for v2) | GPU RTX Pro 6000 |
 
 Order: **A → B → C → D → E**. Each step is cheap enough to fail on before the
 next one spends more.
@@ -92,7 +92,7 @@ RTX 6000 time. It uses a 7B model, so its **score means nothing**; it only
 proves the pipeline.
 
 1. **Create** → **New Notebook** → **File** → **Import Notebook** →
-   `bench_v2_t4.ipynb`.
+   `bench_t4.ipynb`.
 2. **Add Input** four times: the competition; the wheelhouse; the Qwen2.5-7B
    AWQ model; `arc3-public-games`.
 
@@ -101,7 +101,7 @@ proves the pipeline.
    `qwen2.5` (publisher QwenLM → Transformers → 7b-instruct-awq), or open
    https://www.kaggle.com/models/qwen-lm/qwen2.5/transformers/7b-instruct-awq
    and start a notebook from its page (it opens with the model attached), then
-   **File → Import Notebook** → `bench_v2_t4.ipynb` and add the other three.
+   **File → Import Notebook** → `bench_t4.ipynb` and add the other three.
    Check the right panel still lists the model after importing.
 
    **Pick the variation `7b-instruct-awq`, not the default `7b`.** The `7b`
@@ -138,7 +138,7 @@ proves the pipeline.
 
 1. First measure the RTX 6000's quota rate: note your remaining GPU hours
    (right panel), run any RTX 6000 session for 5 minutes, stop it, look again.
-2. Import `bench_v2_rtx6000.ipynb`. **Add Input**: the competition, the
+2. Import `bench_rtx6000.ipynb`. **Add Input**: the competition, the
    wheelhouse, `arc3-public-games`, and **one** model (Qwen3.6 first).
 3. **Session options**: Accelerator **GPU RTX Pro 6000**, Internet **Off**.
 4. **+ Code** above the first cell:
@@ -160,7 +160,7 @@ proves the pipeline.
 
 ## F. Submitting v2 (only if E says it beats v1)
 
-Import `submission_v2.ipynb`; **Add Input**: competition, wheelhouse, the
+Import `submission_v3.ipynb` (or `submission_v2.ipynb`); **Add Input**: competition, wheelhouse, the
 winning model; set `ARC3_MODEL_MATCH` in a first cell as in E; RTX Pro 6000;
 Internet Off; Save & Run All; Submit. If the model cannot start in Kaggle's
 rerun, the agent plays as v1 — a serving failure cannot zero the score.

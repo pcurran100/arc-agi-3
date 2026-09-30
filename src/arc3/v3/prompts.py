@@ -26,7 +26,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
-PROMPT_VERSION = "v3-1"
+PROMPT_VERSION = "v3-2"
 
 API = """\
 WORLD-MODEL API (your code runs in a sandbox with `np` and `math`; no imports):
@@ -51,7 +51,23 @@ WORLD-MODEL API (your code runs in a sandbox with `np` and `math`; no imports):
   state.meta               a dict for anything else you need to track (counters,
                            flags); it persists along a simulated path
 Find objects robustly (by colour, shape or position) rather than hard-coding a
-single id when an object might be replaced."""
+single id when an object might be replaced.
+
+SYNTAX EXAMPLE (shows how the helpers are called, not what this game does):
+  def predict(state, action):
+      if action.startswith("CLICK"):
+          x, y = map(int, action[6:-1].split(","))
+          o = state.at(x, y)
+          if o is not None and o["colour"] == 4:
+              state.recolour(o["id"], 9)
+          return state
+      if action == "ACTION2":
+          for o in state.of_colour(7):
+              if state.free(o["x"] + 3, o["y"], o["w"], o["h"], ignore=[o["id"]]):
+                  state.move(o["id"], 3, 0)
+      return state
+  def goal(state):
+      return 1.0 - len(state.of_colour(4)) / 10"""
 
 SYSTEM = f"""\
 You are the reasoning core of an agent playing an unknown turn-based puzzle game
