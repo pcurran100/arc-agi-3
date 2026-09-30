@@ -286,6 +286,15 @@ health check). The competition dataset **contains the public games** at
 `/kaggle/input/competitions/arc-prize-2026-arc-agi-3/environment_files`, so no
 separate upload is needed.
 
+*[measured on Kaggle, 2026-09-30, RTX Pro 6000]* **First end-to-end v2 run**:
+`bench_v2` notebook (pre-D-038, averaging), Qwen2.5-7B-Instruct-AWQ, games
+tn36 + sp80, seed 0, 500 actions, 2 shards: **2 games, 3 levels, mean RHAE
+24.06% — identical to v1** on the same games and seed (16.4% and 31.7%), in
+about a minute. The pipeline works; this 7B run shows no effect of the LLM.
+An earlier attempt produced 0 games (shards exited silently); fixed by
+forcing `OPERATION_MODE=offline` for the benchmark's game processes, so that
+was very likely arc-agi 0.9.8's competition-mode override.
+
 Verified from Kaggle's docs: **30 GPU-hours per week** shared across P100 and
 2×T4, sessions up to 9 hours; RTX 6000 reserved for ARC-AGI-3 notebooks and
 "burns quota faster" (rate unpublished).
