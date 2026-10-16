@@ -137,9 +137,16 @@ def _start_llm():
         # T4 at engine start. A base model would not follow the prompt anyway.
         print('WARNING: this does not look like an instruction-tuned model:', model)
     links = sum((['--find-links', d] for d in wheel_dirs), [])
+    print('python', sys.version.split()[0])
     r = subprocess.run([sys.executable, '-m', 'pip', 'install', '--no-index', *links, 'vllm'],
                        capture_output=True, text=True)
     print(r.stdout[-2000:], r.stderr[-2000:])
+    # Measured 2026-10-16: a newer Kaggle image (Python 3.13) cannot install the
+    # wheelhouse's cp312 wheels, and the server then "waited" 30 minutes for a
+    # module that did not exist. Check the install before starting anything.
+    if subprocess.run([sys.executable, '-c', 'import vllm'], capture_output=True).returncode != 0:
+        print('vLLM is not importable after pip install (wheel/Python mismatch?): playing as v1')
+        return
     log = open('/tmp/vllm.log', 'w')
     args = [sys.executable, '-m', 'vllm.entrypoints.openai.api_server',
             '--model', model, '--served-model-name', 'local',
