@@ -4,7 +4,17 @@
 currently doing.** Read this first every session. Update it before the session
 ends if anything below is stale.
 
-- **Last updated:** 2026-09-27, session 5
+- **Last updated:** 2026-10-16, session 6
+- **Session 6 (D-040): the 27B model now serves on Kaggle, and v3 has real
+  data.** Three serving blockers fixed: web-imported notebooks lose their
+  inputs (runs are now pushed by `scripts/push_kaggle.py`), Kaggle's image is
+  Python 3.13 (vLLM now runs under a standalone CPython 3.12), and FlashInfer's
+  JIT FP8 kernel fails on the RTX Pro 6000 (disabled). First real run (ls20 +
+  tn36, seed 0): **45 calls, score identical to v1**, because 34 answers were
+  unparseable: truncated after very long `thoughts`, or degenerate
+  whitespace. One tn36 world model verified at 100%. Fixes for the lost
+  answers are committed and **not yet run on Kaggle; that run is next**.
+  ~17 days to 2 Nov. No LICENSE yet; the rules reportedly require CC0/MIT-0.
 - **Status:** **there is an agent, a score and a Kaggle submission (D-034).**
   `GraphAgent` plays all 25 games end to end: **~2.4% mean offline RHAE over
   three seeds** (3.46% on the lucky seed 0), 9–10 levels of 183. That is
