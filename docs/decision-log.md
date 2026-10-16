@@ -3389,4 +3389,27 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 
 ---
 
-<!-- Next entry: D-041 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->
+## D-041 — License the repository MIT-0
+
+- **Date:** 2026-10-16
+- **Status:** accepted
+- **Context:** Milestone and prize eligibility require open-sourcing. A public
+  dataset README quoting the competition rules
+  (`liuzewen123/arc-agi-3-agentfix-cc0`) says code must be released "under a
+  permissive public domain license (eg. CC0 or MIT-0)". Not yet verified on
+  the rules page itself. The repository had no licence. The user asked for one.
+- **Decision:** MIT No Attribution (MIT-0), copyright Patrick Curran.
+- **Options rejected:**
+  - *CC0-1.0* — also named by the rules, but Creative Commons does not
+    recommend CC0 for software, and it carries no warranty disclaimer.
+  - *MIT or Apache-2.0* — require attribution, so arguably not
+    "public-domain-like" as the quoted rule asks.
+- **Consequences:** anyone may reuse the code without attribution. The
+  third-party pieces we depend on but do not vendor (vLLM wheelhouse, model
+  weights, CPython runtime) keep their own licences.
+- **Revisit if:** the rules page, once read directly, names a different
+  licence set.
+
+---
+
+<!-- Next entry: D-042 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->
