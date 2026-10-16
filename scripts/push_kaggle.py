@@ -83,7 +83,9 @@ def main() -> None:
             f" {args.llm_minutes}, 'min')\n"))
     # Always end with a summary of what the model was actually asked and answered.
     cells.append(code_cell(
-        "import glob, json, collections\n"
+        "import glob, json, os, shutil\n"
+        "if os.path.exists('/tmp/vllm.log'):\n"
+        "    shutil.copy('/tmp/vllm.log', '/kaggle/working/results/vllm.log')\n"
         "files = glob.glob('/kaggle/working/results/llm_calls/*.jsonl')\n"
         "print(len(files), 'call files')\n"
         "for f in sorted(files):\n"
