@@ -74,7 +74,7 @@ variable in an earlier cell:
 
 | variable | default | thinking-mode run |
 |---|---|---|
-| `ARC3_LLM_EXTRA` | `{"chat_template_kwargs": {"enable_thinking": false}, "top_p": 0.8, "top_k": 20, "presence_penalty": 1.5}` | `enable_thinking: true`, `top_p` 0.95, `presence_penalty` 0 |
+| `ARC3_LLM_EXTRA` | `{"chat_template_kwargs": {"enable_thinking": false}, "top_p": 0.8, "top_k": 20, "presence_penalty": 0.0, "structured_outputs": {"disable_any_whitespace": true}}` (presence penalty and whitespace changed 2026-10-16) | `enable_thinking: true`, `top_p` 0.95 |
 | `ARC3_LLM_TEMPERATURE` | `0.7` | `0.6` |
 | `ARC3_LLM_MAX_TOKENS` | `900` | ~`8000` (5–10× tokens and time per call) |
 

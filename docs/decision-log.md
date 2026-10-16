@@ -3320,4 +3320,73 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 
 ---
 
-<!-- Next entry: D-040 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->
+## D-040 — Serve Qwen3.6-27B on Kaggle under a standalone CPython 3.12; first real-model v3 data
+
+- **Date:** 2026-10-16
+- **Status:** accepted
+- **Context:** Two weeks after D-039, v3 had never called a real model on
+  Kaggle. The user's 2026-10-05 `benchmark_v3` run silently played as v1. This
+  session pushed runs from the Kaggle CLI (`scripts/push_kaggle.py`) and read
+  each run's log. Four RTX Pro 6000 runs of the same smoke test (ls20 + tn36,
+  seed 0, 500 actions, LLM capped at 40 min after the server is up), each
+  blocked one step further on:
+  1. 2026-10-05 (user): `dataset_sources: []`. Web import drops inputs.
+  2. Run 1: the image is now **Python 3.13**; the cp312 wheelhouse fails on
+     `outlines_core==0.2.11`.
+  3. Run 2: pinned the 2026-09-30 image (3.12). vLLM installed, but
+     **`nvidia-smi` showed no GPU** and vLLM died ("Failed to infer device
+     type"). The wait loop then sat 30 minutes on a dead process.
+  4. Run 3: vLLM under python-build-standalone CPython 3.12.14 (dataset
+     `destinyfire1/arc3-cpython312-runtime`, sha256 checked equal to the
+     upstream release). GPU seen, model loaded, then FlashInfer's JIT
+     `gemm_sm120` failed under ninja. vLLM 0.19 ranks
+     `FlashInferFP8ScaledMMLinearKernel` above CUTLASS for compute capability
+     ≥ 100.
+  5. Run 4: `VLLM_DISABLED_KERNELS=FlashInferFP8ScaledMMLinearKernel`.
+     **Server up after 472 s; 45 real calls recorded.**
+- **Decision:** Serve under a standalone CPython 3.12 with the FlashInfer FP8
+  GEMM disabled. Push every Kaggle run with `push_kaggle.py` (inputs declared,
+  full vLLM log saved). The vLLM cell now fails fast: no GPU, vLLM not
+  importable, or server process exited each end the wait at once.
+- **Experiment (run 4):** the question was whether v3 with the 27B model
+  produces usable, checkable world models. Data:
+  `docs/experiments/kaggle/v3_smoke_qwen36_2026-10-16/`.
+  - **Score identical to v1** (ls20 1 level 0.03%, tn36 1 level 16.4%; mean
+    8.23%). 488/500 and 477/500 actions came from the fallback explorer.
+  - **34 of 45 answers were unparseable.** Most were truncated at the token
+    cap (3000 assess, 2000 repair) after 5–25k characters of `thoughts`;
+    **all 9 repairs truncated**. About 10 degenerated into runs of tabs,
+    spaces or newlines until the cap.
+  - Of the 11 that parsed, ls20's world models verified at 0%. On tn36, one
+    verified at **100%**, others at 44% and 51%: the model can produce
+    checkable world models; the plumbing is what is losing them.
+  - Throughput: ~80–90 s per capped call, two games in parallel; a game took
+    27–31 min for ~20 calls.
+- **Changed our mind?** Not about v3 as a design: this run could not test it,
+  because three-quarters of the model's answers never reached the verifier.
+  It did change the serving defaults (below) and it measured the cost of a
+  call, which the 9-hour budget now has to be planned against.
+- **Follow-up applied (untested on Kaggle):** `presence_penalty` 1.5 → 0 (a
+  chat setting that penalises the repeated identifiers code needs);
+  `structured_outputs.disable_any_whitespace` per request; `maxLength` 1200 on
+  `thoughts` (grammar-enforced); repair cap 2000 → 3000.
+- **Options rejected:**
+  - *Pin the old Python 3.12 image* — tried (run 2): no GPU in that session.
+  - *Find or build a cp313 vLLM wheelhouse* — public ones exist
+    (`vllm031-cp313-wheelhouse`), but a different vLLM version is a new
+    untested stack; a 3.12 interpreter for the server alone changes nothing
+    else.
+  - *Raise the token caps instead of capping thoughts* — longer answers cost
+    linearly more time per call, and the thoughts are not used downstream.
+  - *Turn thinking on* — more tokens per call, the opposite of what truncation
+    needs. Still the later experiment D-036 named.
+- **Consequences:** depends on a third-party dataset holding the upstream
+  CPython build (checked by hash, so a substitution fails closed) and on vLLM
+  0.19's kernel name. Each smoke run costs ~45 min of RTX 6000 time.
+- **Revisit if:** the fixed run still loses most answers (then try a schema
+  with code before thoughts, or a smaller JSON envelope); or Kaggle restores
+  a 3.12 image with a GPU.
+
+---
+
+<!-- Next entry: D-041 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->

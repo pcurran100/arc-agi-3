@@ -96,11 +96,16 @@ bars, decorations) can be listed in ignore_ids so they are not checked.
 Answer with JSON only, matching the schema you are given."""
 
 
+THOUGHTS_MAX = 1200   # characters
+
 ASSESS_SCHEMA = {
     "title": "assess",
     "type": "object",
     "properties": {
-        "thoughts": {"type": "string",
+        # maxLength: measured 2026-10-16, Qwen3.6-27B wrote 5-25k-character
+        # "thoughts" first and was cut off at the token cap before the code on
+        # most calls. Enforced by the server's grammar, so the cap is hard.
+        "thoughts": {"type": "string", "maxLength": THOUGHTS_MAX,
                      "description": "Brief reasoning: what the facts show and what is still uncertain."},
         "hypotheses": {
             "type": "array",
@@ -136,7 +141,8 @@ REPAIR_SCHEMA = {
     "title": "repair",
     "type": "object",
     "properties": {
-        "thoughts": {"type": "string", "description": "What the counterexamples show was wrong."},
+        "thoughts": {"type": "string", "maxLength": THOUGHTS_MAX,
+                     "description": "What the counterexamples show was wrong."},
         "predict_code": {"type": "string"},
         "ignore_ids": {"type": "array", "items": {"type": "integer"}},
     },

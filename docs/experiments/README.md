@@ -20,6 +20,7 @@ Every file here is regenerable. None of it is an input to anything.
 | `agent_v1_nomodel_2000.*` | `scripts/eval_agent.py --actions 2000 --agents graph_nomodel`, `local_min=0.3` | D-034, 2026-09-27 |
 | `agent_v1_seed{1,2}.*` | `scripts/eval_agent.py --actions 500 --seed N --agents "graph_nomodel;explore"`, `local_min=0.3` | D-034, 2026-09-27 |
 | `agent_v2_qwen3b_s0_PARTIAL.txt`, `llm_calls/qwen25coder3b/` | `eval_agent.py --agents v2 --llm-url` (local llama.cpp, Qwen2.5-Coder-3B Q4_K_M, CPU), seed 0 | D-035, 2026-09-27. **Incomplete: 5 of 25 games** (ar25, bp35, cd82, cn04, dc22; 0 levels). Stopped by the system for low memory; not a scoreboard row |
+| `kaggle/v3_smoke_qwen36_2026-10-16/` | `scripts/push_kaggle.py kaggle/notebooks/bench_rtx6000.ipynb --slug arc3-bench-v3-smoke --env "ARC3_BENCH_GAMES=ls20 tn36" --env ARC3_BENCH_SEEDS=0 --env ARC3_BENCH_SHARDS=2 --llm-minutes 40` at commit 178f867 (Kaggle RTX Pro 6000, Qwen3.6-27B FP8, vLLM 0.19 under CPython 3.12, thinking off, presence_penalty 1.5) | D-040, 2026-10-16. **First real-model v3 run.** 45 calls; 34 unparseable (truncated or whitespace-degenerate). 2 games, seed 0: not a scoreboard row |
 
 The `agent_*` runs need no corpus: they play the live engine from a cold start
 and need only `environment_files/`.

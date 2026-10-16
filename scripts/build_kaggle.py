@@ -109,8 +109,14 @@ os.environ['ARC3_CALLS_DIR'] = '/tmp/llm_calls'   # /tmp: not a submission candi
 # is switched off per request. For a thinking run: set enable_thinking True,
 # ARC3_LLM_TEMPERATURE 0.6, top_p 0.95, presence_penalty 0, and raise
 # ARC3_LLM_MAX_TOKENS to ~8000 (roughly 5-10x the tokens and time per call).
+# Two changes from the model card, measured 2026-10-16 (45 real calls, ls20 +
+# tn36): presence_penalty 1.5 is a chat setting and penalises the repeated
+# identifiers code needs, and ~10 of 45 answers degenerated into runs of
+# whitespace under the JSON schema; disable_any_whitespace forbids whitespace
+# between JSON tokens (newlines inside the code strings are escaped, unaffected).
 os.environ.setdefault('ARC3_LLM_EXTRA', '{"chat_template_kwargs": {"enable_thinking": false}, '
-                      '"top_p": 0.8, "top_k": 20, "presence_penalty": 1.5}')
+                      '"top_p": 0.8, "top_k": 20, "presence_penalty": 0.0, '
+                      '"structured_outputs": {"disable_any_whitespace": true}}')
 os.environ.setdefault('ARC3_LLM_TEMPERATURE', '0.7')
 os.environ.setdefault('ARC3_LLM_MAX_TOKENS', '900')
 

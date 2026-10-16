@@ -1,0 +1,453 @@
+{
+ "rows": [
+  {
+   "game": "ls20",
+   "agent": "v3:temperature=0.7,max_tokens=900",
+   "levels": 1,
+   "total_levels": 7,
+   "score": 0.000311677539962663,
+   "actions": 500,
+   "cleared_at": [
+    471
+   ],
+   "per_level": [
+    {
+     "i": 0,
+     "actions": 471,
+     "baseline": 22,
+     "score": 0.0021817427797386412
+    }
+   ],
+   "seconds": 1647.9,
+   "detail": "level 1, calls 20, calls_assess=17, calls_repair=3, carried_plans=1, explore_handoffs=41, explore_steps=488, levels=1, plans=1, src_experiment=1, src_explore=488, src_plan=1, src_probe=8, src_reset=2, surprises=2",
+   "llm_calls": [
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 4,
+     "ok": false,
+     "seconds": 109.11,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 16,
+     "ok": false,
+     "seconds": 85.96,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 28,
+     "ok": true,
+     "seconds": 55.47,
+     "prompt": "v3-2",
+     "accuracy": 0.0
+    },
+    {
+     "kind": "repair",
+     "level": 0,
+     "at": 28,
+     "ok": false,
+     "seconds": 58.35,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 29,
+     "ok": false,
+     "seconds": 87.08,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 65,
+     "ok": false,
+     "seconds": 87.16,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 101,
+     "ok": false,
+     "seconds": 87.84,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 138,
+     "ok": false,
+     "seconds": 87.19,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 174,
+     "ok": true,
+     "seconds": 81.97,
+     "prompt": "v3-2",
+     "accuracy": 0.0
+    },
+    {
+     "kind": "repair",
+     "level": 0,
+     "at": 174,
+     "ok": false,
+     "seconds": 58.56,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 210,
+     "ok": false,
+     "seconds": 87.38,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 246,
+     "ok": true,
+     "seconds": 76.76,
+     "prompt": "v3-2",
+     "accuracy": 0.0
+    },
+    {
+     "kind": "repair",
+     "level": 0,
+     "at": 246,
+     "ok": false,
+     "seconds": 58.59,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 282,
+     "ok": false,
+     "seconds": 87.38,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 318,
+     "ok": false,
+     "seconds": 87.34,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 354,
+     "ok": false,
+     "seconds": 88.14,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 367,
+     "ok": false,
+     "seconds": 87.38,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 403,
+     "ok": false,
+     "seconds": 87.42,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 439,
+     "ok": false,
+     "seconds": 87.37,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 5,
+     "ok": false,
+     "seconds": 87.45,
+     "prompt": "v3-2"
+    }
+   ],
+   "hypotheses": null,
+   "level_report": null,
+   "stats": {
+    "src_probe": 8,
+    "calls_assess": 17,
+    "explore_handoffs": 41,
+    "explore_steps": 488,
+    "src_explore": 488,
+    "calls_repair": 3,
+    "src_experiment": 1,
+    "surprises": 2,
+    "src_reset": 2,
+    "levels": 1,
+    "plans": 1,
+    "carried_plans": 1,
+    "src_plan": 1
+   }
+  },
+  {
+   "game": "tn36",
+   "agent": "v3:temperature=0.7,max_tokens=900",
+   "levels": 1,
+   "total_levels": 7,
+   "score": 0.16428571428571428,
+   "actions": 500,
+   "cleared_at": [
+    24
+   ],
+   "per_level": [
+    {
+     "i": 0,
+     "actions": 24,
+     "baseline": 32,
+     "score": 1.15
+    }
+   ],
+   "seconds": 1884.6,
+   "detail": "level 1, calls 25, calls_assess=20, calls_repair=5, explore_handoffs=41, explore_steps=477, levels=1, plans=1, src_experiment=1, src_explore=477, src_plan=7, src_probe=8, src_reset=7, surprises=2",
+   "llm_calls": [
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 4,
+     "ok": false,
+     "seconds": 109.07,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 0,
+     "at": 16,
+     "ok": false,
+     "seconds": 85.95,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 4,
+     "ok": true,
+     "seconds": 75.46,
+     "prompt": "v3-2",
+     "accuracy": 1.0
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 11,
+     "ok": false,
+     "seconds": 87.08,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 47,
+     "ok": false,
+     "seconds": 87.19,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 72,
+     "ok": true,
+     "seconds": 56.33,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "repair",
+     "level": 1,
+     "at": 72,
+     "ok": false,
+     "seconds": 57.95,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 108,
+     "ok": true,
+     "seconds": 50.93,
+     "prompt": "v3-2",
+     "accuracy": 0.438
+    },
+    {
+     "kind": "repair",
+     "level": 1,
+     "at": 108,
+     "ok": false,
+     "seconds": 58.62,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 133,
+     "ok": false,
+     "seconds": 87.33,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 169,
+     "ok": false,
+     "seconds": 87.37,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 194,
+     "ok": false,
+     "seconds": 87.41,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 230,
+     "ok": true,
+     "seconds": 40.41,
+     "prompt": "v3-2",
+     "accuracy": 0.512
+    },
+    {
+     "kind": "repair",
+     "level": 1,
+     "at": 230,
+     "ok": false,
+     "seconds": 58.63,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 255,
+     "ok": false,
+     "seconds": 87.47,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 291,
+     "ok": true,
+     "seconds": 85.51,
+     "prompt": "v3-2",
+     "accuracy": 0.0
+    },
+    {
+     "kind": "repair",
+     "level": 1,
+     "at": 291,
+     "ok": false,
+     "seconds": 58.06,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 316,
+     "ok": false,
+     "seconds": 87.52,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 352,
+     "ok": false,
+     "seconds": 87.48,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 377,
+     "ok": false,
+     "seconds": 87.48,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 413,
+     "ok": true,
+     "seconds": 52.68,
+     "prompt": "v3-2",
+     "accuracy": 0.0
+    },
+    {
+     "kind": "repair",
+     "level": 1,
+     "at": 413,
+     "ok": false,
+     "seconds": 58.07,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 414,
+     "ok": false,
+     "seconds": 78.12,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 439,
+     "ok": false,
+     "seconds": 78.13,
+     "prompt": "v3-2"
+    },
+    {
+     "kind": "assess",
+     "level": 1,
+     "at": 475,
+     "ok": false,
+     "seconds": 78.11,
+     "prompt": "v3-2"
+    }
+   ],
+   "hypotheses": null,
+   "level_report": null,
+   "stats": {
+    "src_probe": 8,
+    "calls_assess": 20,
+    "explore_handoffs": 41,
+    "explore_steps": 477,
+    "src_explore": 477,
+    "levels": 1,
+    "plans": 1,
+    "src_plan": 7,
+    "surprises": 2,
+    "src_reset": 7,
+    "calls_repair": 5,
+    "src_experiment": 1
+   }
+  }
+ ],
+ "seed": 0,
+ "agents": "v3:temperature=0.7,max_tokens=900"
+}

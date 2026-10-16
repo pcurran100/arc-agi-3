@@ -71,7 +71,7 @@ PROBE_CLICKS = 4
 MAX_CALLS = 200          # per game
 MAX_LEVEL_CALLS = 40
 ASSESS_TOKENS = 3000
-REPAIR_TOKENS = 2000
+REPAIR_TOKENS = 3000     # 2000 truncated all 9 repairs on 2026-10-16
 
 
 @dataclass
