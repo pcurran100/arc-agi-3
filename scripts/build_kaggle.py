@@ -99,6 +99,7 @@ import glob, os, subprocess, sys, time, urllib.request
 
 T0 = time.time()
 LLM_PORT = 8000
+PY312_SHA256 = '3297691ae34f75fed81ac424e040145fccb0bafe8e581cd5cadbddfa1c0766c0'
 LLM_BUDGET_HOURS = __LLM_HOURS__   # stop calling the model after this; play on as v1
 os.environ['ARC3_LLM_DEADLINE'] = str(T0 + LLM_BUDGET_HOURS * 3600)
 os.environ['ARC3_CALLS_DIR'] = '/tmp/llm_calls'   # /tmp: not a submission candidate
@@ -125,6 +126,34 @@ def _model_dir():
             return d
     return None
 
+def _server_python():
+    # A Python 3.12 to run vLLM under: the wheelhouse is built for cp312.
+    # Newer Kaggle images default to Python 3.13 (measured 2026-10-16). Then use
+    # the CPython 3.12.14 install_only build from python-build-standalone,
+    # attached as dataset destinyfire1/arc3-cpython312-runtime in parts; its
+    # concatenation was checked byte-identical to the upstream GitHub release
+    # (PY312_SHA256). Only the server runs under it; the agent stays on
+    # Kaggle's Python and talks to the server over HTTP.
+    if sys.version_info[:2] == (3, 12):
+        return sys.executable
+    parts = sorted(glob.glob('/kaggle/input/**/cpython-3.12.*-part-*.bin', recursive=True))
+    print('python', sys.version.split()[0], '-> standalone 3.12 parts:', len(parts))
+    if not parts:
+        print('No Python 3.12 runtime attached: playing as v1'); return None
+    import hashlib, tarfile
+    h = hashlib.sha256()
+    with open('/tmp/py312.tar.gz', 'wb') as out:
+        for part in parts:
+            with open(part, 'rb') as f:
+                b = f.read(); h.update(b); out.write(b)
+    if h.hexdigest() != PY312_SHA256:
+        print('Python 3.12 runtime checksum mismatch: playing as v1'); return None
+    with tarfile.open('/tmp/py312.tar.gz') as tf:
+        tf.extractall('/tmp/py312')
+    py = '/tmp/py312/python/bin/python3.12'
+    print('server python:', subprocess.run([py, '-V'], capture_output=True, text=True).stdout.strip())
+    return py
+
 def _start_llm():
     wheel_dirs = sorted({os.path.dirname(p) for p in glob.glob('/kaggle/input/**/vllm-*.whl', recursive=True)})
     model = _model_dir()
@@ -136,19 +165,32 @@ def _start_llm():
         # (a full-precision base model) instead of '7b-instruct-awq' failed on a
         # T4 at engine start. A base model would not follow the prompt anyway.
         print('WARNING: this does not look like an instruction-tuned model:', model)
+    # GPU first: measured 2026-10-16, a pinned older image ran with no GPU at
+    # all and vLLM died with "Failed to infer device type". Fail in seconds.
+    try:
+        q = subprocess.run(['nvidia-smi', '--query-gpu=compute_cap,name', '--format=csv,noheader'],
+                           capture_output=True, text=True).stdout.strip().splitlines()
+        major = int(q[0].split('.')[0]) if q else 0
+    except (OSError, ValueError):
+        q, major = [], 0
+    print('GPU:', q)
+    if not q:
+        print('No GPU visible: playing as v1'); return
+    py = _server_python()
+    if py is None:
+        return
     links = sum((['--find-links', d] for d in wheel_dirs), [])
-    print('python', sys.version.split()[0])
-    r = subprocess.run([sys.executable, '-m', 'pip', 'install', '--no-index', *links, 'vllm'],
+    t = time.time()
+    r = subprocess.run([py, '-m', 'pip', 'install', '-q', '--no-index', *links, 'vllm'],
                        capture_output=True, text=True)
-    print(r.stdout[-2000:], r.stderr[-2000:])
-    # Measured 2026-10-16: a newer Kaggle image (Python 3.13) cannot install the
-    # wheelhouse's cp312 wheels, and the server then "waited" 30 minutes for a
-    # module that did not exist. Check the install before starting anything.
-    if subprocess.run([sys.executable, '-c', 'import vllm'], capture_output=True).returncode != 0:
-        print('vLLM is not importable after pip install (wheel/Python mismatch?): playing as v1')
+    print(f'pip install vllm ({time.time() - t:.0f}s):', r.stdout[-1500:], r.stderr[-1500:])
+    # Measured 2026-10-16: on Python 3.13 the cp312 wheels do not install, and
+    # the server then "waited" 30 minutes for a module that did not exist.
+    if subprocess.run([py, '-c', 'import vllm'], capture_output=True).returncode != 0:
+        print('vLLM is not importable after pip install: playing as v1')
         return
     log = open('/tmp/vllm.log', 'w')
-    args = [sys.executable, '-m', 'vllm.entrypoints.openai.api_server',
+    args = [py, '-m', 'vllm.entrypoints.openai.api_server',
             '--model', model, '--served-model-name', 'local',
             '--host', '127.0.0.1', '--port', str(LLM_PORT),
             '--max-model-len', '16384', '--gpu-memory-utilization', '0.90',
@@ -160,25 +202,22 @@ def _start_llm():
     # Pre-Ampere GPUs (T4 is compute capability 7.5): no bf16 and no
     # FlashAttention 2. The settings validated on Kaggle's 2xT4 by
     # github.com/kaggle-vllm/kaggle-vllm: fp16, eager mode, Triton attention.
-    try:
-        q = subprocess.run(['nvidia-smi', '--query-gpu=compute_cap,name', '--format=csv,noheader'],
-                           capture_output=True, text=True).stdout.strip().splitlines()
-        major = int(q[0].split('.')[0]) if q else 0
-    except (OSError, ValueError):
-        q, major = [], 0
-    print('GPU:', q)
     if 0 < major < 8:
         args += ['--dtype', 'float16', '--enforce-eager']
         env.setdefault('VLLM_ATTENTION_BACKEND', 'TRITON_ATTN')
     # Reported workaround for a vLLM startup crash on SM120 (RTX Pro 6000)
     # with Qwen3.8 (recipes.vllm.ai/Qwen/Qwen3.8-27B). Harmless elsewhere.
     env.setdefault('VLLM_USE_FLASHINFER_SAMPLER', '0')
-    subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, env=env)
+    proc = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, env=env)
     # Up to 30 minutes: install + a 27B load (~6 min measured) + kernel
     # compilation and CUDA-graph capture reached 10+ minutes on Kaggle. Print
     # the latest log line every minute so a slow load is visibly not a hang.
     last_print = time.time()
     for _ in range(360):
+        if proc.poll() is not None:
+            # Measured 2026-10-16: the server died at once and the loop still
+            # waited 30 minutes. A dead process will not become healthy.
+            print(f'vLLM exited with code {proc.returncode}'); break
         try:
             with urllib.request.urlopen(f'http://127.0.0.1:{LLM_PORT}/health', timeout=5) as h:
                 if h.status == 200:

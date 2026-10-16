@@ -30,8 +30,10 @@ from pathlib import Path
 
 COMPETITION = "arc-prize-2026-arc-agi-3"
 WHEELHOUSE = "driessmit1/arc3-vllm-h100-wheelhouse-v3"
-PY312_IMAGE = ("gcr.io/kaggle-images/python@sha256:"
-               "dafd4ce5668bbf1ad422e4c109e0f18c9623c3a7c7f48b0235f13142755c40b9")
+# CPython 3.12 for the vLLM server on Python-3.13 images (see build_kaggle.py,
+# _server_python). Pinning the older 3.12 image instead was tried 2026-10-16:
+# it installed vLLM but the session had no GPU.
+PY312_RUNTIME = "destinyfire1/arc3-cpython312-runtime"
 MODELS = {
     "qwen3-6": "driessmit1/vrfai-qwen3-6-27b-fp8-hf-snapshot",
     "qwen3-8": "jamalsaeedi/qwen3-8-27b-fp8",
@@ -55,7 +57,8 @@ def main() -> None:
                     help="stop calling the model this many minutes after it is up "
                          "(overrides the notebook's LLM deadline; bounds quota)")
     ap.add_argument("--accelerator", default="NvidiaRtxPro6000")
-    ap.add_argument("--docker-image", default=PY312_IMAGE)
+    ap.add_argument("--docker-image", default=None,
+                    help="pin a Kaggle image digest (default: latest)")
     ap.add_argument("--timeout", type=int, default=None, help="kernel run limit, seconds")
     ap.add_argument("--dry-run", action="store_true", help="write the folder, do not push")
     args = ap.parse_args()
@@ -98,14 +101,13 @@ def main() -> None:
         "id": f"{args.user}/{args.slug}", "title": args.slug, "code_file": code.name,
         "language": "python", "kernel_type": "notebook", "is_private": True,
         "enable_gpu": True, "enable_tpu": False, "enable_internet": False,
-        "dataset_sources": [WHEELHOUSE, MODELS[args.model]],
+        "dataset_sources": [WHEELHOUSE, PY312_RUNTIME, MODELS[args.model]],
         "competition_sources": [COMPETITION], "kernel_sources": [], "model_sources": [],
         "machine_shape": args.accelerator,
-        # The image of the 2026-09-30 run on which vLLM served. Newer images
-        # default to Python 3.13 and cannot install the cp312 wheelhouse.
-        "docker_image": args.docker_image,
-        "docker_image_pinning_type": "original",
     }
+    if args.docker_image:
+        meta["docker_image"] = args.docker_image
+        meta["docker_image_pinning_type"] = "original"
     (out / "kernel-metadata.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
     print("wrote", out)
     if args.dry_run:
