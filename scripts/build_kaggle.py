@@ -208,6 +208,12 @@ def _start_llm():
     # Reported workaround for a vLLM startup crash on SM120 (RTX Pro 6000)
     # with Qwen3.8 (recipes.vllm.ai/Qwen/Qwen3.8-27B). Harmless elsewhere.
     env.setdefault('VLLM_USE_FLASHINFER_SAMPLER', '0')
+    # Measured 2026-10-16 on the RTX Pro 6000 (SM120): vLLM 0.19 ranks
+    # FlashInfer's FP8 GEMM above CUTLASS for compute capability >= 100, and
+    # FlashInfer JIT-compiles it (gemm_sm120) with ninja, which failed. Skip
+    # the JIT kernels in favour of vLLM's precompiled CUTLASS ones.
+    env.setdefault('VLLM_DISABLED_KERNELS', 'FlashInferFP8ScaledMMLinearKernel')
+    env.setdefault('VLLM_BLOCKSCALE_FP8_GEMM_FLASHINFER', '0')
     proc = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, env=env)
     # Up to 30 minutes: install + a 27B load (~6 min measured) + kernel
     # compilation and CUDA-graph capture reached 10+ minutes on Kaggle. Print
@@ -238,6 +244,10 @@ def _start_llm():
     hits = [ln for ln in text.splitlines() if any(k in ln.lower() for k in keys)]
     print('--- lines naming an error ---'); print('\\n'.join(hits[:40]))
     print('--- end of log ---'); print(text[-2000:])
+    # The full log, as a downloadable output: the printed excerpt cut the
+    # compiler error on 2026-10-16.
+    os.makedirs('/kaggle/working/results', exist_ok=True)
+    open('/kaggle/working/results/vllm.log', 'w').write(text)
 
 if os.getenv('KAGGLE_IS_COMPETITION_RERUN') or os.getenv('ARC3_FORCE_LLM'):
     _start_llm()

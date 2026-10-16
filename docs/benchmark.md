@@ -295,6 +295,27 @@ An earlier attempt produced 0 games (shards exited silently); fixed by
 forcing `OPERATION_MODE=offline` for the benchmark's game processes, so that
 was very likely arc-agi 0.9.8's competition-mode override.
 
+*[measured on Kaggle, 2026-10-16, RTX Pro 6000]* Three findings from getting
+the 27B model to serve, each of which silently turned the LLM agent into v1:
+
+1. **Web-imported notebooks lose their inputs.** The 2026-10-05 `benchmark_v3`
+   run had `dataset_sources: []` (competition only), so the vLLM cell found no
+   wheels and no model. Runs are now pushed with `scripts/push_kaggle.py`,
+   which declares inputs in `kernel-metadata.json`.
+2. **Current Kaggle images are Python 3.13.** The wheelhouse is cp312;
+   `pip install vllm` fails on `outlines_core==0.2.11`. The September runs had
+   a 3.12 image (`gcr.io/kaggle-images/python@sha256:dafd4ce5…`).
+3. **Pinning that old image gives no GPU.** vLLM then installs but dies with
+   `Failed to infer device type`; `nvidia-smi` returns nothing. The fix in use:
+   run only the vLLM server under python-build-standalone CPython 3.12.14
+   (dataset `destinyfire1/arc3-cpython312-runtime`, sha256 `3297691a…`,
+   checked byte-identical to the upstream GitHub release); the agent stays on
+   the image's Python 3.13.
+
+The competition rules, as quoted in a public dataset README
+(`liuzewen123/arc-agi-3-agentfix-cc0`): code must be open-sourced under a
+**permissive public-domain licence, e.g. CC0 or MIT-0**. Unverified at source.
+
 Verified from Kaggle's docs: **30 GPU-hours per week** shared across P100 and
 2×T4, sessions up to 9 hours; RTX 6000 reserved for ARC-AGI-3 notebooks and
 "burns quota faster" (rate unpublished).
