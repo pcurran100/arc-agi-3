@@ -77,7 +77,10 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
                 live = OpenAIChatLLM(base_url=LLM_URL, model=LLM_MODEL, extra=LLM_EXTRA,
                                      api_key=LLM_KEY, allow_remote=bool(LLM_KEY),
                                      timeout=LLM_TIMEOUT)
-                llm = (ReplayLLM(calls, fallback=live if not REPLAY_ONLY else None) if REPLAY
+                # A replay miss falls through to the live model and is recorded
+                # in the same file, so an interrupted run resumes where it stopped.
+                llm = (ReplayLLM(calls, fallback=RecordingLLM(live, calls) if not REPLAY_ONLY
+                                 else None) if REPLAY
                        else RecordingLLM(live, calls))
             if base == "v4":
                 agent = V4Agent(seed=seed, llm=llm, baselines=meta.baseline_actions,
