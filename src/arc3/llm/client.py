@@ -111,6 +111,10 @@ class OpenAIChatLLM:
     #: What the last call returned besides the answer: finish_reason, the
     #: reasoning trace (vLLM and NIM return it as ``reasoning_content``), usage.
     last: dict = field(default_factory=dict, repr=False)
+    #: Retries on HTTP 429/5xx and timeouts, with backoff. NVIDIA NIM's free
+    #: tier answered 28 of 77 calls with HTTP 500 on 2026-10-19.
+    retries: int = 3
+    backoff: float = 5.0
 
     def __post_init__(self) -> None:
         host = urlparse(self.base_url).hostname or ""
@@ -147,8 +151,7 @@ class OpenAIChatLLM:
             headers["Authorization"] = f"Bearer {self.api_key}"
         req = urllib.request.Request(
             self.base_url.rstrip("/") + "/v1/chat/completions", data=body, headers=headers)
-        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-            out = json.loads(resp.read().decode("utf-8"))
+        out = self._send(req)
         choice = out["choices"][0]
         msg = choice["message"]
         self.last = {
@@ -159,6 +162,22 @@ class OpenAIChatLLM:
         if choice.get("finish_reason") == "length":
             raise Truncated(f"answer cut off at max_tokens={max_tokens}")
         return msg["content"] or ""
+
+    def _send(self, req) -> dict:
+        import socket
+        import urllib.error
+        for attempt in range(self.retries + 1):
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                    return json.loads(resp.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                if e.code not in (429, 500, 502, 503, 504) or attempt == self.retries:
+                    raise
+            except (TimeoutError, socket.timeout, urllib.error.URLError):
+                if attempt == self.retries:
+                    raise
+            time.sleep(self.backoff * (2 ** attempt))
+        raise RuntimeError("unreachable")
 
     def ready(self) -> bool:
         """Is the server up? llama-server answers ``/health`` once loaded."""

@@ -57,6 +57,7 @@ from .store import AssumptionStore
 HISTORY = 14              # recent steps shown to the model
 REASONING_TAIL = 4000     # characters of the last act call's thinking passed to update
 EVENT_LINES = 30
+MAX_LIVE = 25            # live assumptions before the update call is asked to consolidate
 
 
 @dataclass
@@ -285,6 +286,11 @@ class V4Agent:
         return data
 
     def _update(self, obs: Observation) -> None:
+        live = len(self.store.live())
+        if live > MAX_LIVE:
+            self._event(f"The store holds {live} live assumptions, more than {MAX_LIVE}: "
+                        "consolidate it - retire duplicates, superseded claims and any "
+                        "descriptions of the current state.")
         data = self._call("update", update_messages(self._context(obs, True, True)),
                           UPDATE_SCHEMA, self.update_tokens)
         self.since_update = 0

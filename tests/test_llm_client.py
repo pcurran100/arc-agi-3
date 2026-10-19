@@ -126,3 +126,34 @@ def test_http_backend_raises_on_truncation():
     with pytest.raises(Truncated):
         llm.complete(MSG)
     srv.server_close()
+
+
+def test_http_backend_retries_server_errors():
+    import json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    hits = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers["Content-Length"]))
+            hits.append(1)
+            if len(hits) == 1:
+                self.send_response(500)
+                self.end_headers()
+                return
+            out = json.dumps({"choices": [{"finish_reason": "stop", "message": {"content": "ok"}}]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(out)
+
+        def log_message(self, *a):
+            pass
+
+    srv = HTTPServer(("127.0.0.1", 0), Handler)
+    t = threading.Thread(target=lambda: [srv.handle_request() for _ in range(2)], daemon=True)
+    t.start()
+    llm = OpenAIChatLLM(base_url=f"http://127.0.0.1:{srv.server_port}", backoff=0.01)
+    assert llm.complete(MSG) == "ok" and len(hits) == 2
+    srv.server_close()

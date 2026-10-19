@@ -29,7 +29,7 @@ from .expect import EXPECT_SCHEMA
 from .render import image_part, legend
 from .store import KINDS, RULE_SCHEMA, SCOPES
 
-PROMPT_VERSION = "v4-2"
+PROMPT_VERSION = "v4-4"
 MAX_STEPS = 6
 
 SYSTEM = f"""\
@@ -57,8 +57,9 @@ different, new objects may appear, things that were still may start moving.
 Assumptions carried from an earlier level are hypotheses until this level
 confirms them.
 
-Coordinates: x is the column (0-63, left to right), y is the row (0-63, top to
-bottom). CLICK(x,y) clicks the cell at column x, row y.
+Only the actions listed under AVAILABLE ACTIONS exist in this game; each game
+offers its own set. Coordinates: x is the column (0-63, left to right), y is the
+row (0-63, top to bottom); when CLICK(x,y) is available it clicks that cell.
 {legend()}
 """
 
@@ -79,6 +80,11 @@ id is an existing id and statement may be "" unless you are rewording it.
 - retire: the evidence has decisively ruled it out (with the reason).
 Write down every belief your reasoning relies on, including the guesses about
 the goal - an assumption that is not in the store does not exist next turn.
+Assumptions are beliefs about how the game WORKS (what things are, what actions
+do, what wins), not descriptions of where things are now: the FACTS show the
+current positions every turn, so never store a snapshot of the current state.
+Prefer revising an existing assumption to adding a near-duplicate, and retire
+assumptions that a newer one replaces. Keep the store short enough to read.
 Keep competing goal assumptions side by side rather than picking one too early.
 Do not retire an assumption on one contradiction if a condition could explain
 it; revise it to state the condition instead.
@@ -88,13 +94,16 @@ ACT_TASK = f"""\
 TASK: CHOOSE WHAT TO DO NEXT.
 Think it through, then return 1 to {MAX_STEPS} steps. Each step is an action
 ("ACTION1".."ACTION7" or "CLICK(x,y)") and an exact expectation of what it will
-do. While you are unsure what will happen, return ONE step and make its
+do. Use only the AVAILABLE ACTIONS. An action you have never tried is always
+uncertain. While you are unsure what will happen, return ONE step and make its
 expectation say what you think; return several only when you are confident of
 every one of them. The sequence stops at the first wrong expectation and you
 are asked again, so a confident sequence costs nothing extra if it is wrong.
 In "tests", list the assumption ids this choice relies on or is meant to test.
 Expectation format: "changes" lists what will change ("target" is "#id",
-"colour N" or "any"; "change" is moved/recoloured/grew/shrank/reshaped/appeared/
+"colour N" or "any"; object ids can be reassigned when an object vanishes and a
+similar one appears, or when a region is redrawn in another colour, so prefer
+"colour N" for things that grow, shrink or recolour; "change" is moved/recoloured/grew/shrank/reshaped/appeared/
 vanished/none; dx, dy for moves and colour for recolours or new objects, null
 when you do not know); "rest" is "unchanged" if nothing else will change, else
 "any"; "outcome" is continue, level_complete or game_over.
