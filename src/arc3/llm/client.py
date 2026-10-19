@@ -193,6 +193,10 @@ class RecordingLLM:
     def name(self) -> str:
         return self.inner.name
 
+    @property
+    def last(self) -> dict:
+        return getattr(self.inner, "last", None) or {}
+
     def complete(self, messages, *, max_tokens=512, temperature=0.0, seed=0, schema=None) -> str:
         t0 = time.time()
         out = self.inner.complete(messages, max_tokens=max_tokens,
@@ -235,7 +239,10 @@ class ReplayLLM:
     fallback: Optional[LLM] = None
     hits: int = 0
     misses: int = 0
+    #: finish_reason and reasoning of the last call served, as a live backend has.
+    last: dict = field(default_factory=dict)
     _table: dict[str, str] = field(default_factory=dict)
+    _extra: dict[str, dict] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.path = Path(self.path)
@@ -244,6 +251,8 @@ class ReplayLLM:
                 if line.strip():
                     rec = json.loads(line)
                     self._table[rec["key"]] = rec["response"]
+                    self._extra[rec["key"]] = {k: rec[k] for k in ("finish_reason", "reasoning")
+                                               if k in rec}
 
     @property
     def name(self) -> str:
@@ -253,9 +262,12 @@ class ReplayLLM:
         key = call_key(messages, max_tokens, temperature, seed)
         if key in self._table:
             self.hits += 1
+            self.last = self._extra.get(key, {})
             return self._table[key]
         self.misses += 1
         if self.fallback is None:
             raise ReplayMiss(key)
-        return self.fallback.complete(messages, max_tokens=max_tokens,
-                                      temperature=temperature, seed=seed, schema=schema)
+        out = self.fallback.complete(messages, max_tokens=max_tokens,
+                                     temperature=temperature, seed=seed, schema=schema)
+        self.last = getattr(self.fallback, "last", None) or {}
+        return out

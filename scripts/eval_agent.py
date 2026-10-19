@@ -29,6 +29,7 @@ from arc3.client.budget import ActionBudget
 from arc3.client.env import EnvClient, available_environments, make_arcade
 from arc3.agent_v2 import HypothesisAgent
 from arc3.v3.agent import V3Agent
+from arc3.v4.agent import V4Agent
 from arc3.explore import ExploringDriver
 from arc3.llm import OpenAIChatLLM, RecordingLLM, ReplayLLM
 from arc3.types import RESET, Action, GameState
@@ -43,6 +44,11 @@ LLM_MODEL = "local"
 #: Development against a hosted API only (Guardrail 5): the key is read from the
 #: environment variable named by --llm-key-env, never passed on the command line.
 LLM_KEY = ""
+LLM_TIMEOUT = 600.0
+
+
+def base_name(agent_name: str) -> str:
+    return agent_name.partition(":")[0]
 
 
 def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: str) -> dict:
@@ -62,17 +68,23 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
         # "graph_nomodel:local_min=0.2" -> GraphAgent(use_model=False, local_min=0.2)
         base, _, opts = agent_name.partition(":")
         kw = {k: float(v) for k, v in (o.split("=") for o in opts.split(",") if o)}
-        if base in ("v2", "v3"):
+        if base in ("v2", "v3", "v4"):
             # The LLM at LLM_URL; every call recorded under CALLS_DIR, or
             # replayed from there when REPLAY is set (then no model is needed).
             llm = None
             if LLM_URL:
                 calls = Path(CALLS_DIR) / f"{agent_name.replace(':', '_')}_s{seed}_{gid}.jsonl"
                 live = OpenAIChatLLM(base_url=LLM_URL, model=LLM_MODEL, extra=LLM_EXTRA,
-                                     api_key=LLM_KEY, allow_remote=bool(LLM_KEY))
+                                     api_key=LLM_KEY, allow_remote=bool(LLM_KEY),
+                                     timeout=LLM_TIMEOUT)
                 llm = (ReplayLLM(calls, fallback=live if not REPLAY_ONLY else None) if REPLAY
                        else RecordingLLM(live, calls))
-            if base == "v3":
+            if base == "v4":
+                agent = V4Agent(seed=seed, llm=llm, baselines=meta.baseline_actions,
+                                total_levels=meta.win_levels,
+                                temperature=float(kw.pop("temperature", 0.6)),
+                                image=bool(kw.pop("image", 1)))
+            elif base == "v3":
                 agent = V3Agent(seed=seed, llm=llm, baselines=meta.baseline_actions,
                                 temperature=float(kw.pop("temperature", 0.0)))
             else:
@@ -113,11 +125,15 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
         "hypotheses": agent.pop.describe() if hasattr(agent, "pop") else None,
         "level_report": agent.level_report() if hasattr(agent, "level_report") else None,
         "stats": dict(agent.stats) if agent else None,
+        # v4 only: the assumption store at the end, and every edit made to it.
+        "assumptions": agent.store.describe() if hasattr(agent, "store") else None,
+        "store_log": agent.store.log if hasattr(agent, "store") else None,
+        "history": getattr(agent, "history", None) if base_name(agent_name) == "v4" else None,
     }
 
 
 def main() -> None:
-    global LLM_URL, CALLS_DIR, REPLAY, REPLAY_ONLY, LLM_EXTRA, LLM_MODEL, LLM_KEY
+    global LLM_URL, CALLS_DIR, REPLAY, REPLAY_ONLY, LLM_EXTRA, LLM_MODEL, LLM_KEY, LLM_TIMEOUT
     ap = argparse.ArgumentParser()
     ap.add_argument("--actions", type=int, default=500)
     ap.add_argument("--agents", default="graph;graph_nomodel;explore")
@@ -134,6 +150,7 @@ def main() -> None:
     ap.add_argument("--llm-key-env", default="",
                     help="env var holding an API key for a hosted endpoint (development only; "
                          "setting it allows a non-local --llm-url)")
+    ap.add_argument("--llm-timeout", type=float, default=600.0, help="seconds per LLM request")
     args = ap.parse_args()
     logging.basicConfig(level=logging.WARNING)
 
@@ -141,6 +158,7 @@ def main() -> None:
     REPLAY, REPLAY_ONLY = args.replay, args.replay_only
     LLM_EXTRA = json.loads(args.llm_extra)
     LLM_MODEL = args.llm_model
+    LLM_TIMEOUT = args.llm_timeout
     if args.llm_key_env:
         import os
         LLM_KEY = os.environ.get(args.llm_key_env, "")

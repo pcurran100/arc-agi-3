@@ -3412,4 +3412,112 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 
 ---
 
-<!-- Next entry: D-042 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->
+## D-042 — v4: an assumption store the LLM edits, testable predictions on every action
+
+- **Date:** 2026-10-19
+- **Status:** accepted. Builds alongside v3 (D-039), which stays in the tree as
+  the comparison. Supersedes D-039's call schedule (assess every 30 actions,
+  explorer in between) and amends the CLAUDE.md convention "do not render
+  frames to PNG": the image is now *added* to the exact text (see Decision).
+- **Context:** The first real-model v3 run (D-040) showed the model's beliefs
+  going nowhere. It wrote good hypotheses ("#7 is the player") into a free-text
+  field nothing read. Only a perfect `predict()` program earned it any control.
+  It was asked once per 30 actions, so 80% of actions came from the blind v1
+  explorer. Thinking was off to save time, and 34 of 45 answers were cut off or
+  degenerate. The user called the approach "stupid" and asked for:
+  1. beliefs extracted into an updatable store that later decisions use;
+  2. a separate call that picks the move and predicts its outcome, which is
+     then tested;
+  3. reasoning never cut off;
+  4. all information used, the image included;
+  5. cross-level carry-over that expects things to change;
+  6. the model consulted on every action, especially early.
+- **Decision:** a new controller, `src/arc3/v4/`:
+  - **Assumption store** (`store.py`). Typed records: ontology, dynamics, goal
+    or other. Each is scoped to the level or the game, has a confidence and
+    status (active, doubtful, retired), and keeps evidence counts and notes.
+    Each may carry a machine-checkable *rule*: on action X, these changes.
+  - **Who edits what.** The LLM adds, revises, supports, weakens and retires
+    assumptions. Code adds evidence. Rules are checked on every matching step
+    with no model call, and a correct prediction credits the assumptions it
+    named, once per decision.
+  - **Soft updates (Guardrail 1).** Evidence softens confidence; only the model
+    retires an assumption, and retired ones stay visible.
+  - **Prediction language** (`expect.py`). Every action the model chooses comes
+    with an expectation: which object or colour moves, recolours, grows,
+    appears or vanishes; whether the rest stays unchanged; and whether the
+    level completes or the game ends. It is checked exactly against the fact
+    layer's typed changes.
+  - **Two calls** (`prompts.py`):
+    - *update* edits the store. It runs at game and level start, after any
+      surprise (a failed prediction, a failed rule, a game over), and at least
+      every 10 actions.
+    - *act* returns 1–6 steps, each with an expectation. A sequence stops at
+      the first wrong expectation.
+  - **The model decides every action** while it is learning, because every
+    surprise brings it straight back. Once its predictions hold, it runs short
+    checked sequences. The explorer only acts when there is no model, or when
+    the call budget or a call fails.
+  - **Thinking on, never cut off.** Reasoning stays in the thinking channel and
+    the JSON stays small. A `finish_reason == "length"` answer raises
+    `Truncated` and is retried once with twice the budget (16k tokens by
+    default). The tail of the act call's reasoning goes to the next update call,
+    which is told to extract any belief in it not yet in the store.
+  - **Image plus exact text.** The frame is sent as a PNG in the official
+    palette alongside the exact grid and facts. Every check uses the exact
+    facts; the image only informs the model's priors (what looks like a door or
+    a key). That prior is the intuition the user wants from the model, and the
+    text hides it.
+  - **Levels.** Every live assumption is marked *carried*. Level-scoped ones are
+    multiplied by 0.6 and game-scoped ones by 0.85. Code states how the new
+    level differs from the last (object count, new or missing colours, unseen
+    shapes, background, action set). The prompt says that appearance and
+    mechanics can change between levels.
+  - **Development endpoint:** NVIDIA NIM's `nemotron-3.5-super-vl-120b-a12b`
+    (NIM serves no Qwen; probed 2026-10-19). `eval_agent.py --agents v4
+    --llm-key-env NVIDIA_TOKEN`. The submission remains local-only
+    (Guardrail 5).
+- **Options rejected:**
+  - *One call that both updates and acts.* It costs half as many calls. But
+    the user asked for the split, and with one call the model can skip writing
+    beliefs down. The update call is skipped whenever nothing surprising
+    happened, which recovers most of the cost.
+  - *An update call before every action.* It roughly doubles the calls for no
+    information: when a prediction came true, the update is mechanical, and
+    code does it.
+  - *Keeping v3's world-model-as-code as the only route to control.* The model
+    is better at stating beliefs and predicting single steps than at writing an
+    exact simulator. v3 handed its decisions to the explorer until the
+    simulator was perfect, which on real games was never.
+  - *Free-text assumptions with no structure.* Nothing could then check them,
+    count evidence or carry them across levels. That is the v3 failure in
+    another form.
+  - *Image only, no exact text.* Models misread cells (the probe on 2026-10-19
+    misplaced a cell by one in one of three answers). The exact facts stay the
+    referee.
+  - *A hand-written list of "things that change between levels".* That would
+    be Guardrail 2. Code reports measured differences; the model interprets
+    them.
+- **Consequences:**
+  - The number of calls scales with surprises, not with actions. A game with
+    rules the model cannot learn will spend its budget on update and act calls
+    and is capped by `max_calls` (800) and the notebook deadline.
+  - There is no planner. Long exact routes rely on the model's six-step
+    sequences, so maze-like levels will cost many calls. v3's verified
+    simulator is the candidate to bring back as a tool the act call can invoke.
+  - Kaggle serving needs a larger context window (it was 16k), thinking on,
+    and image input enabled in vLLM before v4 can run there.
+- **Revisit if:**
+  - on the public games, more than half of the act calls' expectations are
+    uninformative or wrong after the first 20 actions of a level (the model
+    cannot predict in this language);
+  - store edits stay near zero after surprises (the model is not using the
+    store);
+  - update calls exceed act calls over a whole game (the surprise-driven
+    schedule does not save anything);
+  - Qwen3.6-27B on Kaggle performs far below the development model, so that
+    development on Nemotron-VL is misleading.
+
+---
+
+<!-- Next entry: D-043 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->

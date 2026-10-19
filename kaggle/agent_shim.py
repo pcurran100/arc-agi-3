@@ -19,7 +19,8 @@ from arc3.agent import GraphAgent
 from arc3.types import Action, Observation
 from arc3.types import GameState as A3State
 
-#: "v1" (GraphAgent) or "v2" (HypothesisAgent + local LLM server). Set at build.
+#: "v1" (GraphAgent), "v2" (HypothesisAgent), "v3" (V3Agent) or "v4" (V4Agent,
+#: D-042); v2-v4 use the local LLM server. Set at build.
 AGENT_VERSION = "__AGENT_VERSION__"
 
 _llm_lock = threading.Lock()
@@ -41,18 +42,25 @@ class _DeadlineLLM:
     def name(self):
         return self.inner.name
 
+    @property
+    def last(self):
+        return getattr(self.inner, "last", None) or {}
+
     def complete(self, messages, **kw):
         if self.deadline and time.time() > self.deadline:
             return ""
         try:
             return self.inner.complete(messages, **kw)
-        except Exception:
+        except Exception as exc:
+            # v4 retries a truncated answer with more room; let that through.
+            if type(exc).__name__ == "Truncated":
+                raise
             return ""
 
 
 def _make_agent(game_id: str):
     global _llm_ok
-    if AGENT_VERSION not in ("v2", "v3"):
+    if AGENT_VERSION not in ("v2", "v3", "v4"):
         return GraphAgent(seed=0, use_model=__USE_MODEL__)
     from arc3.agent_v2 import HypothesisAgent
     from arc3.llm import OpenAIChatLLM, RecordingLLM
@@ -72,6 +80,14 @@ def _make_agent(game_id: str):
             if calls_dir:
                 inner = RecordingLLM(live, os.path.join(calls_dir, f"{game_id}.jsonl"))
             llm = _DeadlineLLM(inner, float(os.environ.get("ARC3_LLM_DEADLINE", "0") or 0))
+    if AGENT_VERSION == "v4":
+        from arc3.v4.agent import V4Agent
+        # llm None -> V4Agent plays with v1's graph explorer (no LLM, no harm).
+        return V4Agent(seed=0, llm=llm,
+                       temperature=float(os.environ.get("ARC3_LLM_TEMPERATURE", "0.6")),
+                       image=os.environ.get("ARC3_LLM_IMAGE", "1") == "1",
+                       update_tokens=int(os.environ.get("ARC3_LLM_MAX_TOKENS", "16000")),
+                       act_tokens=int(os.environ.get("ARC3_LLM_MAX_TOKENS", "16000")))
     if AGENT_VERSION == "v3":
         from arc3.v3.agent import V3Agent
         # llm None -> V3Agent probes and explores with v1's graph (no LLM, no harm).
