@@ -26,6 +26,7 @@ from .client import (
     ReplayLLM,
     ReplayMiss,
     ScriptedLLM,
+    Truncated,
     call_key,
 )
 
@@ -37,5 +38,6 @@ __all__ = [
     "ReplayLLM",
     "ReplayMiss",
     "ScriptedLLM",
+    "Truncated",
     "call_key",
 ]

@@ -39,6 +39,10 @@ CALLS_DIR = "docs/experiments/llm_calls"
 REPLAY = False
 REPLAY_ONLY = False
 LLM_EXTRA: dict = {}
+LLM_MODEL = "local"
+#: Development against a hosted API only (Guardrail 5): the key is read from the
+#: environment variable named by --llm-key-env, never passed on the command line.
+LLM_KEY = ""
 
 
 def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: str) -> dict:
@@ -64,7 +68,8 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
             llm = None
             if LLM_URL:
                 calls = Path(CALLS_DIR) / f"{agent_name.replace(':', '_')}_s{seed}_{gid}.jsonl"
-                live = OpenAIChatLLM(base_url=LLM_URL, extra=LLM_EXTRA)
+                live = OpenAIChatLLM(base_url=LLM_URL, model=LLM_MODEL, extra=LLM_EXTRA,
+                                     api_key=LLM_KEY, allow_remote=bool(LLM_KEY))
                 llm = (ReplayLLM(calls, fallback=live if not REPLAY_ONLY else None) if REPLAY
                        else RecordingLLM(live, calls))
             if base == "v3":
@@ -112,7 +117,7 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
 
 
 def main() -> None:
-    global LLM_URL, CALLS_DIR, REPLAY, REPLAY_ONLY, LLM_EXTRA
+    global LLM_URL, CALLS_DIR, REPLAY, REPLAY_ONLY, LLM_EXTRA, LLM_MODEL, LLM_KEY
     ap = argparse.ArgumentParser()
     ap.add_argument("--actions", type=int, default=500)
     ap.add_argument("--agents", default="graph;graph_nomodel;explore")
@@ -125,12 +130,22 @@ def main() -> None:
     ap.add_argument("--replay", action="store_true", help="serve v2's LLM calls from --calls-dir")
     ap.add_argument("--replay-only", action="store_true", help="with --replay: never call the live model")
     ap.add_argument("--llm-extra", default="{}", help="JSON merged into every LLM request body")
+    ap.add_argument("--llm-model", default="local", help="model name sent to the server")
+    ap.add_argument("--llm-key-env", default="",
+                    help="env var holding an API key for a hosted endpoint (development only; "
+                         "setting it allows a non-local --llm-url)")
     args = ap.parse_args()
     logging.basicConfig(level=logging.WARNING)
 
     LLM_URL, CALLS_DIR = args.llm_url, args.calls_dir
     REPLAY, REPLAY_ONLY = args.replay, args.replay_only
     LLM_EXTRA = json.loads(args.llm_extra)
+    LLM_MODEL = args.llm_model
+    if args.llm_key_env:
+        import os
+        LLM_KEY = os.environ.get(args.llm_key_env, "")
+        if not LLM_KEY:
+            sys.exit(f"--llm-key-env {args.llm_key_env}: variable is empty or unset")
 
     arcade = make_arcade(environments_dir=args.env_dir)
     games = args.games or available_environments(args.env_dir)

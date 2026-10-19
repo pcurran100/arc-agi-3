@@ -78,3 +78,51 @@ def test_http_backend_sends_extra_fields_and_reads_content():
     assert seen["chat_template_kwargs"] == {"enable_thinking": False}
     assert seen["top_k"] == 20 and seen["temperature"] == 0.7
     srv.server_close()
+
+
+def _serve_once(reply: dict, seen: dict):
+    import json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            seen["auth"] = self.headers.get("Authorization")
+            seen.update(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+            out = json.dumps(reply).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(out)
+
+        def log_message(self, *a):
+            pass
+
+    srv = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=srv.handle_request, daemon=True).start()
+    return srv
+
+
+def test_http_backend_sends_key_and_keeps_reasoning(tmp_path):
+    import json
+    seen: dict = {}
+    srv = _serve_once({"choices": [{"finish_reason": "stop", "message": {
+        "content": "{}", "reasoning_content": "because"}}]}, seen)
+    llm = OpenAIChatLLM(base_url=f"http://127.0.0.1:{srv.server_port}", api_key="k-123")
+    assert "k-123" not in repr(llm)
+    rec = RecordingLLM(llm, tmp_path / "c.jsonl")
+    assert rec.complete(MSG) == "{}"
+    assert seen["auth"] == "Bearer k-123"
+    row = json.loads((tmp_path / "c.jsonl").read_text())
+    assert row["reasoning"] == "because" and row["finish_reason"] == "stop"
+    assert "k-123" not in (tmp_path / "c.jsonl").read_text()
+    srv.server_close()
+
+
+def test_http_backend_raises_on_truncation():
+    from arc3.llm import Truncated
+    srv = _serve_once({"choices": [{"finish_reason": "length", "message": {"content": '{"a": "cut'}}]}, {})
+    llm = OpenAIChatLLM(base_url=f"http://127.0.0.1:{srv.server_port}")
+    with pytest.raises(Truncated):
+        llm.complete(MSG)
+    srv.server_close()

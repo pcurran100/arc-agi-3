@@ -20,6 +20,15 @@ Message = dict
 LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
 
 
+class Truncated(RuntimeError):
+    """The server stopped at ``max_tokens`` (``finish_reason == "length"``).
+
+    A cut-off answer is never parsed: in the 2026-10-16 Kaggle run, 34 of 45 v3
+    answers were unusable, mostly because thinking ran past the budget and the
+    JSON was cut mid-string. Callers retry with more room or a terser prompt.
+    """
+
+
 class LLM(Protocol):
     """Chat completion. Deterministic given ``seed`` where the backend allows."""
 
@@ -96,6 +105,12 @@ class OpenAIChatLLM:
     #: false}}`` turns that off in vLLM, and the model card's non-thinking
     #: sampling (top_p, top_k, presence_penalty) goes here too.
     extra: dict = field(default_factory=dict)
+    #: Bearer token for hosted APIs (NVIDIA NIM, OpenRouter, ...) in development.
+    #: Kept out of repr so it cannot leak into logs or call recordings.
+    api_key: str = field(default="", repr=False)
+    #: What the last call returned besides the answer: finish_reason, the
+    #: reasoning trace (vLLM and NIM return it as ``reasoning_content``), usage.
+    last: dict = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
         host = urlparse(self.base_url).hostname or ""
@@ -127,14 +142,23 @@ class OpenAIChatLLM:
                 "json_schema": {"name": schema.get("title", "output"), "schema": schema},
             }
         body = json.dumps(req_body).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         req = urllib.request.Request(
-            self.base_url.rstrip("/") + "/v1/chat/completions",
-            data=body,
-            headers={"Content-Type": "application/json"},
-        )
+            self.base_url.rstrip("/") + "/v1/chat/completions", data=body, headers=headers)
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             out = json.loads(resp.read().decode("utf-8"))
-        return out["choices"][0]["message"]["content"] or ""
+        choice = out["choices"][0]
+        msg = choice["message"]
+        self.last = {
+            "finish_reason": choice.get("finish_reason"),
+            "reasoning": msg.get("reasoning_content") or msg.get("reasoning") or "",
+            "usage": out.get("usage"),
+        }
+        if choice.get("finish_reason") == "length":
+            raise Truncated(f"answer cut off at max_tokens={max_tokens}")
+        return msg["content"] or ""
 
     def ready(self) -> bool:
         """Is the server up? llama-server answers ``/health`` once loaded."""
@@ -186,6 +210,9 @@ class RecordingLLM:
             "response": out,
             "seconds": round(dt, 3),
         }
+        last = getattr(self.inner, "last", None)
+        if last:
+            rec.update(last)
         with self.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         return out
