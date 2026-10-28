@@ -5,6 +5,9 @@ environment_files/
 # Secrets
 .env
 .env.local
+# Editor backups of .env (vim ~ and undo files) hold the same tokens
+.env~
+*.un~
 
 # Experiment output — logs are the record, but keep raw rollouts out of git.
 # Anything worth preserving gets summarised into docs/decision-log.md.
@@ -26,6 +29,8 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+# Claude Code worktrees: each is a checkout of a branch, not content
+.claude/worktrees/
 
 # Recorded runs from the arc-agi engine (its own format, not ours)
 recordings/
