@@ -34,6 +34,7 @@ A subgoal is
 
 from __future__ import annotations
 
+import re
 from collections import deque
 from dataclasses import dataclass
 from typing import Optional
@@ -66,11 +67,11 @@ class Subgoal:
         to = str(d.get("to", "")).strip()
         to_obj, to_xy = _id(to), None
         if to_obj is None:
-            try:
-                x, y = (int(v) for v in to.replace("(", "").replace(")", "").split(","))
-                to_xy = (x, y)
-            except ValueError:
+            # "36,45", "(36, 45)", "x36,y45", "x36 y45" - models write all of them.
+            nums = re.findall(r"-?\d+", to)
+            if len(nums) != 2:
                 return None
+            to_xy = (int(nums[0]), int(nums[1]))
         rel = d.get("relation") if d.get("relation") in ("overlap", "touch", "at") else "overlap"
         return Subgoal(obj, to_obj, to_xy, rel, Expectation.parse(d.get("on_arrival")),
                        str(d.get("goal", "") or "")[:8], str(d.get("why", "") or "")[:200])

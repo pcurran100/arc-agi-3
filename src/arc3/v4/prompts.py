@@ -29,7 +29,7 @@ from .expect import EXPECT_SCHEMA
 from .render import image_part, legend
 from .store import ATTAIN_SCHEMA, KINDS, RULE_SCHEMA, SCOPES
 
-PROMPT_VERSION = "v4-5"
+PROMPT_VERSION = "v4-6"
 MAX_SUBGOALS = 4
 MAX_STEPS = 6
 
@@ -154,7 +154,9 @@ OP_SCHEMA = {
         "attain": ATTAIN_SCHEMA,
         "note": {"type": "string", "maxLength": 200},
     },
-    "required": ["op", "id", "statement", "note"],
+    # "attain" required but nullable (D-044): the first v4-5 run on NIM wrote three
+    # goal hypotheses and gave none of them a checkable condition.
+    "required": ["op", "id", "statement", "note", "attain"],
 }
 
 UPDATE_SCHEMA = {

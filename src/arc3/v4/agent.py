@@ -435,7 +435,12 @@ class V4Agent:
                         f"available: {', '.join(self._available_names(obs))}.")
             self.need_update = self.need_update or not q
         self.queue = q
-        self.plan = [sg for sg in (Subgoal.parse(d) for d in (data.get("plan") or [])) if sg]
+        raw = [d for d in (data.get("plan") or []) if isinstance(d, dict)]
+        self.plan = [sg for sg in (Subgoal.parse(d) for d in raw) if sg]
+        if len(self.plan) < len(raw):
+            self._event(f"{len(raw) - len(self.plan)} subgoal(s) were not understood: 'object' "
+                        "must be '#id' and 'to' '#id' or 'x,y'.")
+            self.need_update = True
         self.plan_tests = tests
         self._credited = set()
         self.calls[-1]["steps"] = len(q)
