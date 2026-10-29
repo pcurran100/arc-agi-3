@@ -86,7 +86,7 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
                 agent = V4Agent(seed=seed, llm=llm, baselines=meta.baseline_actions,
                                 total_levels=meta.win_levels,
                                 temperature=float(kw.pop("temperature", 0.6)),
-                                image=bool(kw.pop("image", 1)))
+                                image=bool(kw.pop("image", 0)))
             elif base == "v3":
                 agent = V3Agent(seed=seed, llm=llm, baselines=meta.baseline_actions,
                                 temperature=float(kw.pop("temperature", 0.0)))
@@ -132,6 +132,11 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
         "assumptions": agent.store.describe() if hasattr(agent, "store") else None,
         "store_log": agent.store.log if hasattr(agent, "store") else None,
         "history": getattr(agent, "history", None) if base_name(agent_name) == "v4" else None,
+        # v4 (D-044): prediction accuracy on steps where more than the every-action
+        # changers changed, and whether the explorer ever acted (not a clean run).
+        "accuracy": agent.accuracy() if hasattr(agent, "accuracy") else None,
+        "explorer_steps": (agent.stats.get("explore_steps", 0)
+                           if agent is not None and hasattr(agent, "store") else None),
     }
 
 
@@ -154,6 +159,9 @@ def main() -> None:
                     help="env var holding an API key for a hosted endpoint (development only; "
                          "setting it allows a non-local --llm-url)")
     ap.add_argument("--llm-timeout", type=float, default=600.0, help="seconds per LLM request")
+    ap.add_argument("--jobs", type=int, default=1,
+                    help="games played at once (threads; each builds its own arcade). "
+                         "An LLM server batches concurrent requests, so this is the throughput knob")
     args = ap.parse_args()
     logging.basicConfig(level=logging.WARNING)
 
@@ -172,13 +180,22 @@ def main() -> None:
     games = args.games or available_environments(args.env_dir)
     agents = args.agents.split(";")
     rows = []
-    for gid in games:
-        for name in agents:
-            r = play(gid, name, args.actions, args.seed, arcade, args.env_dir)
-            rows.append(r)
-            print(f"{gid:6s} {name:14s} levels {r['levels']}/{r['total_levels']} "
-                  f"score {100 * (r['score'] or 0):5.1f}%  cleared_at {r['cleared_at']}  "
-                  f"{r['seconds']}s  {r['detail']}", flush=True)
+    jobs = [(gid, name) for gid in games for name in agents]
+
+    def one(job):
+        gid, name = job
+        arc = arcade if args.jobs <= 1 else make_arcade(environments_dir=args.env_dir)
+        r = play(gid, name, args.actions, args.seed, arc, args.env_dir)
+        print(f"{gid:6s} {name:14s} levels {r['levels']}/{r['total_levels']} "
+              f"score {100 * (r['score'] or 0):5.1f}%  cleared_at {r['cleared_at']}  "
+              f"{r['seconds']}s  {r['detail']}", flush=True)
+        return r
+    if args.jobs <= 1:
+        rows = [one(j) for j in jobs]
+    else:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=args.jobs) as ex:
+            rows = list(ex.map(one, jobs))
 
     print("\n== summary ==")
     for name in agents:
