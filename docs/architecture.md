@@ -1189,3 +1189,103 @@ the number of objects to 1", and `predict` called `state.move(7, 0)` with the
 wrong arity. That led to prompt `v3-2`, which adds a neutral syntax example of
 the helper API (it demonstrates calls, not a kind of game — Guardrail 2).
 Whether a 27B model writes plannable world models is still unmeasured.
+
+## 12. v4: an assumption store, checked predictions, and subgoals walked by code (D-042, D-044)
+
+v3 (§11) handed control to the explorer until the model's simulator was
+perfect, which on real games was never. v4 (`src/arc3/v4/`) asks the model for
+less and checks more: it keeps an **assumption store** the model edits (what
+things are, what actions do, what wins), it must **predict** the outcome of
+every action it chooses, and code checks each prediction exactly. Since D-044
+the model can also name **subgoals** ("bring #7 onto #5, then onto #3") that
+code routes to and walks without further calls.
+
+### 12.1 The loop
+
+Per step (`v4/agent.py`, `V4Agent.act`):
+
+1. **Observe** with `FactBook4` (§12.2).
+2. **Check.** Assumptions with a machine-checkable rule for the action are
+   checked (`store.observe`); the expectation attached to the action is
+   checked (`expect.check`). A correct prediction supports the **ontology and
+   dynamics** assumptions it named, once per decision. A wrong one — including
+   a change the model did not mention under `rest: unchanged`, except for
+   tickers — is a surprise: the queue and the plan are dropped and an update
+   is due. Goals are tested by code: a failed `level_complete` prediction
+   weakens the goals it named, and a goal whose `attain` condition holds
+   without the level completing is weakened once per arrival.
+3. **Act** on the queue; if it is empty and subgoals remain, **route** to the
+   next one (§12.3) and queue the route, each step with the expectation "the
+   object moves by (dx, dy)", the last with the subgoal's arrival
+   expectation.
+4. Otherwise **ask the model**: *update* (edit the store) after any surprise,
+   no-op, novelty, return-to-start, level start or game over, and every 10
+   actions unless the last 5 predictions all held; then *act* (up to 6 steps
+   and/or up to 4 subgoals).
+
+Without a usable model the step goes to v1's explorer, and every such step is
+counted: a run with `explore_steps > 0` is reported as not clean.
+
+### 12.2 The fact layer v4 adds
+
+`v4/facts.py`, a subclass of §11.2's `FactBook` (v3's prompts are untouched,
+so v3's recorded calls still replay). Each addition answers a failure measured
+on ls20 on 2026-10-19 (D-044). After 14 scripted moves on real ls20
+(`scripts/probe_v4_facts.py ls20 1,1,3,3,4,4,2,2,4,4,4,4,4,4`, seed 0), the new
+lines are:
+
+```
+CHANGE ON EVERY ACTION, WHATEVER THE ACTION (excluded from no-op checks): #13 (last 14 steps)
+SAME SHAPE UP TO SCALE/ROTATION/REFLECTION: #3 ~ #10 (x2 smaller, rotated 270)
+NEXT TO the most controlled-looking object (group #7 #8):
+  ACTION1 -> (+0,-5) would enter: colour 3 x25
+  ACTION2 -> (+0,+5) would enter: colour 4 x25
+  ACTION4 -> (+5,+0) would enter: colour 4 x25
+MOVES THAT HAPPENED entered: colour 3 x250. MOVES THAT DID NOT HAPPEN had in the way: colour 4 x250.
+(20 shape changes of still objects were only a mover covering or uncovering them, and are not reported as changes)
+```
+
+and the per-action tallies no longer list the bar: `ACTION4: tried 8, no
+effect 5; colour-12 moved (+5,+0) x3, colour-9 moved (+5,+0) x3`. Compared with
+§11.2's excerpt: the floor's `#1 reshaped` artefact is gone; the bar #13 is no
+longer "controlled-looking" (an object that moves the same way under every
+action is excluded); the goal box #3 is linked to the key display #10; and the
+wall colour (4) is identified from evidence. The other additions are per-step
+notes: an object back at its level-start position, objects restored to their
+level-start state (on ls20, a lost life), a colour or shape never seen before
+on the level.
+
+### 12.3 Subgoals and routes
+
+`v4/route.py`. A subgoal is `{object, to, relation, on_arrival, goal}` with
+`relation` overlap, touch or at. `route` is a breadth-first search over the
+positions of the object's co-moving group, using each action's dominant
+measured displacement, refusing colours that blocked a move and were never
+entered (`blocked − entered`), and refusing the exact (position, action)
+pairs where a move was refused. The last was added after the real-ls20 check
+below, where a move was refused with floor-coloured cells ahead and the
+router kept proposing it.
+
+Mechanics check on real ls20 (`scripts/oracle_v4_ls20.py "#5" "#3" 60`, seed 0): a
+scripted "model" tries the four moves and then gives the plan "overlap #5
+(expect nothing), then overlap #3 (expect level_complete)". The walker reached
+#5 at t14 (the key display rotated), routed to #3 and **cleared level 1 after
+22 actions — the human baseline is 22** — with 7 act calls; 18 of 19
+predictions held on steps where more than the ticker changed. This measures
+the walker, not a model: the subgoals were supplied.
+
+### 12.4 What this does not do
+
+- **Routes only translate one object.** Pushing, rotating, teleporting, moving
+  obstacles and clicks are the model's to do in explicit steps.
+- **Movement knowledge is per level.** The fact layer restarts at each level,
+  so the moves must be re-observed (a few actions) before code can route.
+- **Goal attainment is one condition.** A goal that needs something done first
+  is weakened when its final condition holds without it; the model must
+  restate it with the precondition.
+- **Tickers are found per id over a 4-step window;** the tracker can swap ids
+  between a bar's spent and live parts after a refill, and the swapped id is
+  re-detected rather than corrected.
+- **Thinking is not capped.** A truncated answer is retried once with twice
+  the room and counted (`stats['truncated']`). vLLM's soft
+  `thinking_token_budget` can be passed with `--llm-extra`; it is untested.

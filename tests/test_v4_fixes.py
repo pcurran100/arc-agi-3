@@ -189,7 +189,7 @@ class Planner:
         if "TASK: UPDATE" in text:
             return json.dumps({"ops": [], "summary": "ok"})
         fb = self.agent.fb
-        if not fb.player_candidates():
+        if not fb.player_candidates() and not fb.prior_moves:
             return json.dumps({"steps": [
                 {"action": "ACTION2", "expect": {"changes": [_item("colour 3", "moved", 0, 4)],
                                                  "rest": "unchanged", "outcome": "continue"}},
@@ -215,6 +215,8 @@ def test_v4_walks_a_subgoal_with_code_routes_and_few_calls():
     assert agent.stats.get("routes", 0) >= 2
     # A walked route costs no calls: far fewer act calls than actions.
     assert agent.stats["calls_act"] * 3 < n, (agent.stats, n)
+    # Level 2 is routed with level 1's moves: the three exploratory steps happen once.
+    assert agent.stats["llm_steps"] == 3, agent.stats
 
 
 def test_periodic_updates_are_skipped_only_while_predictions_hold():

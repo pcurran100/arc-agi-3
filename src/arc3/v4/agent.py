@@ -181,6 +181,7 @@ class V4Agent:
         """Route to the next subgoal and queue the route. Code only, no call."""
         while self.plan:
             sg = self.plan[0]
+            self.fb.focus = sg.obj
             path, why = route(self.fb, sg, [n for n in self._available_names(obs)
                                             if n.startswith("ACTION")])
             if path is None:
@@ -490,7 +491,8 @@ class V4Agent:
         self._bump("levels")
         self.level = obs.levels_completed
         self.level_actions = 0
-        self.fb = FactBook4()
+        pcs = self.fb.player_candidates()
+        self.fb = FactBook4(prior_moves=dict(pcs[0]["moves"]) if pcs else {})
         self._last_action, self.queue, self.plan, self.history = None, [], [], []
         self._recent, self._attained = [], set()
         self.store.new_level(self.level)

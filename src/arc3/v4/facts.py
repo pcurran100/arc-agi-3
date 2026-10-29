@@ -112,6 +112,8 @@ class FactBook4(FactBook):
     entered: Counter = field(default_factory=Counter)   # colours moved into by moves that happened
     blocked: Counter = field(default_factory=Counter)   # colours in the way of moves that did not
     blocked_moves: set = field(default_factory=set)     # (x, y, action) of a mover where it failed
+    prior_moves: dict = field(default_factory=dict)     # action -> (dx, dy) carried from the last level
+    focus: Optional[int] = None                         # the object a subgoal is walking
 
     # -- observing ---------------------------------------------------------
 
@@ -166,6 +168,8 @@ class FactBook4(FactBook):
         if prev_grid is None or step.action.startswith("CLICK"):
             return
         pcs = {p["id"]: p for p in self.player_candidates()}
+        if self.focus is not None and self.focus not in pcs and self.prior_moves:
+            pcs[self.focus] = {"id": self.focus, "moves": self.prior_moves}
         for i, p in pcs.items():
             d = p["moves"].get(step.action)
             if d is None or i not in prev_objs:
@@ -360,6 +364,10 @@ class FactBook4(FactBook):
                                         for c, n in cnt.most_common(6)) or "none"
             lines.append(f"MOVES THAT HAPPENED entered: {fmt(self.entered)}. MOVES THAT DID NOT "
                          f"HAPPEN had in the way: {fmt(self.blocked)}.")
+        if self.prior_moves and not self.player_candidates():
+            lines.append("ON THE LAST LEVEL the controlled object moved: " + ", ".join(
+                f"{a}->({d[0]:+d},{d[1]:+d})" for a, d in sorted(self.prior_moves.items()))
+                + " (code will route with these until this level shows otherwise)")
         if self.occluded:
             lines.append(f"({self.occluded} shape changes of still objects were only a mover "
                          "covering or uncovering them, and are not reported as changes)")

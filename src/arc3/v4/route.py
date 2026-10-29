@@ -145,6 +145,11 @@ def route(fb: FactBook4, sg: Subgoal, actions: list[str]) -> tuple[Optional[list
     pc = {p["id"]: p for p in fb.player_candidates()}
     group = fb.group_of(sg.obj)
     p = next((pc[g] for g in group if g in pc), None)
+    if fb.prior_moves:
+        # The previous level's displacements, as a prior for actions this level
+        # has not yet shown: every step of the route is still checked, and a
+        # wrong one is a surprise like any other.
+        p = {"id": p["id"] if p else sg.obj, "moves": {**fb.prior_moves, **(p["moves"] if p else {})}}
     if p is None:
         return None, (f"#{sg.obj} has not been seen to move under two different actions, so "
                       "code has no movement model for it; give explicit steps instead")
