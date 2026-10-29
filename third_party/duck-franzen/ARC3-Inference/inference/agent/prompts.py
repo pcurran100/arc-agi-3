@@ -1,6 +1,7 @@
 """Prompt templates for the analyzer agent."""
 
 from inference.utils.grid_utils import ARC_COLOR_LEGEND
+from inference.utils.segmentation import SCALE_HASH
 
 LEVEL_TRANSFER_SYSTEM_GUIDANCE = (
     "- Levels usually build on mechanics learned in earlier levels, especially the most "
@@ -344,3 +345,21 @@ SUMMARY_REQUEST_PROMPT = (
     "leave out is gone.\n"
     "Length is not a problem here; leaving something out is."
 )
+
+
+# Graft from the ARC-AGI-3 project (D-045): document the scale-invariant node keys,
+# only when segmentation emits them (ARC3_SCALE_HASH=1).
+if SCALE_HASH:
+    _NODE_DOC_END = "`children` (ids of objects fully enclosed by this one).\n"
+    assert _NODE_DOC_END in STRUCTURED_RUNTIME_STATE_ADDENDUM
+    STRUCTURED_RUNTIME_STATE_ADDENDUM = STRUCTURED_RUNTIME_STATE_ADDENDUM.replace(
+        _NODE_DOC_END,
+        _NODE_DOC_END
+        + "- Each node also has `scale` (the largest integer k such that the object is an "
+        "exact k-times enlargement of a smaller shape; 1 if none) and `scale_free_hash` (a "
+        "colour-independent signature of the object's shape that ignores position, rotation "
+        "AND integer scale). Equal `scale_free_hash` values mean one object is the same "
+        "shape as another, possibly enlarged or rotated: for example a small icon and its "
+        "2x copy elsewhere on the board.\n",
+        1,
+    )

@@ -21,6 +21,14 @@ from inference.utils import retained_functions as _retained_functions
 from inference.utils.grid_utils import ARC_COLOR_CHARS
 
 
+def _segmentation_source() -> str:
+    """The segmentation module's source, with its SCALE_HASH flag frozen to the host's
+    value: the sandbox's environment is empty, so it cannot read the flag itself."""
+    source = inspect.getsource(_segmentation)
+    line = next(l for l in source.splitlines() if l.startswith("SCALE_HASH = "))
+    return source.replace(line, f"SCALE_HASH = {_segmentation.SCALE_HASH!r}", 1)
+
+
 _SANDBOX_BOOTSTRAP = textwrap.dedent(
     r"""
     import ast
@@ -735,7 +743,7 @@ _SANDBOX_BOOTSTRAP = textwrap.dedent(
         main()
     """
 ).replace("__RETAINED_FUNCTIONS_SOURCE__\n", inspect.getsource(_retained_functions)).replace(
-    "__SEGMENTATION_SOURCE__\n", inspect.getsource(_segmentation)
+    "__SEGMENTATION_SOURCE__\n", _segmentation_source()
 ).replace(
     "__FRAME_DIFF_SOURCE__\n", inspect.getsource(_frame_diff_module)
 )

@@ -7,6 +7,13 @@ the Python-tool sandbox bootstrap, where project packages are not importable.
 
 import hashlib
 
+# Graft from the ARC-AGI-3 project (D-045): scale-invariant shape identity, emitted as
+# the node keys ``scale`` and ``scale_free_hash``. Off unless the host process sets
+# ARC3_SCALE_HASH=1. The sandbox runs with an empty environment, so
+# python_tool_sandbox rewrites this line with the host's value when it splices this
+# source in.
+SCALE_HASH = __import__("os").environ.get("ARC3_SCALE_HASH", "").strip().lower() in ("1", "true", "yes", "on")
+
 _ORTH = ((-1, 0), (1, 0), (0, -1), (0, 1))
 # clockwise Moore-neighbour offsets, starting at NW
 _CW = ((-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1))
@@ -115,6 +122,37 @@ def _object_signature(cells, color):
         rotation = rotation % 180
     shape_hash = _cells_hash(norm, "__shape__")
     return canonical, rotation, symmetry, hashes[0], shape_hash
+
+
+def _integer_scale(norm_cells):
+    """Largest k such that the shape is an exact k-times upscale of a smaller shape:
+    its bounding box divides into k-by-k blocks, each wholly inside or outside it."""
+    height = max(r for r, _ in norm_cells) + 1
+    width = max(c for _, c in norm_cells) + 1
+    a, b = height, width
+    while b:
+        a, b = b, a % b
+    for k in range(a, 1, -1):
+        if height % k or width % k or len(norm_cells) % (k * k):
+            continue
+        # Every cell lies in exactly one block, so the blocks are all full exactly
+        # when the cell count equals blocks touched times k*k.
+        blocks = {(r // k, c // k) for r, c in norm_cells}
+        if len(blocks) * k * k == len(norm_cells):
+            return k
+    return 1
+
+
+def _scale_free_signature(norm_cells):
+    """(scale, hash): the integer upscale factor of the shape, and a colour-free hash of
+    its downscaled form, canonical over the four rotations. Equal hashes mean "the same
+    shape up to position, rotation and integer scale", e.g. a glyph and its 2x copy."""
+    k = _integer_scale(norm_cells)
+    small = sorted({(r // k, c // k) for r, c in norm_cells}) if k > 1 else list(norm_cells)
+    variants = [small]
+    for _ in range(3):
+        variants.append(_rotate_cells_90(variants[-1]))
+    return k, min(_cells_hash(v, "__shape__") for v in variants)
 
 
 def segment_layer(layer, color_chars):
@@ -234,19 +272,22 @@ def segment_layer(layer, color_chars):
         color = color_chars[max(0, min(15, comp["value"]))]
         boundary = _corner_points(_trace_outer_contour(comp["cells"], comp["start"]))
         signature = _object_signature(comp["cells"], color)
-        nodes.append(
-            {
-                "id": cid,
-                "color": color,
-                "hash": signature[0],
-                "rotation": signature[1],
-                "rotational_symmetry": signature[2],
-                "pose_hash": signature[3],
-                "shape_hash": signature[4],
-                "pixels": len(comp["cells"]),
-                "boundary": [[r, c] for r, c in boundary],
-                "children": children[cid],
-            }
-        )
+        node = {
+            "id": cid,
+            "color": color,
+            "hash": signature[0],
+            "rotation": signature[1],
+            "rotational_symmetry": signature[2],
+            "pose_hash": signature[3],
+            "shape_hash": signature[4],
+            "pixels": len(comp["cells"]),
+            "boundary": [[r, c] for r, c in boundary],
+            "children": children[cid],
+        }
+        if SCALE_HASH:
+            node["scale"], node["scale_free_hash"] = _scale_free_signature(
+                _normalize_cells(comp["cells"])
+            )
+        nodes.append(node)
 
     return {"nodes": nodes, "adjacency_list": adjacency_list}
