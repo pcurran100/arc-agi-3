@@ -19,6 +19,15 @@ actions; code adds evidence to it as actions play out.
 and, past a threshold, marks an assumption *doubtful*; only the model retires
 one, and retired assumptions stay visible so they are not re-proposed blindly.
 
+**Evidence by kind (D-044).** A correct prediction about what an action does
+supports only the ontology and dynamics assumptions it named; a goal gains only
+from level progress. A goal assumption may carry an ``attain`` condition
+("#7 overlaps #3"); when code sees the condition hold and the level does not
+complete, the goal is weakened, and a failed ``level_complete`` prediction
+weakens the goals it named. Until D-044 every true prediction credited every
+named id, so on ls20 a wrong goal reached confidence 0.91 on five "the bar
+ticked as predicted" supports and nothing ever lowered it.
+
 **Across levels.** At a level change every live assumption is marked *carried*
 and level-scoped ones lose confidence: they are hypotheses about the new level
 until something on it supports them again (D-042).
@@ -31,6 +40,10 @@ until something on it supports them again (D-042).
 - *Rules check changes only* (expect.py's language), not conditions such as
   "unless a wall is in the way"; a conditional rule will collect contradictions,
   become doubtful, and the model is expected to restate it.
+- *Attainment is one condition.* A goal that needs steps first ("touch #5,
+  then reach #3") is weakened when its final condition holds without them; the
+  weakening is soft, and the model is expected to restate the goal with its
+  precondition.
 - *No automatic generalisation.* Code never invents an assumption from a fact;
   the fact text is in front of the model and inventing is the model's job.
 """
@@ -51,6 +64,18 @@ DOUBTFUL_BELOW = 0.25
 CARRY_LEVEL = 0.6        # level-scoped confidence multiplier at a level change
 CARRY_GAME = 0.85        # game-scoped
 MAX_EVIDENCE = 6         # evidence notes kept per assumption (counts are kept in full)
+MAX_SHOWN = 24           # live assumptions shown in full; the rest by id only
+CREDITED_BY_PREDICTION = ("ontology", "dynamics")
+
+ATTAIN_SCHEMA = {
+    "type": ["object", "null"],
+    "properties": {
+        "object": {"type": "string", "maxLength": 8},
+        "to": {"type": "string", "maxLength": 12},
+        "relation": {"type": "string", "enum": ["overlap", "touch", "at"]},
+    },
+    "required": ["object", "to", "relation"],
+}
 
 RULE_SCHEMA = {
     "type": ["object", "null"],
@@ -113,6 +138,7 @@ class Assumption:
     evidence: list[str] = field(default_factory=list)
     level: int = 0                    # level it was made on
     retired_because: str = ""
+    attain: Optional[dict] = None     # goals only: the condition that should complete the level
 
     def note(self, s: str) -> None:
         self.evidence = [*self.evidence, s][-MAX_EVIDENCE:]
@@ -142,6 +168,9 @@ class Assumption:
              f"(+{self.support}/-{self.contra}): {self.statement}")
         if self.rule:
             s += f"\n     rule: {self.rule.describe()}"
+        if self.attain:
+            s += (f"\n     attained when: {self.attain['object']} {self.attain['relation']} "
+                  f"{self.attain['to']}")
         if self.evidence:
             s += "\n     recent evidence: " + " | ".join(self.evidence[-3:])
         return s
@@ -159,10 +188,24 @@ class AssumptionStore:
     def live(self) -> list[Assumption]:
         return [a for a in self.items.values() if a.status != "retired"]
 
+    def goals(self) -> list[Assumption]:
+        return sorted((a for a in self.live() if a.kind == "goal"), key=lambda a: -a.confidence)
+
     def describe(self, max_retired: int = 8) -> str:
-        live = sorted(self.live(), key=lambda a: (KINDS.index(a.kind) if a.kind in KINDS else 9,
-                                                   -a.confidence))
+        live = self.live()
+        top = {a.id for a in sorted(live, key=lambda a: -a.confidence)[:MAX_SHOWN]}
+        hidden = [a.id for a in live if a.id not in top]
+        live = sorted((a for a in live if a.id in top),
+                      key=lambda a: (KINDS.index(a.kind) if a.kind in KINDS else 9, -a.confidence))
         lines = [a.describe() for a in live] or ["(none yet)"]
+        goals = self.goals()
+        if goals:
+            tot = sum(a.confidence for a in goals) or 1.0
+            lines.append("GOAL HYPOTHESES by weight: " + ", ".join(
+                f"{a.id} {a.confidence / tot:.0%}" for a in goals))
+        if hidden:
+            lines.append(f"({len(hidden)} more low-confidence assumptions not shown: "
+                         f"{' '.join(hidden)}; the store is over budget - consolidate it)")
         retired = [a for a in self.items.values() if a.status == "retired"][-max_retired:]
         if retired:
             lines.append("RETIRED (do not re-propose without new evidence):")
@@ -192,7 +235,12 @@ class AssumptionStore:
                     kind=op.get("kind") if op.get("kind") in KINDS else "other",
                     scope=op.get("scope") if op.get("scope") in SCOPES else "level",
                     confidence=_conf(op.get("confidence"), 0.5),
-                    rule=Rule.parse(op.get("rule")), level=self.level)
+                    rule=Rule.parse(op.get("rule")), level=self.level,
+                    attain=_attain(op.get("attain")))
+                if new.kind == "other":
+                    new.rule = None   # a plan with a rule inflated itself on ls20 (A77, +23)
+                if new.kind != "goal":
+                    new.attain = None
                 if note and note.strip() != st:
                     new.note(f"{where}: {note}")
                 self._next += 1
@@ -208,8 +256,10 @@ class AssumptionStore:
                     a.kind = op["kind"]
                 if op.get("scope") in SCOPES:
                     a.scope = op["scope"]
-                if "rule" in op:
+                if "rule" in op and a.kind != "other":
                     a.rule = Rule.parse(op.get("rule"))
+                if op.get("attain") and a.kind == "goal":
+                    a.attain = _attain(op.get("attain"))
                 a.confidence = _conf(op.get("confidence"), a.confidence)
                 if a.status == "doubtful" and a.confidence >= DOUBTFUL_BELOW:
                     a.status = "active"
@@ -249,10 +299,27 @@ class AssumptionStore:
         return out
 
     def supported_by_prediction(self, ids: list, where: str) -> None:
+        """A prediction about an action's effect came true: evidence for what
+        things are and what actions do, not for what wins."""
         for i in ids or []:
             a = self.items.get(str(i))
-            if a is not None and a.status != "retired":
+            if a is not None and a.status != "retired" and a.kind in CREDITED_BY_PREDICTION:
                 a.supported(f"{where}: prediction came true")
+
+    def goals_failed(self, ids: list, where: str, why: str) -> list[str]:
+        out = []
+        for i in ids or []:
+            a = self.items.get(str(i))
+            if a is not None and a.status != "retired" and a.kind == "goal":
+                a.contradicted(f"{where}: {why}")
+                out.append(a.id)
+        return out
+
+    def goals_won(self, ids: list, where: str) -> None:
+        for i in ids or []:
+            a = self.items.get(str(i))
+            if a is not None and a.status != "retired" and a.kind == "goal":
+                a.supported(f"{where}: the level completed as this goal predicted")
 
     # -- levels -------------------------------------------------------------------
 
@@ -262,6 +329,13 @@ class AssumptionStore:
             a.carried = True
             a.confidence *= CARRY_LEVEL if a.scope == "level" else CARRY_GAME
             a.note(f"carried into level {level + 1}")
+
+
+def _attain(v) -> Optional[dict]:
+    if not isinstance(v, dict) or not v.get("object") or not v.get("to"):
+        return None
+    rel = v.get("relation") if v.get("relation") in ("overlap", "touch", "at") else "overlap"
+    return {"object": str(v["object"]).strip(), "to": str(v["to"]).strip(), "relation": rel}
 
 
 def _conf(v, default: float) -> float:

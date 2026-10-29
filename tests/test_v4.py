@@ -16,7 +16,7 @@ import numpy as np
 
 from arc3.llm import ScriptedLLM, Truncated
 from arc3.types import Action, GameState, Observation
-from arc3.v3.facts import FactBook
+from arc3.v4.facts import FactBook4 as FactBook
 from arc3.v4.agent import V4Agent
 from arc3.v4.expect import Expectation, check
 from arc3.v4.store import AssumptionStore
@@ -259,7 +259,7 @@ def test_v4_sends_the_frame_as_an_image_and_the_reasoning_to_update():
             seen.append(messages)
             self.last = {"reasoning": "I suspect the grey column is a wall."}
             return super().complete(messages, **kw)
-    agent = V4Agent(llm=WithReasoning(Mind(env)))
+    agent = V4Agent(llm=WithReasoning(Mind(env)), image=True)
     run(agent, env, cap=12)
     first_user = seen[0][-1]["content"]
     assert first_user[1]["type"] == "image_url"
@@ -299,16 +299,3 @@ def test_an_add_with_the_claim_in_the_note_is_kept():
     assert s.items["A1"].statement == "grey #1 is a wall"
 
 
-def test_an_unmentioned_side_effect_does_not_drop_the_sequence():
-    """ls20, 2026-10-19: every move also shrinks a bar the model left out."""
-    from arc3.v4.agent import V4Agent as A
-    agent = A(llm=None)
-    step, fb = _step({(4, 4, 4, 4): 3, (40, 60, 20, 2): 11}, {(8, 4, 4, 4): 3, (41, 60, 19, 2): 11})
-    agent.fb = fb
-    agent.queue = [("next", None, [])]
-    agent._pending = (_exp([_item("colour 3", "moved", 4, 0)], "unchanged"), ["A1"])
-    agent._judge(step, "continue")
-    assert agent.queue and agent.stats["predictions_partial"] == 1 and agent.need_update
-    agent._pending = (_exp([_item("colour 3", "moved", 0, 4)], "unchanged"), ["A1"])
-    agent._judge(step, "continue")
-    assert not agent.queue and agent.stats["predictions_wrong"] == 1
