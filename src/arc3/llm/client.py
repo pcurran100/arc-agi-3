@@ -218,8 +218,22 @@ class RecordingLLM:
 
     def complete(self, messages, *, max_tokens=512, temperature=0.0, seed=0, schema=None) -> str:
         t0 = time.time()
-        out = self.inner.complete(messages, max_tokens=max_tokens,
-                                  temperature=temperature, seed=seed, schema=schema)
+        try:
+            out = self.inner.complete(messages, max_tokens=max_tokens,
+                                      temperature=temperature, seed=seed, schema=schema)
+        except Exception as exc:
+            # A truncated or failed call costs as much time as a good one and was
+            # invisible in the log (v5 debug run, 2026-10-30): record it, without
+            # a response, so replay never serves it.
+            rec = {"key": None, "backend": self.inner.name, "max_tokens": max_tokens,
+                   "seed": seed, "error": f"{type(exc).__name__}: {exc}"[:300],
+                   "seconds": round(time.time() - t0, 3)}
+            last = getattr(self.inner, "last", None)
+            if last and isinstance(exc, Truncated):
+                rec["usage"] = last.get("usage")
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            raise
         dt = time.time() - t0
         self.n_calls += 1
         self.seconds += dt
@@ -269,6 +283,8 @@ class ReplayLLM:
             for line in self.path.read_text(encoding="utf-8").splitlines():
                 if line.strip():
                     rec = json.loads(line)
+                    if rec.get("key") is None or "response" not in rec:
+                        continue          # a failed or truncated call, logged for the record
                     self._table[rec["key"]] = rec["response"]
                     self._extra[rec["key"]] = {k: rec[k] for k in ("finish_reason", "reasoning")
                                                if k in rec}
