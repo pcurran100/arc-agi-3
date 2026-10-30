@@ -76,6 +76,33 @@ def test_a_wrong_simulator_is_caught_and_repaired():
     assert agent.stats.get("explore_steps", 0) == 0
 
 
+class PlanMind:
+    """Names the player only as 'player' and asks code to route to the goal cell;
+    it never mentions the wall, which code must find and route around."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def __call__(self, messages) -> str:
+        self.calls += 1
+        return json.dumps({
+            "ops": [], "names": [], "simulator": None, "steps": [], "purpose": "go",
+            "plan": [{"object": "player", "to": "29,1", "relation": "overlap",
+                      "on_arrival": {"changes": [], "rest": "any", "outcome": "level_complete"},
+                      "goal": ""}]})
+
+
+def test_a_plan_naming_the_player_is_routed_and_rerouted_around_a_wall():
+    env = WalledRoom()
+    mind = PlanMind()
+    agent = V5Agent(llm=ScriptedLLM(mind))
+    run(agent, env, cap=150)
+    assert env.levels == 2, agent.describe()
+    assert agent.stats.get("reroutes", 0) >= 1          # the wall, found by bumping into it
+    assert agent.stats.get("explore_steps", 0) == 0
+    assert mind.calls <= 4, agent.describe()            # start + new level (+ slack)
+
+
 def test_thinking_is_switched_per_call_and_restored():
     class FakeBackend:
         base_url = "http://127.0.0.1:1"

@@ -39,6 +39,7 @@ Without a model the step goes to v1's graph explorer, counted in
 
 from __future__ import annotations
 
+import re
 import time
 from collections import Counter
 from dataclasses import dataclass, field
@@ -51,7 +52,7 @@ from ..types import CLICK, RESET, Action, GameState, Observation
 from ..v3.facts import Step, action_name
 from ..v3.prompts import parse_json
 from ..v3.world import parse_action
-from ..v4.expect import Expectation, check
+from ..v4.expect import Expectation, Item, check
 from ..v4.route import Subgoal, reached, route
 from ..v4.store import AssumptionStore
 from . import sim as simmod
@@ -64,6 +65,9 @@ MINOR_SHOWN = 12
 THINK_EVERY = 30          # actions without a think call before one is due anyway
 MAX_NEXT_RUN = 3          # next calls in a row before a think call is forced
 REPEAT_MAJOR = 2          # a small surprise seen this often becomes MAJOR (once)
+MAX_REROUTES = 3          # blocked route steps re-routed by code before the model is asked
+re_id = re.compile(r"#\s*\d+")
+re_xy = re.compile(r"^\(?\s*x?\s*-?\d+\s*[, ]\s*y?\s*-?\d+\s*\)?$")
 
 
 def _thinking_backend(llm):
@@ -114,6 +118,8 @@ class V5Agent:
     _pending: Optional[tuple] = None
     _attained: set = field(default_factory=set)
     _sim_goal_hit: bool = False
+    _reroutes: int = 0
+    _player_look: Optional[tuple] = None      # (colour, shape) of last level's controlled object
 
     def __post_init__(self) -> None:
         if self.graph is None:
@@ -252,7 +258,9 @@ class V5Agent:
             self._bump("routes")
             for k, (a, dx, dy) in enumerate(path):
                 last = k == len(path) - 1
-                exp = sg.on_arrival if last else Expectation()
+                move = (Item(f"#{sg.obj}", "moved", dx, dy),)
+                exp = (Expectation(move + sg.on_arrival.items, "any", sg.on_arrival.outcome)
+                       if last else Expectation(move, "any", "continue"))
                 self.queue.append((Action.simple(int(a[6:])), exp, None,
                                    ("arrive", sg.obj) if last else ("route", sg.obj)))
             self._bump("plan_steps", len(path))
@@ -350,7 +358,17 @@ class V5Agent:
                 on_driven = any(any(f"#{i} " in f or f"#{i}," in f or f.endswith(f"#{i}")
                                     for i in driven) for f in bad)
                 self._bump("predictions_wrong")
-                if on_driven:
+                if on_driven and tag and tag[0] in ("route", "arrive") and self.plan \
+                        and self._reroutes < MAX_REROUTES:
+                    # A blocked route step: the fact layer has just learned the blocking
+                    # colour and place, so code re-routes before asking the model.
+                    verdict = "blocked, re-routing"
+                    self._reroutes += 1
+                    self.queue = []
+                    self._bump("reroutes")
+                    self.minors = [*self.minors, f"t{step.t} {step.action}: route step blocked "
+                                   f"({'; '.join(bad[:1])}); code re-routed"][-MINOR_SHOWN:]
+                elif on_driven:
                     verdict = "WRONG (driven object)"
                     self._drop("driven")
                     self._major(f"t{step.t} {step.action}: {'; '.join(bad[:3])}")
@@ -481,9 +499,10 @@ class V5Agent:
         self.store.apply(data.get("ops") or [], where)
         self._names(data.get("names") or [])
         s = data.get("simulator")
-        if isinstance(s, dict) and str(s.get("code", "")).strip():
-            self.sim = simmod.build(str(s["code"]), s.get("tracked") or [], s.get("goal", ""),
-                                    self.fb)
+        code = simmod.source_of(s)
+        if code.strip():
+            self.sim = simmod.build(code, s.get("tracked") or [],
+                                    s.get("goal_id", s.get("goal", "")), self.fb)
             self._bump("sims_written")
             if self.sim.valid:
                 self._bump("sims_trusted")
@@ -530,14 +549,49 @@ class V5Agent:
             self._minor(f"action {bad!r} is not available or not understood; available: "
                         f"{', '.join(self._available_names(obs))}", ("bad_action", bad))
         self.queue = q
-        raw = [d for d in (data.get("plan") or []) if isinstance(d, dict)]
+        raw = [self._resolve_subgoal(d) for d in (data.get("plan") or []) if isinstance(d, dict)]
         self.plan = [sg for sg in (Subgoal.parse(d) for d in raw) if sg]
+        self._reroutes = 0
         if len(self.plan) < len(raw):
             self._minor(f"{len(raw) - len(self.plan)} subgoal(s) not understood: 'object' must be "
                         "'#id' and 'to' '#id' or 'x,y'", ("bad_subgoal",))
         self._bump("llm_steps", len(q))
         self.calls[-1]["steps"] = len(q)
         self.calls[-1]["subgoals"] = len(self.plan)
+
+    def _resolve(self, s: str) -> str:
+        """'#7' stays; a name or role the model gave ('player', 'player_body') becomes
+        its '#id'; 'player'/'me' with no such name becomes the most controlled-looking
+        object. Debug run (d): 5 of 6 plans named objects by name and were dropped."""
+        t = str(s or "").strip()
+        if re_id.fullmatch(t) or re_xy.search(t):
+            return t
+        m = re_id.search(t)
+        if m and t.startswith(("#", "player #", "object #")):
+            return m.group(0).replace(" ", "")
+        key = t.lower().strip(" #")
+        for table in (self.fb.names, self.fb.roles):
+            for i, n in table.items():
+                if i in self.fb.objects and n.lower() == key:
+                    return f"#{i}"
+        for table in (self.fb.names, self.fb.roles):
+            for i, n in table.items():
+                if i in self.fb.objects and key and key in n.lower():
+                    return f"#{i}"
+        if key.startswith(("player", "me", "avatar", "controlled")):
+            pcs = self.fb.player_candidates()
+            if pcs:
+                return f"#{pcs[0]['id']}"
+            # A new level, nothing moved yet: the object that looks like the last
+            # level's controlled object.
+            if self._player_look is not None:
+                for o in self.fb.objects.values():
+                    if (o.colour, o.shape) == self._player_look:
+                        return f"#{o.id}"
+        return t
+
+    def _resolve_subgoal(self, d: dict) -> dict:
+        return {**d, "object": self._resolve(d.get("object")), "to": self._resolve(d.get("to"))}
 
     def _to_action(self, s: str, obs: Observation) -> Optional[Action]:
         if s.strip().upper() == "RESET":
@@ -577,6 +631,9 @@ class V5Agent:
         self.level = obs.levels_completed
         self.level_actions = 0
         pcs = self.fb.player_candidates()
+        if pcs and pcs[0]["id"] in self.fb.objects:
+            o = self.fb.objects[pcs[0]["id"]]
+            self._player_look = (o.colour, o.shape)
         self.fb = FactBook5(prior_moves=dict(pcs[0]["moves"]) if pcs else {})
         self._last_action, self.queue, self.plan, self.history = None, [], [], []
         self._sigs, self._escalated, self._attained = Counter(), set(), set()

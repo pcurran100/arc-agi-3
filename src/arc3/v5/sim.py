@@ -34,6 +34,7 @@ and names the ids its simulator is meant to get right (``tracked``). Code then
 
 from __future__ import annotations
 
+import re
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -78,9 +79,20 @@ def _ignore(fb: FactBook5, tracked: tuple[int, ...], steps) -> set:
     return set(fb.counters()) | set(fb.movers())
 
 
+def source_of(s) -> str:
+    """The simulator's source from the model's answer: ``lines`` (one string per
+    line), or a single ``code`` string as older prompts asked."""
+    if not isinstance(s, dict):
+        return ""
+    lines = s.get("lines")
+    if isinstance(lines, list):
+        return "\n".join(str(x) for x in lines)
+    return str(s.get("code", "") or "")
+
+
 def build(code: str, tracked, goal_id: str, fb: FactBook5) -> Simulator:
     """Compile and validate. Never raises."""
-    tr = tuple(int(str(t).lstrip("#")) for t in (tracked or []) if str(t).lstrip("#").isdigit())
+    tr = tuple(int(m) for t in (tracked or []) for m in re.findall(r"\d+", str(t))[:1])
     wm = WorldModel.compile(code or "")
     sim = Simulator(wm, tr, str(goal_id or "")[:8])
     if wm.error:

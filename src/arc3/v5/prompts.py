@@ -24,7 +24,7 @@ from ..v4.expect import EXPECT_SCHEMA
 from ..v4.prompts import OP_SCHEMA
 from ..v4.render import legend
 
-PROMPT_VERSION = "v5-2"
+PROMPT_VERSION = "v5-3"
 MAX_STEPS = 8
 MAX_SUBGOALS = 4
 
@@ -71,6 +71,9 @@ HOW YOU ACT. Prefer, in this order:
      state.recolour(id, c), state.resize(id, w, h), state.remove(id),
      state.add(colour, x, y, w, h), state.meta (dict for your own counters).
    action is "ACTION1".."ACTION7" or "CLICK(x,y)". No imports; np and math exist.
+   Send it as "simulator": {{"lines": [the source, ONE STRING PER LINE, indentation
+   kept], "tracked": ["#7", ...], "goal_id": the store id of the goal goal()
+   encodes}}. Both predict and goal go in "lines".
    Example: def predict(state, action):
                 p = state.get(7); d = {{"ACTION1": (0,-5), "ACTION2": (0,5)}}.get(action)
                 if p and d and state.free(p["x"]+d[0], p["y"]+d[1], p["w"], p["h"],
@@ -134,21 +137,30 @@ STEP_SCHEMA = {
 
 SUBGOAL_SCHEMA = {
     "type": "object",
-    "properties": {"object": {"type": "string", "maxLength": 8},
-                   "to": {"type": "string", "maxLength": 12},
+    "properties": {"object": {"type": "string", "maxLength": 24,
+                              "description": "#id (or a name you gave it)"},
+                   "to": {"type": "string", "maxLength": 24,
+                          "description": "#id, a name you gave, or x,y"},
                    "relation": {"type": "string", "enum": ["overlap", "touch", "at"]},
                    "on_arrival": EXPECT_SCHEMA,
                    "goal": {"type": "string", "maxLength": 8}},
     "required": ["object", "to", "relation", "on_arrival", "goal"],
 }
 
+# Code as a list of lines: in debug run (d) the model's one-string code arrived
+# with every newline turned into a bare "n" ("def predict(state, action):n    p
+# = ..."), and a field called "goal" was read as the goal's code.
 SIM_SCHEMA = {
     "type": ["object", "null"],
-    "properties": {"code": {"type": "string", "maxLength": 6000},
-                   "tracked": {"type": "array", "items": {"type": "string", "maxLength": 6},
-                               "maxItems": 12},
-                   "goal": {"type": "string", "maxLength": 8}},
-    "required": ["code", "tracked", "goal"],
+    "properties": {"lines": {"type": "array", "maxItems": 150,
+                             "items": {"type": "string", "maxLength": 200},
+                             "description": "the Python source, one string per line"},
+                   "tracked": {"type": "array", "maxItems": 12,
+                               "items": {"type": "string", "maxLength": 12},
+                               "description": "ids the simulator models, e.g. \"#7\""},
+                   "goal_id": {"type": "string", "maxLength": 8,
+                               "description": "the store id of the goal that goal() encodes, or \"\""}},
+    "required": ["lines", "tracked", "goal_id"],
 }
 
 THINK_SCHEMA = {
