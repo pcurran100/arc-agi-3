@@ -241,3 +241,41 @@ def test_click_xy_is_available_to_model_code():
     wm = WorldModel.compile("def predict(state, action):\n    p = click_xy(action)\n"
                             "    state.meta['c'] = p\n    return state\n")
     assert wm.error is None
+
+
+class WallBumpMind:
+    """Think: walk right three times (the third bumps the wall). Next: give up
+    walking and stop asking (steps that are simply blocked must be routine)."""
+
+    def __init__(self):
+        self.kinds: list[str] = []
+        self.texts: list[str] = []
+
+    def __call__(self, messages) -> str:
+        import re
+        text = messages[-1]["content"]
+        self.texts.append(text)
+        kind = text.rsplit("TASK: ", 1)[1]
+        self.kinds.append(kind)
+        pid = re.search(r"#(\d+)\b[^\n]*colour 3\b", text).group(1)
+        step = {"action": "ACTION4", "expect": {"changes": [
+            {"target": f"#{pid}", "change": "moved", "dx": 4, "dy": 0}],
+            "rest": "any", "outcome": "continue"}}
+        steps = [step] * 3 if len(self.kinds) == 1 else [
+            {"action": "ACTION3", "expect": {"changes": [], "rest": "any", "outcome": "continue"}}]
+        out = {"steps": steps, "plan": [], "purpose": "walk"}
+        if kind == "THINK":
+            out.update({"ops": [], "names": [], "simulator": None})
+        return json.dumps(out)
+
+
+def test_a_blocked_step_is_routine_and_gets_a_next_call():
+    env = WalledRoom()
+    mind = WallBumpMind()
+    agent = V5Agent(llm=ScriptedLLM(mind))
+    obs = env.obs()
+    for _ in range(4 + 3 + 1):
+        obs = env.step(agent.act(obs))
+    assert mind.kinds[:2] == ["THINK", "NEXT"], (mind.kinds, agent.describe())
+    assert "BLOCKED" in mind.texts[1]
+    assert agent.stats.get("stops", 0) == 1 and agent.stats.get("major", 0) == 0

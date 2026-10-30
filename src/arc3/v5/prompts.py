@@ -4,8 +4,9 @@
   simulator was invalidated or the goal disproved, and periodically. One call
   does what v4 split into update + act: edit the assumption store, name
   objects, write or repair the simulator and goal, and choose what to do.
-- **next** (thinking off, short prompt): when the last plan finished as
-  expected and only the next move is needed.
+- **next** (thinking off, short prompt): when the last plan finished, or
+  stopped for a routine reason (a blocked step, a subgoal code cannot route),
+  and only the next move is needed.
 
 Everything that does not change between calls is in the system message, so a
 server with prefix caching (vLLM) reuses it; the user message holds only the
@@ -24,7 +25,7 @@ from ..v4.expect import EXPECT_SCHEMA
 from ..v4.prompts import OP_SCHEMA
 from ..v4.render import legend
 
-PROMPT_VERSION = "v5-5"
+PROMPT_VERSION = "v5-6"
 MAX_STEPS = 8
 MAX_SUBGOALS = 4
 
@@ -121,7 +122,9 @@ YOUR TASKS. Each request ends with one of:
 - "TASK: THINK" - update the store (ops), name objects (names), write or repair
   the simulator (or null to keep the current one), then give steps and/or a plan
   (both may be empty if the simulator's goal should be searched).
-- "TASK: NEXT" - the last plan finished as expected; give the next steps or plan.
+- "TASK: NEXT" - the last plan finished, or stopped for a routine reason shown
+  under WHAT HAPPENED (a blocked step, a subgoal code cannot route); give the
+  next steps or plan.
 - "TASK: FIX SIMULATOR" - your simulator failed to compile or to reproduce the
   recorded steps; send the corrected simulator (lines, tracked, goal_id),
   changing only what the problem needs.

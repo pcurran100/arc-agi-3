@@ -30,10 +30,16 @@ changes the loop, keeping v4's store, routing and checker:
    call. (2026-10-30: a tu93 SyntaxError and a vc33 ``import re`` each cost a
    2-4 minute think call to notice.)
 5. **Two call tiers.** *think* (thinking on, full context including the frame)
-   after anything MAJOR, at a level start, when the simulator or goal failed,
-   and every ``THINK_EVERY`` actions; *next* (thinking off, no frame) when a
-   plan finished without trouble. At most ``MAX_NEXT_RUN`` *next* calls in a
-   row.
+   only at genuinely hard moments: a level start, a MAJOR surprise (outcome
+   differed, game over, a jump back to the start, the driven object did
+   something *other* than predicted), a disproved goal, a simulator that a
+   cheap fix could not save, and every ``THINK_EVERY`` actions. *next*
+   (thinking off, no frame) for everything routine: a plan finished, an
+   exploratory step on the driven object that was simply *blocked* (nothing
+   changed there), a subgoal code could not route, or a STOP. At most
+   ``MAX_NEXT_RUN`` *next* calls in a row. (2026-10-30: 20 of 21 good calls
+   were think calls, because every blocked test move and every NO ROUTE was
+   MAJOR and level-start/new-shape notes from the probe forced think.)
 
 Without a model the step goes to v1's graph explorer, counted in
 ``stats['explore_steps']`` so a run that used it is visibly not clean. A
@@ -78,7 +84,7 @@ from .prompts import (FIX_SCHEMA, MAX_STEPS, NEXT_SCHEMA, PROMPT_VERSION, THINK_
 HISTORY = 10
 MINOR_SHOWN = 12
 THINK_EVERY = 30          # actions without a think call before one is due anyway
-MAX_NEXT_RUN = 3          # next calls in a row before a think call is forced
+MAX_NEXT_RUN = 6          # next calls in a row before a think call is forced
 REPEAT_MAJOR = 2          # a small surprise seen this often becomes MAJOR (once)
 MAX_REROUTES = 3          # blocked route steps re-routed by code before the model is asked
 MAX_FIXES = 2             # cheap (thinking off) simulator repairs before a think call
@@ -137,6 +143,7 @@ class V5Agent:
     _reroutes: int = 0
     _player_look: Optional[tuple] = None      # (colour, shape) of last level's controlled object
     halted: str = ""                  # set when the model server is unreachable: stop the game
+    calls_why: str = ""               # what forced the last think call (for the log)
     _search_failed: tuple = ()        # (simulator, action count) of the last failed search
     repair_due: str = ""              # a simulator mispredicted: try a cheap fix first
 
@@ -153,11 +160,20 @@ class V5Agent:
         self._bump("major")
 
     def _soft(self, s: str) -> None:
-        """Worth thinking about, not worth interrupting: shown with the minors, and
-        the next decision is a think call rather than a next call."""
+        """Worth seeing, not worth interrupting or thinking about: shown with the
+        minors at the next call, whatever its tier. (Until 2026-10-30 this forced
+        the next call to be a think call; the probe's level-start returns and
+        new counters made every first call a think call for no reason.)"""
         self.minors = [*self.minors, s][-MINOR_SHOWN:]
-        self.want_think = True
         self._bump("soft")
+
+    def _stop(self, s: str) -> None:
+        """Routine: the plan cannot go on, but nothing about the game is in doubt
+        (a blocked step, an unroutable subgoal). Stops the plan; the next call is
+        a *next* call that sees why."""
+        self.events = [*self.events, s][-20:]
+        self._drop("stop")
+        self._bump("stops")
 
     def _jumped(self, step: Step) -> list[str]:
         """Objects that moved further than any displacement seen for this action
@@ -270,7 +286,7 @@ class V5Agent:
             if path is None:
                 self._bump("routes_failed")
                 self.plan = []
-                self._major(f"NO ROUTE for subgoal '{sg.describe()}': {why}.")
+                self._stop(f"NO ROUTE for subgoal '{sg.describe()}': {why}.")
                 return
             if not path:
                 self.plan.pop(0)
@@ -420,6 +436,11 @@ class V5Agent:
                     self._bump("reroutes")
                     self.minors = [*self.minors, f"t{step.t} {step.action}: route step blocked "
                                    f"({'; '.join(bad[:1])}); code re-routed"][-MINOR_SHOWN:]
+                elif on_driven and all("nothing changed there" in f for f in bad):
+                    # A move into a wall: the effect table and fact layer record it;
+                    # it answers the test, it does not overturn a belief.
+                    verdict = "blocked"
+                    self._stop(f"t{step.t} {step.action}: BLOCKED - {'; '.join(bad[:2])}")
                 elif on_driven:
                     verdict = "WRONG (driven object)"
                     self._drop("driven")
@@ -477,9 +498,16 @@ class V5Agent:
         if not self._model_available():
             return
         think = (self.need_think or self.want_think or self.since_think >= THINK_EVERY
-                 or self.next_run >= MAX_NEXT_RUN or len(self.minors) >= MINOR_SHOWN)
+                 or self.next_run >= MAX_NEXT_RUN)
+        self.calls_why = ("need" if self.need_think else "want" if self.want_think else
+                          "periodic" if self.since_think >= THINK_EVERY else
+                          "next_run" if self.next_run >= MAX_NEXT_RUN else "")
         if think:
             self._think(obs)
+            for c in reversed(self.calls):
+                if c.get("kind") == "think":
+                    c["why"] = self.calls_why
+                    break
         else:
             self._next(obs)
 
@@ -609,6 +637,7 @@ class V5Agent:
         self.next_run += 1
         if data is None:
             return
+        self.events = []
         self._take(data, obs)
         self.calls[-1]["purpose"] = str(data.get("purpose", ""))[:200]
 
