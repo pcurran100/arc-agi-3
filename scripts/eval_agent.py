@@ -30,6 +30,7 @@ from arc3.client.env import EnvClient, available_environments, make_arcade
 from arc3.agent_v2 import HypothesisAgent
 from arc3.v3.agent import V3Agent
 from arc3.v4.agent import V4Agent
+from arc3.v5.agent import V5Agent
 from arc3.explore import ExploringDriver
 from arc3.llm import OpenAIChatLLM, RecordingLLM, ReplayLLM
 from arc3.types import RESET, Action, GameState
@@ -68,7 +69,7 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
         # "graph_nomodel:local_min=0.2" -> GraphAgent(use_model=False, local_min=0.2)
         base, _, opts = agent_name.partition(":")
         kw = {k: float(v) for k, v in (o.split("=") for o in opts.split(",") if o)}
-        if base in ("v2", "v3", "v4"):
+        if base in ("v2", "v3", "v4", "v5"):
             # The LLM at LLM_URL; every call recorded under CALLS_DIR, or
             # replayed from there when REPLAY is set (then no model is needed).
             llm = None
@@ -82,7 +83,11 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
                 llm = (ReplayLLM(calls, fallback=RecordingLLM(live, calls) if not REPLAY_ONLY
                                  else None) if REPLAY
                        else RecordingLLM(live, calls))
-            if base == "v4":
+            if base == "v5":
+                agent = V5Agent(seed=seed, llm=llm, baselines=meta.baseline_actions,
+                                total_levels=meta.win_levels,
+                                temperature=float(kw.pop("temperature", 0.6)))
+            elif base == "v4":
                 agent = V4Agent(seed=seed, llm=llm, baselines=meta.baseline_actions,
                                 total_levels=meta.win_levels,
                                 temperature=float(kw.pop("temperature", 0.6)),
@@ -131,7 +136,7 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
         # v4 only: the assumption store at the end, and every edit made to it.
         "assumptions": agent.store.describe() if hasattr(agent, "store") else None,
         "store_log": agent.store.log if hasattr(agent, "store") else None,
-        "history": getattr(agent, "history", None) if base_name(agent_name) == "v4" else None,
+        "history": getattr(agent, "history", None) if base_name(agent_name) in ("v4", "v5") else None,
         # v4 (D-044): prediction accuracy on steps where more than the every-action
         # changers changed, and whether the explorer ever acted (not a clean run).
         "accuracy": agent.accuracy() if hasattr(agent, "accuracy") else None,
@@ -182,10 +187,24 @@ def main() -> None:
     rows = []
     jobs = [(gid, name) for gid in games for name in agents]
 
+    partial = Path(args.out).with_suffix(".partial.jsonl") if args.out else None
+    lock = __import__("threading").Lock()
+
     def one(job):
         gid, name = job
         arc = arcade if args.jobs <= 1 else make_arcade(environments_dir=args.env_dir)
-        r = play(gid, name, args.actions, args.seed, arc, args.env_dir)
+        try:
+            r = play(gid, name, args.actions, args.seed, arc, args.env_dir)
+        except Exception as exc:  # one game's crash must not lose the others' results
+            import traceback
+            traceback.print_exc()
+            r = {"game": gid, "agent": name, "levels": 0, "total_levels": 0, "score": 0.0,
+                 "actions": 0, "cleared_at": [], "seconds": 0, "error": repr(exc)[:500],
+                 "detail": f"CRASHED: {exc!r}"[:300]}
+        if partial is not None:
+            with lock, partial.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(r, default=str) + "
+")
         print(f"{gid:6s} {name:14s} levels {r['levels']}/{r['total_levels']} "
               f"score {100 * (r['score'] or 0):5.1f}%  cleared_at {r['cleared_at']}  "
               f"{r['seconds']}s  {r['detail']}", flush=True)
@@ -201,13 +220,13 @@ def main() -> None:
     for name in agents:
         rs = [r for r in rows if r["agent"] == name]
         lv = sum(r["levels"] for r in rs)
-        tot = sum(r["total_levels"] for r in rs)
+        tot = sum(r["total_levels"] or 0 for r in rs)
         sc = sum((r["score"] or 0) for r in rs) / len(rs)
         g = sum(1 for r in rs if r["levels"])
         print(f"{name:14s} levels {lv}/{tot}  games with a level {g}/{len(rs)}  "
               f"mean RHAE {100 * sc:.2f}%")
     if args.out:
-        Path(args.out).write_text(json.dumps({"args": vars(args), "rows": rows}, indent=1))
+        Path(args.out).write_text(json.dumps({"args": vars(args), "rows": rows}, indent=1, default=str))
 
 
 if __name__ == "__main__":
