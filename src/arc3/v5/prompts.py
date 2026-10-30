@@ -24,7 +24,7 @@ from ..v4.expect import EXPECT_SCHEMA
 from ..v4.prompts import OP_SCHEMA
 from ..v4.render import legend
 
-PROMPT_VERSION = "v5-1"
+PROMPT_VERSION = "v5-2"
 MAX_STEPS = 8
 MAX_SUBGOALS = 4
 
@@ -50,6 +50,11 @@ HOW YOU SEE THE GAME. Exact code tracks every object and keeps its state for you
   life was lost or the level was reset).
 - Coordinates: x is the column (0-63, left to right), y the row (0-63, top to
   bottom). Only the AVAILABLE ACTIONS exist; CLICK(x,y) clicks that cell.
+- The CURRENT FRAME is there to glance at, NOT to count by hand: never count
+  characters along a row or column. Positions and sizes are on the sheet, and
+  code answers spatial questions exactly - in a simulator, state.free() and
+  state.colours_in_box() check walls and paths for you, and code searches the
+  routes. Spend your thinking on what things ARE and what WINS.
 
 HOW YOU ACT. Prefer, in this order:
 1. A SIMULATOR. Write Python defining predict(state, action) and goal(state).

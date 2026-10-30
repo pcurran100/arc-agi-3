@@ -231,6 +231,7 @@ class RecordingLLM:
             last = getattr(self.inner, "last", None)
             if last and isinstance(exc, Truncated):
                 rec["usage"] = last.get("usage")
+                rec["reasoning_tail"] = (last.get("reasoning") or "")[-4000:]
             with self.path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             raise

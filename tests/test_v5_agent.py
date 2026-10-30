@@ -82,7 +82,8 @@ def test_thinking_is_switched_per_call_and_restored():
         name = "fake"
 
         def __init__(self):
-            self.extra = {"chat_template_kwargs": {"enable_thinking": True}, "top_p": 0.9}
+            self.extra = {"chat_template_kwargs": {"enable_thinking": True,
+                                                   "reasoning_budget": 12000}, "top_p": 0.9}
             self.seen = []
             self.last = {}
 
@@ -96,5 +97,7 @@ def test_thinking_is_switched_per_call_and_restored():
     agent._call("next", [], {}, 100, False)
     agent._call("think", [], {}, 100, True)
     assert be.seen == [False, True]
-    assert be.extra == {"chat_template_kwargs": {"enable_thinking": True}, "top_p": 0.9}
+    # Other template options (a soft reasoning budget on NIM) survive the switch.
+    assert be.extra == {"chat_template_kwargs": {"enable_thinking": True,
+                                                 "reasoning_budget": 12000}, "top_p": 0.9}
     assert [c["thinking"] for c in agent.calls] == [False, True]
