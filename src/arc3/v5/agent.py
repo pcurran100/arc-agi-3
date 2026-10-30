@@ -102,6 +102,8 @@ class V5Agent:
     events: list = field(default_factory=list)
     level_notes: list = field(default_factory=list)
     need_think: bool = True
+    want_think: bool = False          # think at the next decision, without interrupting
+    probed: bool = False
     since_think: int = 0
     next_run: int = 0
     calls: list = field(default_factory=list)
@@ -124,6 +126,29 @@ class V5Agent:
         self.events = [*self.events, s][-20:]
         self.need_think = True
         self._bump("major")
+
+    def _soft(self, s: str) -> None:
+        """Worth thinking about, not worth interrupting: shown with the minors, and
+        the next decision is a think call rather than a next call."""
+        self.minors = [*self.minors, s][-MINOR_SHOWN:]
+        self.want_think = True
+        self._bump("soft")
+
+    def _jumped(self, step: Step) -> list[str]:
+        """Objects that moved further than any displacement seen for this action
+        (a teleport back to the start, not a step)."""
+        known: dict[int, set] = {}
+        for p in self.fb.player_candidates():
+            known[p["id"]] = {tuple(d) for d in p["moves"].values()}
+        out = []
+        for c in step.changes:
+            if "moved" not in c.kinds:
+                continue
+            ds = known.get(c.id, set())
+            lim = max((abs(dx) + abs(dy) for dx, dy in ds), default=0)
+            if lim and abs(c.dx) + abs(c.dy) > lim:
+                out.append(f"#{c.id} moved ({c.dx:+d},{c.dy:+d})")
+        return out
 
     def _minor(self, s: str, sig: tuple) -> None:
         """Logged; escalated to MAJOR the REPEAT_MAJOR-th time, once per signature."""
@@ -159,6 +184,8 @@ class V5Agent:
         if obs.state == GameState.WIN or frame is None:
             return self._emit(Action.simple(RESET), None)
 
+        if not self.queue and not self.probed:
+            self._probe(obs)
         if not self.queue and self.plan:
             self._walk(obs)
         if not self.queue and not self.need_think and self.sim is not None and self.sim.valid:
@@ -191,6 +218,19 @@ class V5Agent:
         self.queue, self.plan = [], []
 
     # -- code planning -------------------------------------------------------------
+
+    def _probe(self, obs: Observation) -> None:
+        """Try each non-click action once at the start of the game, before the first
+        think call. Debug run 2026-10-30: the model spent one think call (60-190 s)
+        per action learning what the four actions do; code can learn that for four
+        actions and no calls (Guardrail 4: early actions go to dynamics)."""
+        self.probed = True
+        simple = self._simple(obs)
+        if self.level or self.level_actions or len(simple) < 2 or self.llm is None:
+            return
+        for a in simple:
+            self.queue.append((Action.simple(a), None, None, ("probe", None)))
+        self._bump("probe_steps", len(simple))
 
     def _simple(self, obs: Observation) -> list[int]:
         return [a for a in sorted(obs.available_actions) if a not in (RESET, CLICK)]
@@ -252,16 +292,24 @@ class V5Agent:
         actual = "; ".join(c.describe() for c in real[:5]) or "nothing (only the interface)"
         if outcome != "continue":
             actual += f"; {outcome.upper()}"
+        jumped = self._jumped(step)
         for t, e in self.fb.events:
-            if t == step.t:
-                if "level-start" in e or e.startswith("RESTORED"):
-                    self._major(f"t{step.t} {step.action}: {e}")
-                else:
-                    self.minors = [*self.minors, f"t{step.t}: {e}"][-MINOR_SHOWN:]
+            if t != step.t:
+                continue
+            if ("level-start" in e or e.startswith("RESTORED")) and jumped:
+                self._major(f"t{step.t} {step.action}: {e} - a jump, not an ordinary move "
+                            f"({', '.join(jumped)})")
+            else:
+                # Debug run 2026-10-30: ACTION1 then ACTION2 put the player back on its
+                # start square and was read as a lost life; a split/return without a
+                # jump is noted and thought about when the current plan is done.
+                self._soft(f"t{step.t}: {e}")
         if getattr(step, "novel", False):
             for n in self.fb.notes.get(step.t, []):
                 if n.startswith("NEW"):
-                    self._major(f"t{step.t} {step.action}: {n}")
+                    # Counters appear on the first action, before they can be
+                    # classified (both debug games): think next, do not interrupt.
+                    self._soft(f"t{step.t} {step.action}: {n}")
         for note in self.store.observe(step, outcome):
             self._minor(f"t{step.t} rule check failed: {note}", ("rule", note[:40]))
         self._check_goals(step, outcome)
@@ -319,7 +367,8 @@ class V5Agent:
         if tag and tag[0] == "arrive" and self.plan and verdict in ("ok", "minor miss"):
             self.plan.pop(0)
             self._bump("subgoals_done")
-        self._line(f"t{step.t} {step.action} | {exp.describe() if exp else 'simulator'} | "
+        what = exp.describe() if exp else ("simulator" if pred is not None else "code probe")
+        self._line(f"t{step.t} {step.action} | {what} | "
                    f"{actual} | {verdict}")
 
     def _check_goals(self, step: Step, outcome: str) -> None:
@@ -356,7 +405,7 @@ class V5Agent:
     def _decide(self, obs: Observation) -> None:
         if not self._model_available():
             return
-        think = (self.need_think or self.since_think >= THINK_EVERY
+        think = (self.need_think or self.want_think or self.since_think >= THINK_EVERY
                  or self.next_run >= MAX_NEXT_RUN or len(self.minors) >= MINOR_SHOWN)
         if think:
             self._think(obs)
@@ -441,7 +490,7 @@ class V5Agent:
         elif self.sim is not None:
             simmod.validate(self.sim, self.fb)        # re-check against the new evidence
         self.events, self.minors = [], []
-        self.need_think, self.since_think, self.next_run = False, 0, 0
+        self.need_think, self.want_think, self.since_think, self.next_run = False, False, 0, 0
         self._take(data, obs)
         self.calls[-1]["purpose"] = str(data.get("purpose", ""))[:200]
         self.calls[-1]["sim"] = self.sim.describe()[:200] if self.sim else None

@@ -59,7 +59,8 @@ def test_v5_wins_both_levels_by_searching_its_simulator():
     assert env.levels == 2, agent.describe()
     assert agent.stats.get("explore_steps", 0) == 0
     assert mind.thinks == 2, agent.describe()            # game start + new level, no more
-    assert n <= 2 * 17 + 1, n                            # the shortest path, twice
+    assert agent.stats["probe_steps"] == 4               # each action once, game start only
+    assert n <= 4 + 2 * 17 + 3, n                        # probes, then ~the shortest path twice
     assert agent.stats["sim_plan_steps"] >= 34
     assert "NEW LEVEL 2" in mind.texts[1]
 
