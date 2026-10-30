@@ -108,7 +108,10 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
         if obs.state == GameState.WIN:
             break
         before = obs.levels_completed
-        obs = client.step(choose(obs))
+        a = choose(obs)
+        if getattr(agent, "halted", ""):
+            break                 # the model server is gone: stop, do not play blind
+        obs = client.step(a)
         budget.observe(obs)
         if obs.levels_completed > before:
             level_actions.append(client.actions_used)
@@ -126,6 +129,7 @@ def play(gid: str, agent_name: str, n_actions: int, seed: int, arcade, env_dir: 
              "score": lv.score()} for lv in res.levels if lv.completed
         ],
         "seconds": round(time.time() - t0, 1),
+        "invalid": getattr(agent, "halted", "") or None,
         "detail": agent.describe() if agent else "",
         # v2 only: (level, actions into level, hypotheses proposed, compiled) per call,
         # and the population as it stood at the end.
@@ -206,7 +210,7 @@ def main() -> None:
                 f.write(json.dumps(r, default=str) + "\n")
         print(f"{gid:6s} {name:14s} levels {r['levels']}/{r['total_levels']} "
               f"score {100 * (r['score'] or 0):5.1f}%  cleared_at {r['cleared_at']}  "
-              f"{r['seconds']}s  {r['detail']}", flush=True)
+              f"{r['seconds']}s  {'INVALID ' if r.get('invalid') else ''}{r['detail']}", flush=True)
         return r
     if args.jobs <= 1:
         rows = [one(j) for j in jobs]
@@ -223,7 +227,9 @@ def main() -> None:
         sc = sum((r["score"] or 0) for r in rs) / len(rs)
         g = sum(1 for r in rs if r["levels"])
         print(f"{name:14s} levels {lv}/{tot}  games with a level {g}/{len(rs)}  "
-              f"mean RHAE {100 * sc:.2f}%")
+              f"mean RHAE {100 * sc:.2f}%"
+              + (f"  INVALID games (network down): {bad}" if (bad := [r['game'] for r in rs
+                                                               if r.get('invalid')]) else ""))
     if args.out:
         Path(args.out).write_text(json.dumps({"args": vars(args), "rows": rows}, indent=1, default=str))
 

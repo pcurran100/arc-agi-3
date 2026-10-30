@@ -21,6 +21,7 @@ client refuses any host that is not local unless explicitly allowed.
 from .client import (
     LLM,
     Message,
+    NetworkDown,
     OpenAIChatLLM,
     RecordingLLM,
     ReplayLLM,
@@ -33,6 +34,7 @@ from .client import (
 __all__ = [
     "LLM",
     "Message",
+    "NetworkDown",
     "OpenAIChatLLM",
     "RecordingLLM",
     "ReplayLLM",

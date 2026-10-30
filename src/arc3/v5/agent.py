@@ -25,7 +25,11 @@ changes the loop, keeping v4's store, routing and checker:
    row.
 
 Without a model the step goes to v1's graph explorer, counted in
-``stats['explore_steps']`` so a run that used it is visibly not clean.
+``stats['explore_steps']`` so a run that used it is visibly not clean. A
+*lost network* is different from having no model: the client retries
+connection and DNS failures for ten minutes, and if the server is still
+unreachable the agent sets ``halted`` and the caller stops the game, marked
+invalid, rather than letting the explorer play blind (2026-10-30 run).
 
 **What this does not do.**
 
@@ -46,7 +50,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from ..agent import GraphAgent
-from ..llm import LLM, Truncated
+from ..llm import LLM, NetworkDown, Truncated
 from ..scene import make_scene
 from ..types import CLICK, RESET, Action, GameState, Observation
 from ..v3.facts import Step, action_name
@@ -120,6 +124,7 @@ class V5Agent:
     _sim_goal_hit: bool = False
     _reroutes: int = 0
     _player_look: Optional[tuple] = None      # (colour, shape) of last level's controlled object
+    halted: str = ""                  # set when the model server is unreachable: stop the game
 
     def __post_init__(self) -> None:
         if self.graph is None:
@@ -202,6 +207,9 @@ class V5Agent:
                 self._walk(obs)
             if not self.queue and self.sim is not None and self.sim.valid:
                 self._search(obs)
+        if self.halted:
+            # The caller checks ``halted`` and must not spend this action.
+            return Action.simple(RESET)
         if self.queue:
             a, exp, pred, tag = self.queue.pop(0)
             return self._emit(a, (exp, pred, tag))
@@ -416,7 +424,7 @@ class V5Agent:
     # -- calling the model --------------------------------------------------------------
 
     def _model_available(self) -> bool:
-        if self.llm is None or len(self.calls) >= self.max_calls:
+        if self.halted or self.llm is None or len(self.calls) >= self.max_calls:
             return False
         return not (self.deadline and time.time() > self.deadline)
 
@@ -469,6 +477,13 @@ class V5Agent:
                 except Truncated:
                     self._bump("truncated")
                     text = ""
+                except NetworkDown as exc:
+                    self._bump("network_down")
+                    self.halted = f"network down: {exc}"[:300]
+                    self.calls.append({"kind": kind, "ok": False, "level": self.level,
+                                       "at": self.level_actions, "error": self.halted,
+                                       "seconds": round(time.time() - t0, 2)})
+                    return None
                 except Exception as exc:  # a dead server must not end the game
                     self._bump("llm_errors")
                     self.calls.append({"kind": kind, "ok": False, "level": self.level,
@@ -655,6 +670,8 @@ class V5Agent:
     def describe(self) -> str:
         clean = "CLEAN" if not self.stats.get("explore_steps") else \
             f"NOT CLEAN ({self.stats['explore_steps']} explorer steps)"
+        if self.halted:
+            clean = f"INVALID ({self.halted[:80]}), {clean}"
         think = sum(1 for c in self.calls if c.get("kind") == "think")
         return (f"level {self.level}, calls {len(self.calls)} (think {think}, "
                 f"next {len(self.calls) - think}), {clean}, acc {self.accuracy()}, "

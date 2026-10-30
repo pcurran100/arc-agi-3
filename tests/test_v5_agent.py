@@ -128,3 +128,25 @@ def test_thinking_is_switched_per_call_and_restored():
     assert be.extra == {"chat_template_kwargs": {"enable_thinking": True,
                                                  "reasoning_budget": 12000}, "top_p": 0.9}
     assert [c["thinking"] for c in agent.calls] == [False, True]
+
+
+def test_a_lost_network_halts_the_game_instead_of_exploring():
+    from arc3.llm import NetworkDown
+
+    def down(messages):
+        raise NetworkDown("no connection for 600s")
+
+    env = WalledRoom()
+    agent = V5Agent(llm=ScriptedLLM(down))
+    obs = env.obs()
+    spent = 0
+    for _ in range(40):
+        a = agent.act(obs)
+        if agent.halted:
+            break
+        obs = env.step(a)
+        spent += 1
+    assert agent.halted.startswith("network down")
+    assert spent == 4                                    # the code probes only
+    assert agent.stats.get("explore_steps", 0) == 0
+    assert "INVALID" in agent.describe()
