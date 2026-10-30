@@ -203,8 +203,7 @@ def main() -> None:
                  "detail": f"CRASHED: {exc!r}"[:300]}
         if partial is not None:
             with lock, partial.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(r, default=str) + "
-")
+                f.write(json.dumps(r, default=str) + "\n")
         print(f"{gid:6s} {name:14s} levels {r['levels']}/{r['total_levels']} "
               f"score {100 * (r['score'] or 0):5.1f}%  cleared_at {r['cleared_at']}  "
               f"{r['seconds']}s  {r['detail']}", flush=True)
