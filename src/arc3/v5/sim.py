@@ -94,9 +94,12 @@ def build(code: str, tracked, goal_id: str, fb: FactBook5) -> Simulator:
     """Compile and validate. Never raises."""
     tr = tuple(int(m) for t in (tracked or []) for m in re.findall(r"\d+", str(t))[:1])
     wm = WorldModel.compile(code or "")
-    sim = Simulator(wm, tr, str(goal_id or "")[:8])
+    gid = str(goal_id or "")
+    sim = Simulator(wm, tr, gid[:8] if re.fullmatch(r"A\d+", gid.strip()) else "")
     if wm.error:
-        sim.why = f"does not compile: {wm.error}"
+        sim.why = (f"does not compile: {wm.error}. The source code received was:\n"
+                   + "\n".join(f"  {k + 1:3d}| {ln}" for k, ln in
+                               enumerate((code or "").splitlines()[:40])))
         return sim
     validate(sim, fb)
     return sim

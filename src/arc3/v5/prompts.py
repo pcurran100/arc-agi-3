@@ -24,7 +24,7 @@ from ..v4.expect import EXPECT_SCHEMA
 from ..v4.prompts import OP_SCHEMA
 from ..v4.render import legend
 
-PROMPT_VERSION = "v5-3"
+PROMPT_VERSION = "v5-4"
 MAX_STEPS = 8
 MAX_SUBGOALS = 4
 
@@ -73,9 +73,10 @@ HOW YOU ACT. Prefer, in this order:
    action is "ACTION1".."ACTION7" or "CLICK(x,y)". No imports; np and math exist.
    Send it as "simulator": {{"lines": [the source, ONE STRING PER LINE, indentation
    kept], "tracked": ["#7", ...], "goal_id": the store id of the goal goal()
-   encodes}}. Both predict and goal go in "lines".
+   encodes}}. Both predict and goal go in "lines". Use ONLY single quotes in
+   the Python ('ACTION1', never "ACTION1"): a double quote ends the JSON string.
    Example: def predict(state, action):
-                p = state.get(7); d = {{"ACTION1": (0,-5), "ACTION2": (0,5)}}.get(action)
+                p = state.get(7); d = {{'ACTION1': (0,-5), 'ACTION2': (0,5)}}.get(action)
                 if p and d and state.free(p["x"]+d[0], p["y"]+d[1], p["w"], p["h"],
                                           passable=(3,), ignore=(7,)):
                     state.move(7, *d)

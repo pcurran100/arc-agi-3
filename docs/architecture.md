@@ -1289,3 +1289,166 @@ the walker, not a model: the subgoals were supplied.
 - **Thinking is not capped.** A truncated answer is retried once with twice
   the room and counted (`stats['truncated']`). vLLM's soft
   `thinking_token_budget` can be passed with `--llm-extra`; it is untested.
+
+
+## 13. v5: object permanence, an object sheet, and the model's simulator searched by code (D-046)
+
+v4 (§12) asked the model before nearly every action and made it predict every
+change by object number; on five games (2026-10-29) that was ~1.3 calls per
+action, ~10k thinking tokens per call and no level. v5 (`src/arc3/v5/`) keeps
+v4's assumption store, router and checker and changes three things: code
+keeps the state of every object and shows the model one line per object; a
+small surprise no longer stops a plan; and the model can hand code a
+*program* — a simulator and a goal — that code validates and searches for the
+shortest path. Nothing here knows what a counter, key or door is (Guardrail 2);
+every classification is "behaves the same whatever the action" or similar.
+
+### 13.1 Object permanence
+
+Two changes, measured on all 25 public games (`docs/experiments/identity_2026-10-30/`):
+
+- **The tracker prefers same-coloured in-place overlap.** `perception/track.py`
+  prices a same-coloured pair that overlaps by containment
+  (`0.45 · (1 − overlap/min size) + 0.05`), so a bar that fills or empties is
+  the same object rather than a stranger of the same shape. In-place id swaps
+  fell from 96 to 49 of 60,102 same-colour overlapping pairs
+  (`scripts/eval_identity.py`, 80 scripted actions, seed 0); the oracle's
+  id-switch rate on exclusive sprites fell from 0.8% to 0.6%
+  (`scripts/eval_tracking.py`, 60 actions, seed 0).
+- **Deformation is not motion.** v3's diff calls any shift of the box corner
+  "moved", so a bar growing leftwards "moved (−1,+0)". `FactBook5` reports a
+  change whose old and new cells overlap and whose shape changed as
+  grew/shrank/reshaped with the sides that moved ("extended left"). On the v4
+  fact layer 1,269 of 2,478 reported moves were of this kind; on v5 none are
+  (that number is zero by construction — the metric is the rule).
+
+Splits and merges are events ("#5 split: #23 appeared out of it"), and the
+model can attach a name and a role to an id, which code shows wherever the id
+appears.
+
+### 13.2 Counters and movers
+
+`FactBook5.counters()`: an object that, on each of the last 3 steps, under at
+least two different actions, changed size by the same amount on the same side
+and did not translate. `movers()`: an object that translated the same way on
+each of those steps whatever the action. A counter leaves the object sheet
+for one INTERFACE line and is ignored by every prediction check; a mover stays
+on the sheet, flagged "MOVES ON ITS OWN". The distinction the user asked for —
+a counter must not capture things that move — is that a counter's change does
+not depend on the action: a growing snake extends where the action points, so
+its side changes and it is not a counter (`tests/test_v5_facts.py`).
+
+Audit (`scripts/eval_counters.py`, 40 scripted actions, seed 0): counters on
+9 of 25 games, every one a 1–2 cell bar on a frame edge (rows 0, 61, 63,
+column 63); no player candidate was ever classed as a counter; no autonomous
+mover appeared in that play.
+
+### 13.3 What the model sees
+
+Real ls20 after the four code probes and six more moves (seed 0, the
+`FactBook5.describe()` of §13.1's scripted play, abridged):
+
+```
+INTERFACE (changes the same way on every action, whatever the action - most likely a move counter or timer ...): #13 colour 11 at x23 y61 32x2, 64 cells now (84 at level start), -2 cells per action (retracted left)
+OBJECT SHEET (17 objects; background colour 4; x = column, y = row of the top-left corner):
+  #7 colour 12 at x49 y35 5x2 (10 cells) | ACTION4: moved (+5,+0) x4; ACTION1: moved (+0,-5) x3; ACTION3: moved (-5,+0) x1; ACTION2: moved (+0,+5) x1
+  #8 colour 9 at x49 y37 5x3 (15 cells) | ACTION4: moved (+5,+0) x4; ...
+  #1 colour 3 at x14 y8 40x42 (892 cells) | never changed
+  ...
+SAME SHAPE UP TO SCALE/ROTATION/REFLECTION: #3 ~ #10 (x2 smaller, rotated 270)
+CONTROLLED-LOOKING (moved differently by different actions): #7: ACTION1->(+0,-5), ACTION2->(+0,+5), ...
+ACTION-EFFECT TABLE (what each action did so far, counters left out):
+  ACTION4: tried 5, nothing happened 1 | #7 moved (+5,+0) x4; #8 moved (+5,+0) x4; ...
+```
+
+The same view on tn36 (eight random clicks) puts the growing bar on the
+INTERFACE line ("+1 cells per action (extended left)") — the object v4's
+model spent a level trying to "overlap with #0".
+
+The think prompt adds the store, the recent steps with verdicts, the small
+surprises since the last think, why the model is being asked, and the frame;
+the next prompt leaves out the frame and earlier-level notes. All
+instructions are in the system message, identical across calls, so a server
+with prefix caching reuses them. Prompts were ~4–6k tokens in the debug runs
+(v4: ~9.5k).
+
+### 13.4 The loop
+
+Per step (`V5Agent.act`): observe; judge the step (§13.5); then take, in
+order, a queued step, a code-walked route to the next subgoal (§12.3's router,
+with subgoal objects given by name resolved to ids), a path searched in the
+model's simulator (§13.6), and only then a model call. The first action of a
+game goes to **code probes**: each non-click action once, before any call.
+
+Calls come in two tiers. **think** (thinking on, full context): at the start,
+after anything MAJOR or soft, every 30 actions, and after 3 next calls in a
+row; it edits the store, names objects, may write or repair the simulator,
+and gives steps and/or a plan. **next** (thinking off, no frame): when a plan
+finished cleanly; it gives steps or a plan. In debug run (d) on tn36 a think
+call took 70–300 s and 7–13k completion tokens, a next call 5 s and ~300.
+
+### 13.5 Surprises
+
+- **MAJOR** — stops the plan and calls think: the outcome differed (level
+  complete, game over); the driven object (the controlled-looking object, the
+  plan's object, the simulator's tracked ids) did something else than
+  predicted; an object jumped back to its level-start position (further than
+  any displacement seen for that action); the simulator mispredicted a tracked
+  object; a goal reached in the simulator without the level completing; a
+  small surprise seen twice (escalated once per kind).
+- **soft** — shown, and the next decision is a think, but nothing is dropped:
+  a new colour or shape (a counter's first appearance comes before it can be
+  classified), an object back on its start square by an ordinary move.
+- **MINOR** — logged and shown at the next call: any other wrong or
+  unpredicted detail.
+- A blocked step on a code-walked route is re-routed by code (the blocking
+  colour and position were just learned), up to 3 times per plan.
+
+### 13.6 The simulator as a program
+
+`v5/sim.py`. The model sends `{"lines": [...], "tracked": ["#7", "#8"],
+"goal_id": "A3"}`: Python defining `predict(state, action)` and `goal(state)`
+over v3's sandboxed `State` (§11.3), one string per line — one string with
+`\n` escapes arrived with every newline turned into a bare "n" in debug run
+(d). Code compiles it, replays it on every recorded step of the level and
+compares **only the tracked ids** (or everything but counters and movers if
+none are named); at ≥80% it is trusted. Then breadth-first search from the
+current state for the fewest actions that make `goal()` true (6,000 nodes,
+20 s), executed step by step and checked against the simulator's predicted
+state.
+
+The first simulator the model wrote (ls20, debug run d, call 2) was, newlines
+restored:
+
+```python
+def predict(state, action):
+    p = state.get(7); f = state.get(8)
+    if not p or not f: return state
+    delta = {'ACTION1': (0,-5), 'ACTION2': (0,5), 'ACTION3': (-5,0), 'ACTION4': (5,0)}.get(action)
+    if delta is None: return state
+    dx, dy = delta
+    if state.free(p['x'] + dx, p['y'] + dy, 5, 5, passable=(3,), ignore=(7, 8)):
+        state.move(7, dx, dy); state.move(8, dx, dy)
+    return state
+```
+
+It validates 8/8 on real ls20 steps, and in it code finds 34 reachable player
+positions and a route across the maze (`tests/test_v5_sim_ls20.py`).
+
+### 13.7 What this does not do
+
+- **One simulator at a time.** Goals are a weighted population in the store;
+  simulators are not. A failed one goes back to the model with its
+  counterexamples.
+- **Untracked objects are frozen in the search.** A plan that depends on
+  something the simulator does not model fails at execution, as a surprise.
+- **Clicks are searched over object centres only** (at most 24).
+- **The classification window is 3 steps.** An object that changes the same
+  way three times by coincidence would be hidden; the audit found no such
+  case, but the audit is one seed of scripted play.
+- **A counter is hidden from the model's sheet.** If a game needs the player
+  to act on one, the model sees it only on the INTERFACE line.
+- **Thinking is not capped on the Kaggle path.** NIM development runs pass
+  Nemotron's `reasoning_budget=12000` (`scripts/run_v5_nim.sh`) because NIM
+  closes a request after ~340 s; that is an endpoint workaround, not a design
+  choice.
