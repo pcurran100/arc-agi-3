@@ -24,7 +24,7 @@ from ..v4.expect import EXPECT_SCHEMA
 from ..v4.prompts import OP_SCHEMA
 from ..v4.render import legend
 
-PROMPT_VERSION = "v5-4"
+PROMPT_VERSION = "v5-5"
 MAX_STEPS = 8
 MAX_SUBGOALS = 4
 
@@ -70,7 +70,9 @@ HOW YOU ACT. Prefer, in this order:
      state.overlaps(a, b), state.move(id, dx, dy), state.place(id, x, y),
      state.recolour(id, c), state.resize(id, w, h), state.remove(id),
      state.add(colour, x, y, w, h), state.meta (dict for your own counters).
-   action is "ACTION1".."ACTION7" or "CLICK(x,y)". No imports; np and math exist.
+   action is "ACTION1".."ACTION7" or "CLICK(x,y)"; click_xy(action) gives (x, y)
+   for a click and None otherwise. There is NO import: a line starting with
+   "import" or "from" makes the simulator fail. np (numpy) and math already exist.
    Send it as "simulator": {{"lines": [the source, ONE STRING PER LINE, indentation
    kept], "tracked": ["#7", ...], "goal_id": the store id of the goal goal()
    encodes}}. Both predict and goal go in "lines". Use ONLY single quotes in
@@ -120,6 +122,9 @@ YOUR TASKS. Each request ends with one of:
   the simulator (or null to keep the current one), then give steps and/or a plan
   (both may be empty if the simulator's goal should be searched).
 - "TASK: NEXT" - the last plan finished as expected; give the next steps or plan.
+- "TASK: FIX SIMULATOR" - your simulator failed to compile or to reproduce the
+  recorded steps; send the corrected simulator (lines, tracked, goal_id),
+  changing only what the problem needs.
 """
 
 NAME_SCHEMA = {
@@ -190,6 +195,9 @@ NEXT_SCHEMA = {
 }
 
 
+FIX_SCHEMA = {**SIM_SCHEMA, "type": "object", "title": "fix"}
+
+
 @dataclass
 class Context:
     level: int
@@ -241,3 +249,12 @@ def think_messages(c: Context) -> list[dict]:
 def next_messages(c: Context) -> list[dict]:
     return [{"role": "system", "content": SYSTEM},
             {"role": "user", "content": _body(c, False) + "\n\nTASK: NEXT"}]
+
+
+def fix_messages(c: Context, source: str, problem: str) -> list[dict]:
+    """The cheap repair call (thinking off): the error and the source."""
+    src = "\n".join(f"{k + 1:3d}| {ln}" for k, ln in enumerate(source.splitlines()[:150]))
+    return [{"role": "system", "content": SYSTEM},
+            {"role": "user", "content": _body(c, False)
+             + "\n\nYOUR SIMULATOR (numbered; the numbers are not part of the code):\n" + src
+             + "\n\nWHAT IS WRONG WITH IT:\n" + problem + "\n\nTASK: FIX SIMULATOR"}]

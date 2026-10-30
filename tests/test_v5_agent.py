@@ -191,3 +191,53 @@ def test_a_subgoal_is_searched_in_a_trusted_simulator():
     assert env.levels >= 1, agent.describe()
     assert agent.stats.get("sim_plan_steps", 0) >= 17
     assert agent.stats.get("reroutes", 0) == 0          # the simulator knew the wall
+
+
+BROKEN = SIM.replace("def goal(state):", "def goal(state:")       # a SyntaxError
+
+
+class FixMind(SimMind):
+    """Its first simulator does not compile; a FIX call returns the good one."""
+
+    def __init__(self, first=BROKEN):
+        super().__init__(first)
+        self.fixes = 0
+
+    def __call__(self, messages) -> str:
+        text = messages[-1]["content"]
+        if text.endswith("TASK: FIX SIMULATOR"):
+            self.fixes += 1
+            assert "WHAT IS WRONG" in text and "def predict" in text
+            return json.dumps({"lines": SIM.strip("\n").splitlines(), "tracked": [],
+                               "goal_id": "A1"})
+        return super().__call__(messages)
+
+
+def test_a_broken_simulator_is_fixed_by_a_cheap_call_before_any_think():
+    env = WalledRoom()
+    mind = FixMind()
+    agent = V5Agent(llm=ScriptedLLM(mind))
+    run(agent, env)
+    assert env.levels == 2, agent.describe()
+    assert mind.fixes == 1 and agent.stats.get("sims_fixed") == 1
+    assert mind.thinks == 2, agent.describe()            # game start + new level only
+    kinds = [c["kind"] for c in agent.calls]
+    assert kinds[:2] == ["think", "fix"]
+    assert [c["thinking"] for c in agent.calls if c["kind"] == "fix"] == [False]
+
+
+def test_a_mispredicting_simulator_gets_a_cheap_fix_not_a_think():
+    env = WalledRoom()
+    mind = FixMind(first=NAIVE)
+    agent = V5Agent(llm=ScriptedLLM(mind))
+    run(agent, env)
+    assert env.levels == 2, agent.describe()
+    assert agent.stats.get("sim_wrong", 0) >= 1
+    assert mind.fixes >= 1 and mind.thinks == 2, agent.describe()
+
+
+def test_click_xy_is_available_to_model_code():
+    from arc3.v3.world import WorldModel
+    wm = WorldModel.compile("def predict(state, action):\n    p = click_xy(action)\n"
+                            "    state.meta['c'] = p\n    return state\n")
+    assert wm.error is None

@@ -23,7 +23,13 @@ changes the loop, keeping v4's store, routing and checker:
    Only when code has nothing to do is the model called. (2026-10-30 run: ls20
    had a simulator trusted on 10/10 recorded steps and code walked the
    model's subgoals instead; zero actions came from a simulator search.)
-4. **Two call tiers.** *think* (thinking on, full context including the frame)
+4. **Cheap repair first.** A simulator that does not compile, raises, or no
+   longer reproduces the recorded steps (including one that just mispredicted
+   a tracked object) goes back to the model in a *fix* call - thinking off,
+   the error and the source - at most ``MAX_FIXES`` times, before any think
+   call. (2026-10-30: a tu93 SyntaxError and a vc33 ``import re`` each cost a
+   2-4 minute think call to notice.)
+5. **Two call tiers.** *think* (thinking on, full context including the frame)
    after anything MAJOR, at a level start, when the simulator or goal failed,
    and every ``THINK_EVERY`` actions; *next* (thinking off, no frame) when a
    plan finished without trouble. At most ``MAX_NEXT_RUN`` *next* calls in a
@@ -66,8 +72,8 @@ from ..v4.route import Subgoal, reached, route
 from ..v4.store import AssumptionStore
 from . import sim as simmod
 from .facts import FactBook5
-from .prompts import (MAX_STEPS, NEXT_SCHEMA, PROMPT_VERSION, THINK_SCHEMA, Context,
-                      next_messages, think_messages)
+from .prompts import (FIX_SCHEMA, MAX_STEPS, NEXT_SCHEMA, PROMPT_VERSION, THINK_SCHEMA,
+                      Context, fix_messages, next_messages, think_messages)
 
 HISTORY = 10
 MINOR_SHOWN = 12
@@ -75,6 +81,7 @@ THINK_EVERY = 30          # actions without a think call before one is due anywa
 MAX_NEXT_RUN = 3          # next calls in a row before a think call is forced
 REPEAT_MAJOR = 2          # a small surprise seen this often becomes MAJOR (once)
 MAX_REROUTES = 3          # blocked route steps re-routed by code before the model is asked
+MAX_FIXES = 2             # cheap (thinking off) simulator repairs before a think call
 re_id = re.compile(r"#\s*\d+")
 re_xy = re.compile(r"^\(?\s*x?\s*-?\d+\s*[, ]\s*y?\s*-?\d+\s*\)?$")
 
@@ -131,6 +138,7 @@ class V5Agent:
     _player_look: Optional[tuple] = None      # (colour, shape) of last level's controlled object
     halted: str = ""                  # set when the model server is unreachable: stop the game
     _search_failed: tuple = ()        # (simulator, action count) of the last failed search
+    repair_due: str = ""              # a simulator mispredicted: try a cheap fix first
 
     def __post_init__(self) -> None:
         if self.graph is None:
@@ -203,6 +211,10 @@ class V5Agent:
 
         if not self.queue and not self.probed:
             self._probe(obs)
+        if not self.queue and self.repair_due:
+            why, self.repair_due = self.repair_due, ""
+            if not self.need_think and not self._repair(obs, why):
+                self._major(why + " (the cheap repair did not fix it)")
         if not self.queue and not self.need_think:
             self._code_plan(obs)
         if not self.queue:
@@ -372,7 +384,9 @@ class V5Agent:
                 self._bump("sim_wrong")
                 self.sim.valid = False
                 self._drop("simulator")
-                self._major(f"SIMULATOR WRONG at t{step.t} {step.action}: " + "; ".join(miss[:4]))
+                msg = f"SIMULATOR WRONG at t{step.t} {step.action}: " + "; ".join(miss[:4])
+                self.events = [*self.events, msg][-20:]
+                self.repair_due = msg
             if tag and tag[0] == "sim_goal" and outcome != "level_complete":
                 verdict = "GOAL NOT WON"
                 self._bump("goals_disproved")
@@ -536,11 +550,35 @@ class V5Agent:
         self._bump(f"calls_{kind}")
         return data
 
+    def _repair(self, obs: Observation, why: str = "") -> bool:
+        """Up to MAX_FIXES thinking-off calls that get the simulator's error and
+        source back and return fixed code. True when the simulator is trusted."""
+        for _ in range(MAX_FIXES):
+            if self.sim is None or not self._model_available():
+                return False
+            problem = (why + "\n" if why else "") + self.sim.describe()
+            data = self._call("fix", fix_messages(self._context(obs, False),
+                                                  self.sim.model.source.strip(), problem),
+                              FIX_SCHEMA, 2 * self.next_tokens, False)
+            self._bump("sim_fixes")
+            code = simmod.source_of(data) if data else ""
+            if not code.strip():
+                continue
+            self.sim = simmod.build(code, data.get("tracked") or list(self.sim.tracked),
+                                    data.get("goal_id") or self.sim.goal_id, self.fb)
+            self.calls[-1]["sim"] = self.sim.describe()[:200]
+            if self.sim.valid:
+                self._bump("sims_fixed")
+                return True
+            why = ""
+        return False
+
     def _think(self, obs: Observation) -> None:
         data = self._call("think", think_messages(self._context(obs, True)), THINK_SCHEMA,
                           self.think_tokens, True)
         if data is None:
             return
+        rec = self.calls[-1]
         where = f"L{self.level + 1} t{self.level_actions}"
         self.store.apply(data.get("ops") or [], where)
         self._names(data.get("names") or [])
@@ -553,12 +591,17 @@ class V5Agent:
             if self.sim.valid:
                 self._bump("sims_trusted")
         elif self.sim is not None:
+            was = self.sim.valid
             simmod.validate(self.sim, self.fb)        # re-check against the new evidence
+            code = self.sim.model.source if was else ""
         self.events, self.minors = [], []
         self.need_think, self.want_think, self.since_think, self.next_run = False, False, 0, 0
-        self._take(data, obs)
-        self.calls[-1]["purpose"] = str(data.get("purpose", ""))[:200]
-        self.calls[-1]["sim"] = self.sim.describe()[:200] if self.sim else None
+        self.repair_due = ""
+        rec["sim"] = self.sim.describe()[:200] if self.sim else None
+        if self.sim is not None and not self.sim.valid and code.strip():
+            self._repair(obs)
+        self._take(data, obs, rec)
+        rec["purpose"] = str(data.get("purpose", ""))[:200]
 
     def _next(self, obs: Observation) -> None:
         data = self._call("next", next_messages(self._context(obs, False)), NEXT_SCHEMA,
@@ -581,7 +624,7 @@ class V5Agent:
                 if n.get("role"):
                     self.fb.roles[i] = str(n["role"])[:80]
 
-    def _take(self, data: dict, obs: Observation) -> None:
+    def _take(self, data: dict, obs: Observation, rec: Optional[dict] = None) -> None:
         q, bad = [], None
         for s in (data.get("steps") or [])[:MAX_STEPS]:
             if not isinstance(s, dict):
@@ -600,7 +643,7 @@ class V5Agent:
         if len(self.plan) < len(raw):
             self._minor(f"{len(raw) - len(self.plan)} subgoal(s) not understood: 'object' must be "
                         "'#id' and 'to' '#id' or 'x,y'", ("bad_subgoal",))
-        rec = self.calls[-1]
+        rec = rec if rec is not None else self.calls[-1]
         rec["steps"], rec["subgoals"] = len(q), len(self.plan)
         # A route through a trusted simulator takes precedence over explicit steps.
         self.queue = []
@@ -718,7 +761,7 @@ class V5Agent:
             f"NOT CLEAN ({self.stats['explore_steps']} explorer steps)"
         if self.halted:
             clean = f"INVALID ({self.halted[:80]}), {clean}"
-        think = sum(1 for c in self.calls if c.get("kind") == "think")
-        return (f"level {self.level}, calls {len(self.calls)} (think {think}, "
-                f"next {len(self.calls) - think}), {clean}, acc {self.accuracy()}, "
+        kinds = Counter(c.get("kind") for c in self.calls)
+        return (f"level {self.level}, calls {len(self.calls)} (think {kinds['think']}, "
+                f"next {kinds['next']}, fix {kinds['fix']}), {clean}, acc {self.accuracy()}, "
                 + ", ".join(f"{k}={v}" for k, v in sorted(self.stats.items())))
