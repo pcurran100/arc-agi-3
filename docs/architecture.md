@@ -1375,29 +1375,68 @@ with prefix caching reuses them. Prompts were ~4–6k tokens in the debug runs
 ### 13.4 The loop
 
 Per step (`V5Agent.act`): observe; judge the step (§13.5); then take, in
-order, a queued step, a code-walked route to the next subgoal (§12.3's router,
-with subgoal objects given by name resolved to ids), a path searched in the
-model's simulator (§13.6), and only then a model call. The first action of a
-game goes to **code probes**: each non-click action once, before any call.
+order, a queued step; a pending cheap simulator fix (§13.6); code's own plan;
+and only then a model call. The first action of a game goes to **code
+probes**: each non-click action once, before any call.
 
-Calls come in two tiers. **think** (thinking on, full context): at the start,
-after anything MAJOR or soft, every 30 actions, and after 3 next calls in a
-row; it edits the store, names objects, may write or repair the simulator,
-and gives steps and/or a plan. **next** (thinking off, no frame): when a plan
-finished cleanly; it gives steps or a plan. In debug run (d) on tn36 a think
-call took 70–300 s and 7–13k completion tokens, a next call 5 s and ~300.
+**Code's plan wins over the model's steps** (amended 2026-10-30). With a
+TRUSTED simulator, code searches it for the shortest path to `goal()`, and if
+that fails to the current subgoal (`sim.subgoal_test`: the same
+overlap/touch/at relation route.py checks, on simulated boxes), and that route
+replaces any explicit steps the model gave in the same answer
+(`stats['steps_overridden']`). Explicit steps run only when there is no
+trusted simulator or no route; a subgoal is walked by route.py only after
+them. A failed search no longer invalidates the simulator; it is shown to the
+model, and if the answer leaves code nothing to do, that is MAJOR. Before this
+change ls20 had a simulator trusted on 10/10 recorded steps and code walked
+the model's subgoal plan instead; no action came from a search.
+
+Calls come in three kinds. **think** (thinking on, full context including
+the frame) only at hard moments: the start of a level, a MAJOR surprise, a
+disproved goal, a simulator a cheap fix could not save, every 30 actions, and
+after 6 next calls in a row; each think record carries `why` (need /
+periodic / next_run). It edits the store, names objects, may write the
+simulator, and gives steps and/or a plan. **next** (thinking off, no frame):
+after a plan finished or a routine STOP (§13.5); it gives steps or a plan.
+**fix** (thinking off): the simulator's source and its error, answered with
+corrected code (§13.6). In debug run (d) on tn36 a think call took 70–300 s
+and 7–13k completion tokens, a next call 5 s and ~300.
+
+Why the change of tiers: in the 2026-10-30 run (invalid for other reasons,
+`docs/experiments/README.md`) 20 of the 21 good calls were think. Every first
+call was forced by the "soft" notes the code probes produce (ACTION1 then
+ACTION2 returns the player to its start square; the move counter appears as a
+new shape), and every later one by a MAJOR that was routine: a test move on
+the player that was simply blocked by a wall ("expected #7 moved (+0,+5), got:
+nothing changed there"), or a subgoal route.py could not route because the
+object had not been seen to move under two actions.
+
+**When the model cannot be reached the game stops.** The HTTP client retries
+connection and DNS failures for up to ten minutes (`outage_seconds`) and then
+raises `NetworkDown`; HTTP 5xx and read timeouts get 3 retries with backoff,
+and v5 asks again up to three failed calls in a row. Either way the agent
+sets `halted`, `eval_agent.py` stops before spending the action and marks the
+row `invalid`. The explorer still plays when there is no model at all, and
+the row says NOT CLEAN.
 
 ### 13.5 Surprises
 
 - **MAJOR** — stops the plan and calls think: the outcome differed (level
   complete, game over); the driven object (the controlled-looking object, the
-  plan's object, the simulator's tracked ids) did something else than
-  predicted; an object jumped back to its level-start position (further than
-  any displacement seen for that action); the simulator mispredicted a tracked
-  object; a goal reached in the simulator without the level completing; a
-  small surprise seen twice (escalated once per kind).
-- **soft** — shown, and the next decision is a think, but nothing is dropped:
-  a new colour or shape (a counter's first appearance comes before it can be
+  plan's object, the simulator's tracked ids) did something *other* than
+  predicted (moved differently, changed); an object jumped back to its
+  level-start position (further than any displacement seen for that action);
+  a goal reached in the simulator without the level completing; a store goal
+  whose condition holds without a win; a small surprise seen twice (escalated
+  once per kind); an answer that left code nothing to do.
+- **STOP** — routine; stops the plan and the next call is a *next* call that
+  sees why: a step on the driven object that was simply blocked (every
+  failure on it is "nothing changed there"), and a subgoal route.py cannot
+  route.
+- **SIMULATOR WRONG** — a tracked object mispredicted during a simulator plan:
+  stops the plan and goes to a cheap fix first; MAJOR only if the fix fails.
+- **soft** — shown at the next call, of whichever tier, nothing dropped: a new
+  colour or shape (a counter's first appearance comes before it can be
   classified), an object back on its start square by an ordinary move.
 - **MINOR** — logged and shown at the next call: any other wrong or
   unpredicted detail.
@@ -1416,6 +1455,16 @@ none are named); at ≥80% it is trusted. Then breadth-first search from the
 current state for the fewest actions that make `goal()` true (6,000 nodes,
 20 s), executed step by step and checked against the simulator's predicted
 state.
+
+**Cheap repair.** A simulator that does not compile, raises on replay, falls
+under 80%, or mispredicts a tracked object during a plan goes back in a *fix*
+call (thinking off, `prompts.fix_messages`: the object sheet, the numbered
+source and what is wrong), at most twice, before any think call. The sandbox
+offers `np`, `math` and `click_xy(action)` (the (x, y) of a click, else
+None); an `import` line fails to compile, and the prompt now says so in those
+words. In the 2026-10-30 run a tu93 SyntaxError (`'[' was never closed`) and
+a vc33 `import re` (to parse clicks) each cost a 2–4 minute think call to
+come back to.
 
 The first simulator the model wrote (ls20, debug run d, call 2) was, newlines
 restored:
