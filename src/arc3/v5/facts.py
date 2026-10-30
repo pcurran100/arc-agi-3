@@ -57,7 +57,10 @@ from ..types import Action
 from ..v3.facts import Change, Obj, Step
 from ..v4.facts import FactBook4, cells_of
 
-WINDOW = 4               # steps of evidence before an object is classified
+#: Steps of evidence before an object is classified. 3, not v4's 4: on tn36
+#: (debug run 2026-10-30) the model planned around the counter in the three
+#: steps before it was classified.
+WINDOW = 3
 SHEET_MAX = 30           # objects listed one per line; the rest are grouped
 
 
