@@ -150,3 +150,44 @@ def test_a_lost_network_halts_the_game_instead_of_exploring():
     assert spent == 4                                    # the code probes only
     assert agent.stats.get("explore_steps", 0) == 0
     assert "INVALID" in agent.describe()
+
+
+class StepsAndSimMind(SimMind):
+    """Writes a good simulator AND asks for explicit steps; code's route wins."""
+
+    def __call__(self, messages) -> str:
+        d = json.loads(super().__call__(messages))
+        d["steps"] = [{"action": "ACTION3", "expect": {"changes": [], "rest": "any",
+                                                       "outcome": "continue"}}] * 3
+        return json.dumps(d)
+
+
+def test_a_trusted_simulator_route_overrides_explicit_steps():
+    env = WalledRoom()
+    agent = V5Agent(llm=ScriptedLLM(StepsAndSimMind()))
+    run(agent, env)
+    assert env.levels == 2, agent.describe()
+    assert agent.stats.get("steps_overridden", 0) >= 3
+    assert agent.stats.get("llm_steps", 0) == 0
+
+
+class SubgoalSimMind(SimMind):
+    """A simulator without goal() and a subgoal plan: code searches the
+    simulator for the subgoal."""
+
+    def __call__(self, messages) -> str:
+        d = json.loads(super().__call__(messages))
+        d["simulator"]["code"] = SIM.split("def goal")[0]
+        d["plan"] = [{"object": "player", "to": "29,1", "relation": "overlap",
+                      "on_arrival": {"changes": [], "rest": "any", "outcome": "level_complete"},
+                      "goal": ""}]
+        return json.dumps(d)
+
+
+def test_a_subgoal_is_searched_in_a_trusted_simulator():
+    env = WalledRoom()
+    agent = V5Agent(llm=ScriptedLLM(SubgoalSimMind()))
+    run(agent, env)
+    assert env.levels >= 1, agent.describe()
+    assert agent.stats.get("sim_plan_steps", 0) >= 17
+    assert agent.stats.get("reroutes", 0) == 0          # the simulator knew the wall

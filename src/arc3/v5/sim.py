@@ -38,7 +38,7 @@ import re
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Callable, Optional
 
 from ..v3.world import Check, State, WorldModel, action_space, compare
 from .facts import FactBook5
@@ -142,15 +142,43 @@ class Route:
     why: str = ""
 
 
+def subgoal_test(sg) -> Callable[[State], bool]:
+    """A v4 subgoal (``bring #obj to overlap|touch|at target``) as a test on a
+    simulated state, by bounding boxes - the same relation route.py checks on
+    the real frame, so code can search a trusted simulator for a subgoal."""
+    def ok(st: State) -> bool:
+        o = st.get(sg.obj)
+        if not o:
+            return False
+        if sg.relation == "at" and sg.to_xy is not None:
+            return (o["x"], o["y"]) == tuple(sg.to_xy)
+        if sg.to_obj is not None:
+            t = st.get(sg.to_obj)
+            if not t:
+                return False
+            tb = [t["x"], t["y"], t["x"] + t["w"], t["y"] + t["h"]]
+        else:
+            tb = [sg.to_xy[0], sg.to_xy[1], sg.to_xy[0] + 1, sg.to_xy[1] + 1]
+        if sg.relation == "touch":
+            tb = [tb[0] - 1, tb[1] - 1, tb[2] + 1, tb[3] + 1]
+        ob = (o["x"], o["y"], o["x"] + o["w"], o["y"] + o["h"])
+        return ob[0] < tb[2] and tb[0] < ob[2] and ob[1] < tb[3] and tb[1] < ob[3]
+    return ok
+
+
 def search(sim: Simulator, fb: FactBook5, simple: list[int], click: bool,
-           max_nodes: int = MAX_NODES, max_seconds: float = MAX_SECONDS) -> Route:
-    """Fewest actions to a state where goal() holds, inside the simulator."""
+           max_nodes: int = MAX_NODES, max_seconds: float = MAX_SECONDS,
+           target: Optional[Callable[[State], bool]] = None, what: str = "goal()") -> Route:
+    """Fewest actions to a state where ``target`` holds (default: the model's
+    goal()), inside the simulator."""
     m = sim.model
-    if m.goal_fn is None:
-        return Route([], [], False, 0, "the simulator has no goal() function")
+    if target is None:
+        if m.goal_fn is None:
+            return Route([], [], False, 0, "the simulator has no goal() function")
+        target = lambda st: m.goal(st) >= 0.99      # noqa: E731
     start = state_of(fb)
-    if m.goal(start) >= 0.99:
-        return Route([], [], True, 0, "goal() already holds")
+    if target(start):
+        return Route([], [], True, 0, f"{what} already holds")
     t0 = time.time()
     seen = {start.key()}
     q = deque([(start, [], [])])
@@ -158,7 +186,7 @@ def search(sim: Simulator, fb: FactBook5, simple: list[int], click: bool,
     while q:
         if nodes >= max_nodes or time.time() - t0 > max_seconds:
             return Route([], [], False, nodes,
-                         f"search stopped after {nodes} states without reaching goal()")
+                         f"search stopped after {nodes} states without reaching {what}")
         s, path, states = q.popleft()
         nodes += 1
         if len(path) >= MAX_DEPTH:
@@ -169,11 +197,11 @@ def search(sim: Simulator, fb: FactBook5, simple: list[int], click: bool,
             if k in seen:
                 continue
             seen.add(k)
-            if m.goal(t) >= 0.99:
+            if target(t):
                 return Route(path + [a], states + [t], True, nodes, f"{len(path) + 1} actions")
             q.append((t, path + [a], states + [t]))
     return Route([], [], False, nodes,
-                 f"goal() is unreachable in the simulator ({nodes} states explored)")
+                 f"{what} is unreachable in the simulator ({nodes} states explored)")
 
 
 def mismatch(sim: Simulator, predicted: State, fb: FactBook5) -> list[str]:

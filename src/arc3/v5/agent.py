@@ -15,9 +15,14 @@ changes the loop, keeping v4's store, routing and checker:
    one small surprise repeated - stops the plan and calls *think*. MINOR -
    any other wrong or unpredicted detail - is logged, shown at the next call,
    and does not stop anything.
-3. **Code plans.** In order: a queued step; a subgoal route (v4's route.py);
-   a search of the model's simulator for the shortest path to its goal
-   (sim.py); and only then a model call.
+3. **Code plans, and its plan wins.** With a TRUSTED simulator, code searches
+   it (sim.py) for the shortest path to the model's goal(), or failing that to
+   the current subgoal, and that route replaces any explicit steps the model
+   gave (counted in ``steps_overridden``). Without a trusted simulator or a
+   route: the model's explicit steps, then a subgoal walk (v4's route.py).
+   Only when code has nothing to do is the model called. (2026-10-30 run: ls20
+   had a simulator trusted on 10/10 recorded steps and code walked the
+   model's subgoals instead; zero actions came from a simulator search.)
 4. **Two call tiers.** *think* (thinking on, full context including the frame)
    after anything MAJOR, at a level start, when the simulator or goal failed,
    and every ``THINK_EVERY`` actions; *next* (thinking off, no frame) when a
@@ -125,6 +130,7 @@ class V5Agent:
     _reroutes: int = 0
     _player_look: Optional[tuple] = None      # (colour, shape) of last level's controlled object
     halted: str = ""                  # set when the model server is unreachable: stop the game
+    _search_failed: tuple = ()        # (simulator, action count) of the last failed search
 
     def __post_init__(self) -> None:
         if self.graph is None:
@@ -197,16 +203,10 @@ class V5Agent:
 
         if not self.queue and not self.probed:
             self._probe(obs)
-        if not self.queue and self.plan:
-            self._walk(obs)
-        if not self.queue and not self.need_think and self.sim is not None and self.sim.valid:
-            self._search(obs)
+        if not self.queue and not self.need_think:
+            self._code_plan(obs)
         if not self.queue:
             self._decide(obs)
-            if not self.queue and self.plan:
-                self._walk(obs)
-            if not self.queue and self.sim is not None and self.sim.valid:
-                self._search(obs)
         if self.halted:
             # The caller checks ``halted`` and must not spend this action.
             return Action.simple(RESET)
@@ -274,21 +274,51 @@ class V5Agent:
             self._bump("plan_steps", len(path))
             return
 
-    def _search(self, obs: Observation) -> None:
-        r = simmod.search(self.sim, self.fb, self._simple(obs), CLICK in obs.available_actions)
-        self._bump("searches")
-        if not r.reached or not r.actions:
-            self.sim.valid = False
-            self._major(f"SIMULATOR SEARCH: {r.why}. Repair predict()/goal() or give steps.")
-            return
-        self.sim.plans += 1
-        self._bump("sim_plan_steps", len(r.actions))
-        for k, (a, st) in enumerate(zip(r.actions, r.states)):
-            act = self._to_action(a, obs)
-            if act is None:
-                break
-            tag = ("sim_goal", None) if k == len(r.actions) - 1 else ("sim", None)
-            self.queue.append((act, None, st, tag))
+    def _sim_ready(self) -> bool:
+        return (self.sim is not None and self.sim.valid
+                and self._search_failed != (id(self.sim), self.total_actions))
+
+    def _code_plan(self, obs: Observation) -> int:
+        """Code's own plan: a search of a trusted simulator, else a subgoal walk.
+        Returns the number of actions queued."""
+        if self._sim_ready() and self._search(obs):
+            return len(self.queue)
+        if self.plan:
+            self._walk(obs)
+        return len(self.queue)
+
+    def _search(self, obs: Observation) -> int:
+        """Search the trusted simulator for its goal(), then for the current
+        subgoal (when the simulator models the subgoal's object). Queues the
+        first route found; returns its length (0: nothing found)."""
+        simple, click = self._simple(obs), CLICK in obs.available_actions
+        tries = []
+        if self.sim.model.goal_fn is not None:
+            tries.append((None, "goal()", None))
+        if self.plan and (not self.sim.tracked or self.plan[0].obj in self.sim.tracked):
+            sg = self.plan[0]
+            tries.append((simmod.subgoal_test(sg), f"subgoal '{sg.describe()}'", sg))
+        why = []
+        for target, what, sg in tries:
+            r = simmod.search(self.sim, self.fb, simple, click, target=target, what=what)
+            self._bump("searches")
+            if not r.reached or not r.actions:
+                why.append(r.why)
+                continue
+            acts = [self._to_action(a, obs) for a in r.actions]
+            if any(a is None for a in acts):
+                why.append(f"{what}: the route uses an unavailable action")
+                continue
+            self.sim.plans += 1
+            self._bump("sim_plan_steps", len(acts))
+            last = ("sim_goal", None) if sg is None else ("sim_arrive", sg.obj)
+            for k, (act, st) in enumerate(zip(acts, r.states)):
+                self.queue.append((act, None, st, last if k == len(acts) - 1 else ("sim", None)))
+            return len(acts)
+        self._search_failed = (id(self.sim), self.total_actions)
+        if why:
+            self.minors = [*self.minors, "SIMULATOR SEARCH: " + "; ".join(why)][-MINOR_SHOWN:]
+        return 0
 
     # -- checking ------------------------------------------------------------------
 
@@ -390,7 +420,8 @@ class V5Agent:
                     self._bump("predictions_ok_real")
             for u in v.unpredicted:
                 self._minor(f"t{step.t} {step.action}: also {u}", ("extra", u.split(" ", 1)[0]))
-        if tag and tag[0] == "arrive" and self.plan and verdict in ("ok", "minor miss"):
+        if tag and tag[0] in ("arrive", "sim_arrive") and self.plan \
+                and verdict in ("ok", "minor miss"):
             self.plan.pop(0)
             self._bump("subgoals_done")
         what = exp.describe() if exp else ("simulator" if pred is not None else "code probe")
@@ -563,16 +594,31 @@ class V5Agent:
         if bad:
             self._minor(f"action {bad!r} is not available or not understood; available: "
                         f"{', '.join(self._available_names(obs))}", ("bad_action", bad))
-        self.queue = q
         raw = [self._resolve_subgoal(d) for d in (data.get("plan") or []) if isinstance(d, dict)]
         self.plan = [sg for sg in (Subgoal.parse(d) for d in raw) if sg]
         self._reroutes = 0
         if len(self.plan) < len(raw):
             self._minor(f"{len(raw) - len(self.plan)} subgoal(s) not understood: 'object' must be "
                         "'#id' and 'to' '#id' or 'x,y'", ("bad_subgoal",))
+        rec = self.calls[-1]
+        rec["steps"], rec["subgoals"] = len(q), len(self.plan)
+        # A route through a trusted simulator takes precedence over explicit steps.
+        self.queue = []
+        n = self._search(obs) if self._sim_ready() else 0
+        if n:
+            rec["sim_route"] = n
+            if q:
+                rec["overridden"] = len(q)
+                self._bump("steps_overridden", len(q))
+            return
+        self.queue = q
         self._bump("llm_steps", len(q))
-        self.calls[-1]["steps"] = len(q)
-        self.calls[-1]["subgoals"] = len(self.plan)
+        if not q and self.plan:
+            self._walk(obs)
+        if not self.queue and not self.need_think:
+            self._major("Your last answer left nothing to do: no steps, no routable subgoal, "
+                        "and no route to goal() in a trusted simulator. Give steps, or write "
+                        "or repair the simulator.")
 
     def _resolve(self, s: str) -> str:
         """'#7' stays; a name or role the model gave ('player', 'player_body') becomes
