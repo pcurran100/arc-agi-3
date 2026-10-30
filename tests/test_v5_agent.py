@@ -279,3 +279,19 @@ def test_a_blocked_step_is_routine_and_gets_a_next_call():
     assert mind.kinds[:2] == ["THINK", "NEXT"], (mind.kinds, agent.describe())
     assert "BLOCKED" in mind.texts[1]
     assert agent.stats.get("stops", 0) == 1 and agent.stats.get("major", 0) == 0
+
+
+def test_failing_calls_are_retried_then_halt_instead_of_exploring():
+    def broken(messages):
+        raise RuntimeError("HTTP Error 500: Internal Server Error")
+
+    env = WalledRoom()
+    agent = V5Agent(llm=ScriptedLLM(broken))
+    obs = env.obs()
+    for _ in range(10):
+        a = agent.act(obs)
+        if agent.halted:
+            break
+        obs = env.step(a)
+    assert agent.halted.startswith("model server failing")
+    assert agent.stats.get("llm_errors") == 3 and agent.stats.get("explore_steps", 0) == 0

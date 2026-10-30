@@ -87,6 +87,7 @@ THINK_EVERY = 30          # actions without a think call before one is due anywa
 MAX_NEXT_RUN = 6          # next calls in a row before a think call is forced
 REPEAT_MAJOR = 2          # a small surprise seen this often becomes MAJOR (once)
 MAX_REROUTES = 3          # blocked route steps re-routed by code before the model is asked
+MAX_CALL_FAILS = 3        # failed calls in a row (after the client's retries) before halting
 MAX_FIXES = 2             # cheap (thinking off) simulator repairs before a think call
 re_id = re.compile(r"#\s*\d+")
 re_xy = re.compile(r"^\(?\s*x?\s*-?\d+\s*[, ]\s*y?\s*-?\d+\s*\)?$")
@@ -143,6 +144,7 @@ class V5Agent:
     _reroutes: int = 0
     _player_look: Optional[tuple] = None      # (colour, shape) of last level's controlled object
     halted: str = ""                  # set when the model server is unreachable: stop the game
+    _fails: int = 0                   # failed calls in a row
     calls_why: str = ""               # what forced the last think call (for the log)
     _search_failed: tuple = ()        # (simulator, action count) of the last failed search
     repair_due: str = ""              # a simulator mispredicted: try a cheap fix first
@@ -233,8 +235,17 @@ class V5Agent:
                 self._major(why + " (the cheap repair did not fix it)")
         if not self.queue and not self.need_think:
             self._code_plan(obs)
-        if not self.queue:
+        for _ in range(MAX_CALL_FAILS):
+            # A failed call (HTTP 5xx after the client's retries) is asked again
+            # rather than handing the action to the explorer; MAX_CALL_FAILS in a
+            # row halts the game (debug run 2026-10-30 22:20: NIM answered every
+            # request with HTTP 500 after ~150 s and the explorer would have played).
+            if self.queue or self.halted:
+                break
+            n = len(self.calls)
             self._decide(obs)
+            if len(self.calls) == n or self.calls[-1].get("ok"):
+                break
         if self.halted:
             # The caller checks ``halted`` and must not spend this action.
             return Action.simple(RESET)
@@ -557,12 +568,15 @@ class V5Agent:
                                        "at": self.level_actions, "error": self.halted,
                                        "seconds": round(time.time() - t0, 2)})
                     return None
-                except Exception as exc:  # a dead server must not end the game
+                except Exception as exc:  # retried by act(); halts after MAX_CALL_FAILS
                     self._bump("llm_errors")
+                    self._fails += 1
+                    err = f"{type(exc).__name__}: {exc}"[:200]
                     self.calls.append({"kind": kind, "ok": False, "level": self.level,
-                                       "at": self.level_actions,
-                                       "error": f"{type(exc).__name__}: {exc}"[:200],
+                                       "at": self.level_actions, "error": err,
                                        "seconds": round(time.time() - t0, 2)})
+                    if self._fails >= MAX_CALL_FAILS:
+                        self.halted = f"model server failing ({self._fails} calls in a row): {err}"
                     return None
         finally:
             if be is not None and saved is not None:
@@ -576,6 +590,7 @@ class V5Agent:
                            "prompt_tokens": usage.get("prompt_tokens"),
                            "prompt": PROMPT_VERSION})
         self._bump(f"calls_{kind}")
+        self._fails = 0
         return data
 
     def _repair(self, obs: Observation, why: str = "") -> bool:
