@@ -3698,4 +3698,81 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 
 ---
 
+## D-046 — v5: object permanence, an object sheet, tolerant checking, and the model's simulator searched by code
+
+- **Date:** 2026-10-30 (built), 2026-10-31 (clean run). Written up by the main
+  session: the builder agent's draft was lost when it stalled.
+- **Status:** accepted as the direction for our own agent; **not** a submission
+  candidate by 2 Nov (see Consequences).
+- **Context:** v4 after the D-044 fixes scored 0 levels on five games at ~1.3
+  calls per action and ~10k thinking tokens per call. Reading its logs showed
+  the loop rewarded predictable actions, not progress: every slip in an exact
+  per-object prediction dropped the plan and cost two thinking calls; the move
+  counter kept being taken for a puzzle piece (tn36, as ls20 before); object
+  ids swapped when bars filled. The user asked for object permanence, a
+  counter rule that cannot capture objects that move, less bookkeeping for the
+  model, and goal -> subgoals -> code-computed routes, ideally as a program the
+  model writes and code runs; and for calls that are smaller where they can be.
+- **Decision:** `src/arc3/v5/` (architecture section 13):
+  - identity prefers same-coloured in-place overlap; deformation is reported
+    as grew/shrank/reshaped, not motion; splits and merges are events;
+  - counters (constant size change on the same side, no translation, under
+    >= 2 actions) leave the object list for an INTERFACE line; things that
+    translate on their own stay on the sheet, flagged;
+  - an object sheet replaces the event log; code keeps an action-effect table;
+  - surprises are MAJOR (interrupt) or MINOR (logged, plan kept);
+  - the model writes `step(state, action)` and a goal as Python; code replays
+    it on the recorded history (TRUSTED only if it reproduces it), searches
+    it for the shortest route, and that route beats the model's explicit steps;
+    a broken simulator gets up to two cheap repair calls (thinking off);
+  - call tiers: `think` (thinking on) at hard moments only, `next` (thinking
+    off) for routine continuations, `fix` for simulator repair;
+  - a lost network halts the game and marks the run INVALID after a 10-minute
+    wait, instead of letting the v1 explorer play blind.
+- **Options rejected:**
+  - *A system-prompt line about counters alone* — v4's model had a code fact
+    saying the object changes on every action and reasoned past it; removing
+    the counter from the object list is stronger.
+  - *A counter rule of "changes on every step"* — captures objects that move
+    on their own; the rule requires no translation and an action-independent
+    change.
+  - *Demanding a perfect simulator before using it (v3)* — v3 never trusted
+    one on real games; v5 accepts simulators that cover only the tracked
+    objects and replays them before use.
+  - *Hard caps on thinking* — rejected by the user (truncation loses the
+    conclusion). A soft `reasoning_budget` of 12000 is used on NIM only, for
+    development speed; Kaggle is uncapped.
+  - *Images* — off; no measured benefit, and the model has the exact grid.
+- **Experiment (clean run):** `nim/v5_set5b_2026-10-31/`, command in
+  `docs/experiments/README.md`, commit a8476a7, seed 0, 80 actions, five
+  games, Nemotron-3.5-Super-VL on NIM.
+  - **1 level on 4 valid games** (vc33 level 1 at action 34, human baseline
+    7, level score 4.2%); ls20, re86, tn36 0. tu93 is **INVALID**: the network
+    was down for ~3 h mid-run and the halt worked as designed.
+  - Valid games: 34–60 calls for 80 actions (**0.43–0.75 calls per action**;
+    v4: ~1.3); ~180–270k completion tokens per game (v4: ~0.9–1.0M); 26–40
+    minutes per game (v4: ~3.5 h). Tiers: think 13–19, next 10–17, fix 4–25.
+  - The simulator is now used: actions planned by simulator search ls20 28,
+    re86 21, vc33 11, tn36 0; simulator mispredictions on those steps 1, 5, 2.
+    Simulators written 2–12 per game; trusted 0–5. ls20 completed 9 subgoals.
+  - Explorer steps 4–8 per valid game (from probes and failed calls), so no
+    valid game is clean.
+  - Prediction accuracy on informative steps 45–72%.
+- **Changed our mind?** Partly. The cost problem is largely solved: v5 is
+  2–3x cheaper per action than v4 and the thinking/no-thinking split works.
+  The simulator-as-program idea is viable in the narrow sense that the model
+  writes simulators that replay history and code plans with them. But
+  progress is still near zero: one level in 320 actions. The failure has
+  moved from "cannot act efficiently" to "does not find the goal": routes
+  failed 10–15 times per game and plans were dropped 8–13 times.
+- **Consequences:** five games, one seed, the development model; nothing on
+  Kaggle. With two days to the deadline this does not compete with the public
+  Milestone #2 harness (D-045, ~28%); its value is as a record and as grafts
+  (object permanence, counter rule, simulator search) onto that harness.
+- **Revisit if:** a run on the full 25 games with Qwen on Kaggle clears levels
+  on several games; or the goal-finding failure is diagnosed to something
+  fixable in the prompt or the object sheet.
+
+---
+
 <!-- Next entry: D-045 (D-043 reserved by the main session, D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->
