@@ -49,3 +49,15 @@ sturdier comparison.
 diagnostic and can be vacuous — if a game changes nothing outside the induced
 bookkeeping mask, "exact outside the mask" is satisfied by predicting nothing.
 Check the `vacuous` flag before quoting it. The headline metric is `exact`.
+
+## Duck harness smoke runs on Kaggle (D-045, 2026-11-01)
+
+`docs/experiments/kaggle/duck_smoke_2026-11-01/`. Each: `scripts/push_duck.py --games ls20,ft09 --game-minutes 20 --push`, RTX Pro 6000, seed as the harness sets it, one pass.
+
+| run | flags | commit | result |
+|---|---|---|---|
+| `duck-base-smoke`, `duck-scale-smoke` | (none), `--graft --env ARC3_SCALE_HASH=1` | 602fc82 | **Both failed before play**: Kaggle's latest image is Python 3.13 and the Pennyroyal cp312 wheels do not install (`aiohttp==3.14.3`). Fixed by pinning Franzen's image (e36d22b) |
+| `duck-mem-smoke` (A) | `--memory` | e36d22b | ft09 100 (6/6), ls20 15.45 (3/7), mean 57.72; memory pinned 2 levels |
+| `duck-memscale-smoke` (B) | `--memory --graft --env ARC3_SCALE_HASH=1` | e36d22b | ft09 100 (6/6), ls20 19.84 (3/7), mean 59.92; graft applied |
+
+A vs B is within noise (same levels cleared); these runs show only that both notebooks run end to end on the pinned image. The 2-game filter applies to offline practice runs only; a competition rerun takes the live game list and the TRUE_SUBMISSION settings.
