@@ -49,6 +49,10 @@ MODELS = [
 ]
 FRANZEN_APPLY = ('subprocess.run(["git", "apply", "--include=ARC3-Inference/*", "-v", '
                  '"/kaggle/harness-changes.patch"], cwd=f"{BUNDLE_DIR}/src", check=True)\n')
+#: Franzen's pinned Kaggle image (Python 3.12). Kaggle's latest image is Python 3.13, on which
+#: the Pennyroyal cp312 wheels do not install (smoke runs 2026-11-01 failed on aiohttp==3.14.3).
+DOCKER_IMAGE = ("gcr.io/kaggle-private-byod/python@sha256:"
+                "57e612b484cf3df5026ee4dcc3cb176974b22b2bc0937fb1e16132a8be4cb13c")
 MEMORY = ROOT / "third_party" / "solved-level-memory" / "memory_patch.py"
 #: (old, new) edits that, with MEMORY, turn Franzen's notebook into lalalia9's (see NOTICE.md).
 MEMORY_EDITS = [
@@ -160,6 +164,7 @@ def main() -> None:
         "enable_gpu": True, "enable_tpu": False, "enable_internet": False,
         "dataset_sources": DATASETS, "competition_sources": [COMPETITION],
         "kernel_sources": [], "model_sources": MODELS, "machine_shape": args.accelerator,
+        "docker_image": DOCKER_IMAGE, "docker_image_pinning_type": "original",
     }
     (out / "kernel-metadata.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
     print("wrote", out)
