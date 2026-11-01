@@ -3639,3 +3639,44 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
   - a stronger public solution appears (e.g. Tufa's later harness);
   - the scale-hash arm shows no difference over several games (then drop it
     and try the life-loss graft).
+
+---
+
+## D-047 — Final submission: two Franzen-based notebooks, the safe one and one carrying a single change of ours
+
+- **Date:** 2026-11-01
+- **Status:** accepted; submission itself awaits the user's approval
+- **Context:** Submissions close 2 Nov 2026. The leaderboard (Kaggle API,
+  1 Nov) is led by private entries at 40–76; the best public notebooks are
+  Franzen's Milestone #2 solution and small variants at ~28–31. Our own agent
+  (v5, D-046) cleared 1 level in ~320 actions on five public games. The rules
+  (arcprize.org/competitions/2026) require our code under CC0/MIT-0 and allow
+  third-party code under an open-source licence such as Apache-2.0. Kaggle
+  scores the better of two selected final submissions.
+- **Decision:** submit **A** = Franzen + lalalia9's solved-level memory and
+  longer timeouts (`push_duck.py --memory`; functionally identical to the
+  public notebook scored 31.46), and as the second entry one variant of A with
+  a single change: **B** (+ scale-invariant shape matching, D-045) or **C**
+  (+ `EXPOSE_RESET=on`), whichever smoke-tests cleanly and is preferred. C
+  targets a failure read in B's ls20 transcript: on level 2 the model planned
+  a route longer than its move budget, then spent 38 moves on purpose
+  exhausting lives to force a restart; the harness has a model RESET (one
+  action) that Franzen built but left off.
+- **Smoke evidence (ls20 + ft09, 20 min each, one run per arm):** A 57.72,
+  B 59.92 (both ft09 6/6, ls20 3/7). The difference is within noise: B beat A
+  on ls20 levels 1 and 3 and lost on level 2 by 71 actions.
+- **Options rejected:**
+  - *Submit our own agent (v5)* — ~0% on public games against ~30% for the base.
+  - *Stack several of our changes into one notebook* — lalalia9 measured
+    changes that looked neutral on public games costing 7–8 points on the
+    hidden set; one change per arm keeps each arm interpretable.
+  - *Franzen exactly as published* — dominated by A on the evidence published
+    (31.46 vs ~28, same code plus memory), though that is also within noise.
+  - *Pushing to Kaggle's latest image* — Python 3.13 breaks the server
+    install (smoke runs 2026-11-01); the notebooks pin Franzen's image.
+- **Consequences:** the submission depends on dfranzen's public Kaggle inputs
+  staying available; the second arm's value is untested beyond two games.
+  Prize eligibility requires open-sourcing this repository before private
+  scores are released.
+- **Revisit if:** the private leaderboard shows the second arm below A by more
+  than run-to-run noise (then its change hurts on the hidden set).
