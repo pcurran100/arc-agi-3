@@ -105,6 +105,23 @@ def test_push_duck_builds_smoke_notebook_with_graft():
     assert "demo_excluded_games = []" in hook and "max_runtime_s_per_game = 20 * 60" in hook
 
 
+def test_push_duck_memory_reproduces_lalalia_config():
+    """--memory pins the solved-level memory before Franzen's settings in the
+    customization cell and applies the three longer timeouts of lalalia9's notebook."""
+    import argparse
+    import sys
+
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import push_duck
+
+    args = argparse.Namespace(graft=False, memory=True, games="", game_minutes=None, env=[])
+    text = "\n".join("".join(c["source"]) for c in push_duck.build(args)["cells"])
+    hook = text[text.index("SOLVED-LEVEL MEMORY (lalalia9)"):]
+    assert hook.index("SOLVED_LEVEL_MEMORY_PATCH on") < hook.index("bm.solver.max_runtime_s_per_game")
+    for old, new in push_duck.MEMORY_EDITS:
+        assert new in text and old not in text
+
+
 def test_ls20_key_matches_its_scaled_copy(monkeypatch):
     """On real ls20 level-1 data the forensic analysis (2026-10-29) found the key display
     is the goal glyph at 2x scale and another rotation, which the rotation-only hashes

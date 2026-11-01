@@ -11,6 +11,8 @@ On top of that, optionally:
 - ``--graft`` adds OUR changes to the vendored harness as a second patch, applied
   after Franzen's. The patch is ``git diff`` of ``third_party/duck-franzen/ARC3-Inference``
   against the vendoring commit, so the vendored tree stays the single source.
+- ``--memory`` adds lalalia9's solved-level memory and that notebook's longer
+  timeouts (``third_party/solved-level-memory/NOTICE.md``).
 - ``--env K=V`` sets environment variables in a first cell (e.g. the graft flag
   ``ARC3_SCALE_HASH=1``), so the same patched code runs A and B arms.
 - ``--games`` / ``--game-minutes`` shrink an interactive Save & Run to a smoke test.
@@ -47,6 +49,14 @@ MODELS = [
 ]
 FRANZEN_APPLY = ('subprocess.run(["git", "apply", "--include=ARC3-Inference/*", "-v", '
                  '"/kaggle/harness-changes.patch"], cwd=f"{BUNDLE_DIR}/src", check=True)\n')
+MEMORY = ROOT / "third_party" / "solved-level-memory" / "memory_patch.py"
+#: (old, new) edits that, with MEMORY, turn Franzen's notebook into lalalia9's (see NOTICE.md).
+MEMORY_EDITS = [
+    ("SERVER_STARTUP_TIMEOUT = 12 * 60", "SERVER_STARTUP_TIMEOUT = 55 * 60"),
+    ("os.environ['ARC3_HTTP_RETRY_INITIAL_SECONDS'] = '900'",
+     "os.environ['ARC3_HTTP_RETRY_INITIAL_SECONDS'] = '3600'"),
+    ("bm.solver.analyzer_timeout = 900.0", "bm.solver.analyzer_timeout = 3600.0"),
+]
 OFFLINE_FILTER = ("    game_ids = [game_id for game_id in game_ids if not any(game_id.startswith(g) "
                   "for g in demo_excluded_games)]\n")
 
@@ -95,6 +105,13 @@ def build(args: argparse.Namespace) -> dict:
             '"/kaggle/arc3-graft.patch"], cwd=f"{BUNDLE_DIR}/src", check=True)\n'
             "print('ARC-AGI-3 project graft patch applied (D-045)')\n"))
 
+    if getattr(args, "memory", False):
+        for old, new in MEMORY_EDITS:
+            replace_once(cells[cell_index(cells, old)], old, new)
+        k = cell_index(cells, "# show config")
+        replace_once(cells[k], "bm.solver.max_runtime_s_per_game = 48*60",
+                     MEMORY.read_text(encoding="utf-8") + "bm.solver.max_runtime_s_per_game = 48*60")
+
     if args.games:
         games = [g.strip() for g in args.games.split(",") if g.strip()]
         j = cell_index(cells, OFFLINE_FILTER.strip())
@@ -122,6 +139,8 @@ def main() -> None:
     ap.add_argument("--slug", required=True, help="kernel slug under your Kaggle user")
     ap.add_argument("--user", default="experiencebreakfast")
     ap.add_argument("--graft", action="store_true", help="apply our harness changes too")
+    ap.add_argument("--memory", action="store_true",
+                    help="add lalalia9's solved-level memory (third_party/solved-level-memory)")
     ap.add_argument("--env", action="append", default=[], metavar="K=V")
     ap.add_argument("--games", default="", help="comma-separated game-id prefixes (Save & Run)")
     ap.add_argument("--game-minutes", type=float, default=None,
