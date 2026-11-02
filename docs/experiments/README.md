@@ -61,3 +61,16 @@ Check the `vacuous` flag before quoting it. The headline metric is `exact`.
 | `duck-memscale-smoke` (B) | `--memory --graft --env ARC3_SCALE_HASH=1` | e36d22b | ft09 100 (6/6), ls20 19.84 (3/7), mean 59.92; graft applied |
 
 A vs B is within noise (same levels cleared); these runs show only that both notebooks run end to end on the pinned image. The 2-game filter applies to offline practice runs only; a competition rerun takes the live game list and the TRUE_SUBMISSION settings.
+
+## Duck variants on 11 public games, Kaggle (D-048, 2026-11-02)
+
+`docs/experiments/kaggle/duck_11g_2026-11-02/`. Each: `scripts/push_duck.py <flags> --games ar25,ft09,lp85,r11l,re86,sb26,sc25,tr87,tu93,vc33,ls20 --game-minutes 20 --push`, RTX Pro 6000, one pass, 11 games concurrently (so ~70k tokens per game, about half the 2-game smoke runs: scores are not comparable with those).
+
+| run | flags (all have `--memory`) | mean | levels |
+|---|---|---|---|
+| `duck-ctrl-11g` (A, control) | — | 28.88 | 38 |
+| `duck-d-11g` (D) | `--hints --graft`, BUDGET+LIFE+EFFECTS, EXPOSE_RESET, SCALE_HASH | 36.73 | 41 |
+| `duck-e-11g` (E) | D + `--adaptive` | 31.63 | 40 |
+| `duck-f-11g` (F) | D without EXPOSE_RESET | 32.48 | 40 |
+
+Per-game noise is very large (tr87: A 3.5, D 71.4, F 2.5), so one run per arm cannot separate the arms with confidence; a replicate of D (`duck-h-11g`) and a hints-only arm (`duck-g-11g`) were queued to measure that. Two earlier control attempts (`duck-a-11g` v1, v2) failed at startup because the kernel, first created by a push Kaggle rejected (2-GPU-session limit), never mounted its datasets; pushing under a new slug fixed it.

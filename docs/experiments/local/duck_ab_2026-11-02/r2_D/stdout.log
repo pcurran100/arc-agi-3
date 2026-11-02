@@ -1,0 +1,266 @@
+SOLVED_LEVEL_MEMORY_PATCH on
+TURN_HINTS on: {'ARC3_HINT_BUDGET': True, 'ARC3_HINT_LIFE': True, 'ARC3_HINT_EFFECTS': True}
+local_run arm=D games=['sb26-7fbdac44', 'vc33-5430563c', 'ft09-0d8bbf25', 'ls20-9607627b'] cap=30.0 min concurrency=2 model=nvidia/nemotron-3.5-super-vl-120b-a12b seed=0
+priority gate active: 10 concurrent streams
+SOLVED_LEVEL_MEMORY pinned: 1 level(s), 1864 chars
+SOLVED_LEVEL_MEMORY pinned: 1 level(s), 1727 chars
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r2_D in 3.09s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 03:31:16
+ended:     in progress
+mean score:    0.46
+median score:  0.39
+total actions: 164
+total tokens:  130500
+generated tokens/sec: 216.22 (job wallclock)
+total wallclock: 1135.2s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=0, tokens=0
+  ls20-9607627b: score=0.00, levels=0.0/7, actions=0, tokens=0
+  sb26-7fbdac44: score=1.07, levels=1.0/8, actions=102, tokens=63989
+  vc33-5430563c: score=0.78, levels=1.0/7, actions=62, tokens=66511
+
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r2_D in 15.80s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 03:31:16
+ended:     in progress
+mean score:    0.51
+median score:  0.49
+total actions: 329
+total tokens:  255901
+generated tokens/sec: 209.84 (job wallclock)
+total wallclock: 2423.0s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=0, tokens=0
+  ls20-9607627b: score=0.00, levels=0.0/7, actions=0, tokens=0
+  sb26-7fbdac44: score=1.07, levels=1.0/8, actions=205, tokens=119937
+  vc33-5430563c: score=0.98, levels=2.0/7, actions=124, tokens=135964
+
+SOLVED_LEVEL_MEMORY pinned: 2 level(s), 2713 chars
+analyzer request timed out at action 141; yielding with 0 tool call(s) preserved: HTTPSConnectionPool(host='integrate.api.nvidia.com', port=443): Read timed out. (read timeout=6.577999999979511)
+analyzer request timed out at action 263; yielding with 0 tool call(s) preserved: HTTPSConnectionPool(host='integrate.api.nvidia.com', port=443): Read timed out. (read timeout=82.89100000000326)
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.3s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.4s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.6s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.0s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.7s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.8s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.6s
+analyzer endpoint returned HTTP 429; retry 1/8 in 11.0s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.6s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.2s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.3s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 11.0s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.5s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.4s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.3s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.9s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.2s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.8s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.5s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.3s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.7s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.1s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.5s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.9s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.4s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.5s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.3s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.2s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.9s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.4s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.1s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.9s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.6s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.4s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.4s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.4s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.6s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.5s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.5s
+analyzer endpoint returned HTTP 429; retry 2/8 in 21.0s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.1s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.5s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.8s
+analyzer endpoint returned HTTP 429; retry 5/8 in 60.0s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.6s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.0s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.9s
+analyzer endpoint returned HTTP 429; retry 6/8 in 60.4s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.7s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.0s
+analyzer endpoint returned HTTP 429; retry 7/8 in 60.1s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.0s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.5s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.6s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.2s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.3s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.4s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.3s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.0s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.4s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.8s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.1s
+analyzer endpoint returned HTTP 429; retry 5/8 in 61.0s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.4s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+tail fade phase after 52.7 minutes: 0.0 minutes remaining; fading tail B to zero over the final 6.0 minutes, retaining hazard C
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.8s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.1s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.7s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.5s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.7s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.8s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.5s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.1s
+analyzer endpoint returned HTTP 429; retry 5/8 in 60.1s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.9s
+analyzer endpoint returned HTTP 429; retry 6/8 in 60.8s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.8s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.4s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.6s
+analyzer endpoint returned HTTP 429; retry 5/8 in 60.6s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.2s
+[finished] vc33-5430563c state=gave_up level=2/7 score=0.98 actions=140 tokens=192828 per-level=15/7,107/18,18/44,0/61,0/131,0/34,0/152 note="tokens=192828"
+[finished] sb26-7fbdac44 state=gave_up level=1/8 score=1.07 actions=262 tokens=161883 per-level=29/18,233/28,0/18,0/19,0/31,0/23,0/58,0/18 note="tokens=161883"
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r2_D in 2.92s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 03:31:16
+ended:     in progress
+mean score:    0.51
+median score:  0.49
+total actions: 402
+total tokens:  354711
+generated tokens/sec: 194.63 (job wallclock)
+total wallclock: 3603.0s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=0, tokens=0
+  ls20-9607627b: score=0.00, levels=0.0/7, actions=0, tokens=0
+  sb26-7fbdac44: score=1.07, levels=1.0/8, actions=262, tokens=161883
+  vc33-5430563c: score=0.98, levels=2.0/7, actions=140, tokens=192828
+
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r2_D in 2.28s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 03:31:16
+ended:     in progress
+mean score:    1.70
+median score:  1.03
+total actions: 436
+total tokens:  402902
+generated tokens/sec: 166.16 (job wallclock)
+total wallclock: 8348.1s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=4.76, levels=1.0/6, actions=13, tokens=27771
+  ls20-9607627b: score=0.00, levels=0.0/7, actions=21, tokens=20420
+  sb26-7fbdac44: score=1.07, levels=1.0/8, actions=262, tokens=161883
+  vc33-5430563c: score=0.98, levels=2.0/7, actions=140, tokens=192828
+
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r2_D in 2.02s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 03:31:16
+ended:     in progress
+mean score:    1.70
+median score:  1.03
+total actions: 468
+total tokens:  429881
+generated tokens/sec: 142.03 (job wallclock)
+total wallclock: 9459.6s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=4.76, levels=1.0/6, actions=34, tokens=41226
+  ls20-9607627b: score=0.00, levels=0.0/7, actions=32, tokens=33944
+  sb26-7fbdac44: score=1.07, levels=1.0/8, actions=262, tokens=161883
+  vc33-5430563c: score=0.98, levels=2.0/7, actions=140, tokens=192828
+
+SOLVED_LEVEL_MEMORY pinned: 1 level(s), 1510 chars
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.5s
+analyzer endpoint returned HTTP 429; retry 6/8 in 60.6s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.9s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.9s
+analyzer request timed out at action 51; yielding with 0 tool call(s) preserved: HTTPSConnectionPool(host='integrate.api.nvidia.com', port=443): Read timed out. (read timeout=23.65600000001723)
+[finished] ls20-9607627b state=gave_up level=0/7 score=0.00 actions=53 tokens=59815 per-level=53/22,0/123,0/73,0/84,0/96,0/192,0/186 note="tokens=62546"
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r2_D in 2.66s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 03:31:16
+ended:     in progress
+mean score:    1.70
+median score:  1.03
+total actions: 505
+total tokens:  481465
+generated tokens/sec: 132.65 (job wallclock)
+total wallclock: 10773.0s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=4.76, levels=1.0/6, actions=50, tokens=66939
+  ls20-9607627b: score=0.00, levels=0.0/7, actions=53, tokens=59815
+  sb26-7fbdac44: score=1.07, levels=1.0/8, actions=262, tokens=161883
+  vc33-5430563c: score=0.98, levels=2.0/7, actions=140, tokens=192828
+
+[finished] ft09-0d8bbf25 state=gave_up level=1/6 score=4.76 actions=50 tokens=66939 per-level=11/43,39/12,0/23,0/28,0/65,0/37 note="tokens=69419"
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r2_D in 5.09s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 03:31:16
+ended:     2026-11-02 04:31:51
+duration:  1h 0m 34s
+mean score:    1.70
+median score:  1.03
+total actions: 505
+total tokens:  481465
+generated tokens/sec: 132.49 (job wallclock)
+total wallclock: 10845.9s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=4.76, levels=1.0/6, actions=50, tokens=66939
+  ls20-9607627b: score=0.00, levels=0.0/7, actions=53, tokens=59815
+  sb26-7fbdac44: score=1.07, levels=1.0/8, actions=262, tokens=161883
+  vc33-5430563c: score=0.98, levels=2.0/7, actions=140, tokens=192828
+
+diagnostics: C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r2_D\diagnostics.html
+RESULT arm=D sb26-7fbdac44 levels=1/8 score=1.07 actions=262 resets_model=17 hints={'effects': 59} gen_tokens=161883
+RESULT arm=D vc33-5430563c levels=2/7 score=0.98 actions=140 resets_model=27 hints={'effects': 62, 'life': 2} gen_tokens=192828
+RESULT arm=D ft09-0d8bbf25 levels=1/6 score=4.76 actions=50 resets_model=0 hints={'effects': 30, 'budget': 17} gen_tokens=66939
+RESULT arm=D ls20-9607627b levels=0/7 score=0.00 actions=53 resets_model=1 hints={'effects': 29, 'budget': 25} gen_tokens=59815
+MEAN arm=D 1.70

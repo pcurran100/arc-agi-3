@@ -1,0 +1,148 @@
+SOLVED_LEVEL_MEMORY_PATCH on
+TURN_HINTS on: {'ARC3_HINT_BUDGET': True, 'ARC3_HINT_LIFE': True, 'ARC3_HINT_EFFECTS': True}
+local_run arm=D games=['ls20-9607627b', 'ft09-0d8bbf25', 'vc33-5430563c', 'sb26-7fbdac44'] cap=30.0 min concurrency=2 model=nvidia/nemotron-3.5-super-vl-120b-a12b seed=0
+priority gate active: 10 concurrent streams
+SOLVED_LEVEL_MEMORY pinned: 1 level(s), 841 chars
+tail fade phase after 27.7 minutes: 2.3 minutes remaining; fading tail B to zero over the final 6.0 minutes, retaining hazard C
+analyzer request timed out at action 59; yielding with 0 tool call(s) preserved: HTTPSConnectionPool(host='integrate.api.nvidia.com', port=443): Read timed out. (read timeout=9.0)
+analyzer request timed out at action 210; yielding with 0 tool call(s) preserved: HTTPSConnectionPool(host='integrate.api.nvidia.com', port=443): Read timed out. (read timeout=19.28200000000652)
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r1_D in 3.00s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 02:31:03
+ended:     in progress
+mean score:    0.59
+median score:  0.00
+total actions: 89
+total tokens:  117827
+generated tokens/sec: 195.29 (job wallclock)
+total wallclock: 1182.5s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=18, tokens=54343
+  ls20-9607627b: score=2.37, levels=1.0/7, actions=71, tokens=63484
+  sb26-7fbdac44: score=0.00, levels=0.0/8, actions=0, tokens=0
+  vc33-5430563c: score=0.00, levels=0.0/7, actions=0, tokens=0
+
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r1_D in 3.00s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 02:31:03
+ended:     in progress
+mean score:    0.59
+median score:  0.00
+total actions: 173
+total tokens:  253173
+generated tokens/sec: 209.83 (job wallclock)
+total wallclock: 2361.4s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=43, tokens=122559
+  ls20-9607627b: score=2.37, levels=1.0/7, actions=130, tokens=130614
+  sb26-7fbdac44: score=0.00, levels=0.0/8, actions=0, tokens=0
+  vc33-5430563c: score=0.00, levels=0.0/7, actions=0, tokens=0
+
+[finished] ft09-0d8bbf25 state=gave_up level=0/6 score=0.00 actions=58 tokens=172664 per-level=58/43,0/12,0/23,0/28,0/65,0/37 note="tokens=172664"
+[finished] ls20-9607627b state=gave_up level=1/7 score=2.37 actions=209 tokens=160594 per-level=27/22,182/123,0/73,0/84,0/96,0/192,0/186 note="tokens=160594"
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r1_D in 2.58s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 02:31:03
+ended:     in progress
+mean score:    0.59
+median score:  0.00
+total actions: 267
+total tokens:  333258
+generated tokens/sec: 184.21 (job wallclock)
+total wallclock: 3602.0s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=58, tokens=172664
+  ls20-9607627b: score=2.37, levels=1.0/7, actions=209, tokens=160594
+  sb26-7fbdac44: score=0.00, levels=0.0/8, actions=0, tokens=0
+  vc33-5430563c: score=0.00, levels=0.0/7, actions=0, tokens=0
+
+SOLVED_LEVEL_MEMORY pinned: 1 level(s), 737 chars
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r1_D in 2.20s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 02:31:03
+ended:     in progress
+mean score:    1.30
+median score:  1.22
+total actions: 461
+total tokens:  429178
+generated tokens/sec: 177.98 (job wallclock)
+total wallclock: 8411.3s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=58, tokens=172664
+  ls20-9607627b: score=2.37, levels=1.0/7, actions=209, tokens=160594
+  sb26-7fbdac44: score=2.78, levels=1.0/8, actions=73, tokens=57064
+  vc33-5430563c: score=0.06, levels=1.0/7, actions=121, tokens=38856
+
+SOLVED_LEVEL_MEMORY pinned: 1 level(s), 1095 chars
+analyzer request timed out at action 256; yielding with 0 tool call(s) preserved: HTTPSConnectionPool(host='integrate.api.nvidia.com', port=443): Read timed out. (read timeout=13.23499999998603)
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r1_D in 2.30s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 02:31:03
+ended:     in progress
+mean score:    1.30
+median score:  1.22
+total actions: 580
+total tokens:  510615
+generated tokens/sec: 169.43 (job wallclock)
+total wallclock: 9604.6s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=58, tokens=172664
+  ls20-9607627b: score=2.37, levels=1.0/7, actions=209, tokens=160594
+  sb26-7fbdac44: score=2.78, levels=1.0/8, actions=107, tokens=107028
+  vc33-5430563c: score=0.06, levels=1.0/7, actions=206, tokens=70329
+
+[finished] vc33-5430563c state=gave_up level=1/7 score=0.06 actions=255 tokens=93513 per-level=54/7,201/18,0/44,0/61,0/131,0/34,0/152 note="tokens=93513"
+[finished] sb26-7fbdac44 state=gave_up level=1/8 score=2.78 actions=142 tokens=146757 per-level=12/18,130/28,0/18,0/19,0/31,0/23,0/58,0/18 note="tokens=146885"
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r1_D in 5.36s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 02:31:03
+ended:     2026-11-02 03:31:07
+duration:  1h 0m 4s
+mean score:    1.30
+median score:  1.22
+total actions: 664
+total tokens:  573528
+generated tokens/sec: 159.12 (job wallclock)
+total wallclock: 10809.0s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=58, tokens=172664
+  ls20-9607627b: score=2.37, levels=1.0/7, actions=209, tokens=160594
+  sb26-7fbdac44: score=2.78, levels=1.0/8, actions=142, tokens=146757
+  vc33-5430563c: score=0.06, levels=1.0/7, actions=255, tokens=93513
+
+diagnostics: C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r1_D\diagnostics.html
+RESULT arm=D ls20-9607627b levels=1/7 score=2.37 actions=209 resets_model=4 hints={'effects': 88, 'budget': 70} gen_tokens=160594
+RESULT arm=D ft09-0d8bbf25 levels=0/6 score=0.00 actions=58 resets_model=0 hints={'effects': 59, 'budget': 46} gen_tokens=172664
+RESULT arm=D vc33-5430563c levels=1/7 score=0.06 actions=255 resets_model=26 hints={'effects': 96, 'life': 12} gen_tokens=93513
+RESULT arm=D sb26-7fbdac44 levels=1/8 score=2.78 actions=142 resets_model=4 hints={'effects': 77} gen_tokens=146757
+MEAN arm=D 1.30

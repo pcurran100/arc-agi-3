@@ -1,0 +1,162 @@
+{
+ "games": [
+  {
+   "game_id": "sb26-7fbdac44",
+   "state": "gave_up",
+   "levels_completed": 1,
+   "number_of_levels": 8,
+   "final_score": 2.7777777777777777,
+   "actions": 81,
+   "actions_per_level": [
+    12,
+    69,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "base_actions_per_level": [
+    18,
+    28,
+    18,
+    19,
+    31,
+    23,
+    58,
+    18
+   ],
+   "resets_total": 0,
+   "resets_auto": 0,
+   "resets_model": 0,
+   "undos": 2,
+   "generated_tokens": 222010,
+   "uncached_input_tokens": 0,
+   "wallclock_s": 1800.9070000000065,
+   "turn_prompts": 46,
+   "hint_turns": {},
+   "solver_note": "tokens=234298"
+  },
+  {
+   "game_id": "vc33-5430563c",
+   "state": "gave_up",
+   "levels_completed": 2,
+   "number_of_levels": 7,
+   "final_score": 6.807589148309369,
+   "actions": 63,
+   "actions_per_level": [
+    21,
+    19,
+    23,
+    0,
+    0,
+    0,
+    0
+   ],
+   "base_actions_per_level": [
+    7,
+    18,
+    44,
+    61,
+    131,
+    34,
+    152
+   ],
+   "resets_total": 0,
+   "resets_auto": 0,
+   "resets_model": 0,
+   "undos": 0,
+   "generated_tokens": 239327,
+   "uncached_input_tokens": 0,
+   "wallclock_s": 1800.4530000000377,
+   "turn_prompts": 64,
+   "hint_turns": {},
+   "solver_note": "tokens=241722"
+  },
+  {
+   "game_id": "ft09-0d8bbf25",
+   "state": "gave_up",
+   "levels_completed": 2,
+   "number_of_levels": 6,
+   "final_score": 14.285714285714285,
+   "actions": 32,
+   "actions_per_level": [
+    11,
+    10,
+    11,
+    0,
+    0,
+    0
+   ],
+   "base_actions_per_level": [
+    43,
+    12,
+    23,
+    28,
+    65,
+    37
+   ],
+   "resets_total": 0,
+   "resets_auto": 0,
+   "resets_model": 0,
+   "undos": 0,
+   "generated_tokens": 116052,
+   "uncached_input_tokens": 0,
+   "wallclock_s": 3600.9380000000237,
+   "turn_prompts": 31,
+   "hint_turns": {},
+   "solver_note": "tokens=143115"
+  },
+  {
+   "game_id": "ls20-9607627b",
+   "state": "gave_up",
+   "levels_completed": 0,
+   "number_of_levels": 7,
+   "final_score": 0.0,
+   "actions": 38,
+   "actions_per_level": [
+    38,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "base_actions_per_level": [
+    22,
+    123,
+    73,
+    84,
+    96,
+    192,
+    186
+   ],
+   "resets_total": 0,
+   "resets_auto": 0,
+   "resets_model": 0,
+   "undos": 0,
+   "generated_tokens": 42719,
+   "uncached_input_tokens": 0,
+   "wallclock_s": 3654.1869999999763,
+   "turn_prompts": 19,
+   "hint_turns": {},
+   "solver_note": "tokens=48463"
+  }
+ ],
+ "mean_score": 5.967770302950358,
+ "wall_s": 3659.5066709518433,
+ "hint_examples": {},
+ "arm": "A",
+ "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+ "minutes_cap": 30.0,
+ "seed": 0,
+ "concurrency": 2,
+ "games_order": [
+  "sb26-7fbdac44",
+  "vc33-5430563c",
+  "ft09-0d8bbf25",
+  "ls20-9607627b"
+ ]
+}
