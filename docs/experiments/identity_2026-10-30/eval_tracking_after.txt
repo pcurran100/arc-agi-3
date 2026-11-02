@@ -1,0 +1,35 @@
+game            cell  comps  sprites  frag   merge  switch%  excl%   pairs  note
+--------------------------------------------------------------------------------
+ar25-0c556536   1     14     7        1.14   2.00   0.0      0.0     413    
+bp35-0a0ad940   1     212    0        -      -      -        -       0      no visible sprites
+cd82-fb555c5d   1     15     7        1.83   1.00   0.0      0.0     413    
+cn04-2fe56bfb   1     9      2        3.00   1.00   0.0      0.0     108    
+dc22-fdcac232   2     27     12       2.49   1.29   0.0      0.0     776    
+ft09-0d8bbf25   2     59     19       3.16   1.03   0.0      0.0     1121   
+g50t-5849a774   1     15     12       1.47   1.39   0.6      1.2     687    
+ka59-38d34dbb   1     14     6        1.33   1.01   2.8      0.0     354    
+lf52-271a04aa   1     59     0        -      -      -        -       0      no visible sprites
+lp85-305b61c3   1     38     23       1.13   1.00   0.3      0.3     1357   
+ls20-9607627b   1     19     115      1.05   8.08   0.0      0.3     6783   
+m0r0-492f87ba   5     6      2        1.00   1.00   0.0      0.0     118    
+r11l-495a7899   1     39     11       2.82   1.00   1.1      1.1     88     
+re86-8af5384d   1     22     3        6.39   1.01   5.1      2.7     177    
+s5i5-18d95033   1     22     8        2.50   1.00   0.0      0.0     232    
+sb26-7fbdac44   1     27     21       1.31   1.13   0.4      0.1     1146   
+sc25-635fd71a   1     24     16       1.44   1.00   2.1      2.1     800    
+sk48-d8078629   1     36     19       2.05   1.21   3.5      0.7     1146   
+sp80-589a99af   4     -      -        -      -      -        -       0      terminal during warm-up
+su15-1944f8ab   1     26     7        3.45   1.08   0.0      0.0     376    
+tn36-ef4dde99   1     20     19       1.15   1.10   0.0      0.0     799    
+tr87-cd924810   1     65     53       1.34   1.13   0.9      1.1     3127   
+tu93-0768757b   1     42     3        12.67  1.00   0.0      0.0     87     
+vc33-5430563c   1     11     7        1.29   1.00   0.0      0.0     203    
+wa30-ee6fef47   1     12     5        2.00   1.00   0.3      0.0     295    
+
+segmentation: colour_8, 60 actions, seed 0
+OVERALL id switch rate: 0.6% over 20606 sprite-frame pairs
+OVERALL id switch rate, exclusive sprites only: 0.6% over 11619 pairs <- the number to trust
+mean fragmentation (components per sprite): 2.55
+mean merge (sprites per component): 1.43
+unscoreable (no visible sprites, UI-rendered): bp35-0a0ad940, lf52-271a04aa
+terminal during warm-up (random play died): sp80-589a99af

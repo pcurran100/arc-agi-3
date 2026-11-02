@@ -1,9 +1,18 @@
 # Architecture: what is built, how it works, and what it does not do
 
-- **Last updated:** 2026-09-24, session 4
-- **Scope:** the perception layer (§1-§6), dynamics induction (§7) and
-  exploration (§8). Goal proposal and the planner still do not exist, and
-  nothing yet plays *to win* — §8 plays to make things happen.
+- **Last updated:** 2026-11-02. §1–§8 date from sessions 1–4 (2026-09-24) and
+  describe the perception, dynamics and exploration layers, which have not
+  changed since. §9–§13 were added as each agent version landed. §14 is new.
+- **Scope:** the perception layer (§1–§6), dynamics induction (§7),
+  exploration (§8), the v1 agent loop (§9), and the four LLM-driven versions:
+  v2 (§10), v3 (§11), v4 (§12) and v5 (§13). §14 describes the machine we
+  actually submit, which is **not our agent**: Daniel Franzen's vendored Duck
+  harness with flag-gated grafts of ours (D-045, D-047, D-049).
+- **Where the code is:** §1–§12 (before D-044) describe code on `main` and
+  every branch after it. §12's D-044 parts and §13 describe code on
+  `v5-objects`, which has not been merged. §14 describes code on `duck-base`.
+  This document was reconciled across those branches on 2026-11-02, on branch
+  `docs-status`.
 - **Companion documents:** `design-thesis.md` argues *why* we are building this
   kind of agent. `benchmark.md` records what the environment actually does.
   `state-of-play.md` is the short status snapshot. `decision-log.md` is the
@@ -1189,3 +1198,407 @@ the number of objects to 1", and `predict` called `state.move(7, 0)` with the
 wrong arity. That led to prompt `v3-2`, which adds a neutral syntax example of
 the helper API (it demonstrates calls, not a kind of game — Guardrail 2).
 Whether a 27B model writes plannable world models is still unmeasured.
+
+## 12. v4: an assumption store, checked predictions, and subgoals walked by code (D-042, D-044)
+
+v3 (§11) handed control to the explorer until the model's simulator was
+perfect, which on real games was never. v4 (`src/arc3/v4/`) asks the model for
+less and checks more: it keeps an **assumption store** the model edits (what
+things are, what actions do, what wins), it must **predict** the outcome of
+every action it chooses, and code checks each prediction exactly. Since D-044
+the model can also name **subgoals** ("bring #7 onto #5, then onto #3") that
+code routes to and walks without further calls.
+
+### 12.1 The loop
+
+Per step (`v4/agent.py`, `V4Agent.act`):
+
+1. **Observe** with `FactBook4` (§12.2).
+2. **Check.** Assumptions with a machine-checkable rule for the action are
+   checked (`store.observe`); the expectation attached to the action is
+   checked (`expect.check`). A correct prediction supports the **ontology and
+   dynamics** assumptions it named, once per decision. A wrong one — including
+   a change the model did not mention under `rest: unchanged`, except for
+   tickers — is a surprise: the queue and the plan are dropped and an update
+   is due. Goals are tested by code: a failed `level_complete` prediction
+   weakens the goals it named, and a goal whose `attain` condition holds
+   without the level completing is weakened once per arrival.
+3. **Act** on the queue; if it is empty and subgoals remain, **route** to the
+   next one (§12.3) and queue the route, each step with the expectation "the
+   object moves by (dx, dy)", the last with the subgoal's arrival
+   expectation.
+4. Otherwise **ask the model**: *update* (edit the store) after any surprise,
+   no-op, novelty, return-to-start, level start or game over, and every 10
+   actions unless the last 5 predictions all held; then *act* (up to 6 steps
+   and/or up to 4 subgoals).
+
+Without a usable model the step goes to v1's explorer, and every such step is
+counted: a run with `explore_steps > 0` is reported as not clean.
+
+### 12.2 The fact layer v4 adds
+
+`v4/facts.py`, a subclass of §11.2's `FactBook` (v3's prompts are untouched,
+so v3's recorded calls still replay). Each addition answers a failure measured
+on ls20 on 2026-10-19 (D-044). After 14 scripted moves on real ls20
+(`scripts/probe_v4_facts.py ls20 1,1,3,3,4,4,2,2,4,4,4,4,4,4`, seed 0), the new
+lines are:
+
+```
+CHANGE ON EVERY ACTION, WHATEVER THE ACTION (excluded from no-op checks): #13 (last 14 steps)
+SAME SHAPE UP TO SCALE/ROTATION/REFLECTION: #3 ~ #10 (x2 smaller, rotated 270)
+NEXT TO the most controlled-looking object (group #7 #8):
+  ACTION1 -> (+0,-5) would enter: colour 3 x25
+  ACTION2 -> (+0,+5) would enter: colour 4 x25
+  ACTION4 -> (+5,+0) would enter: colour 4 x25
+MOVES THAT HAPPENED entered: colour 3 x250. MOVES THAT DID NOT HAPPEN had in the way: colour 4 x250.
+(20 shape changes of still objects were only a mover covering or uncovering them, and are not reported as changes)
+```
+
+and the per-action tallies no longer list the bar: `ACTION4: tried 8, no
+effect 5; colour-12 moved (+5,+0) x3, colour-9 moved (+5,+0) x3`. Compared with
+§11.2's excerpt: the floor's `#1 reshaped` artefact is gone; the bar #13 is no
+longer "controlled-looking" (an object that moves the same way under every
+action is excluded); the goal box #3 is linked to the key display #10; and the
+wall colour (4) is identified from evidence. The other additions are per-step
+notes: an object back at its level-start position, objects restored to their
+level-start state (on ls20, a lost life), a colour or shape never seen before
+on the level.
+
+### 12.3 Subgoals and routes
+
+`v4/route.py`. A subgoal is `{object, to, relation, on_arrival, goal}` with
+`relation` overlap, touch or at. `route` is a breadth-first search over the
+positions of the object's co-moving group, using each action's dominant
+measured displacement, refusing colours that blocked a move and were never
+entered (`blocked − entered`), and refusing the exact (position, action)
+pairs where a move was refused. The last was added after the real-ls20 check
+below, where a move was refused with floor-coloured cells ahead and the
+router kept proposing it.
+
+Mechanics check on real ls20 (`scripts/oracle_v4_ls20.py "#5" "#3" 60`, seed 0): a
+scripted "model" tries the four moves and then gives the plan "overlap #5
+(expect nothing), then overlap #3 (expect level_complete)". The walker reached
+#5 at t14 (the key display rotated), routed to #3 and **cleared level 1 after
+22 actions — the human baseline is 22** — with 7 act calls; 18 of 19
+predictions held on steps where more than the ticker changed. This measures
+the walker, not a model: the subgoals were supplied.
+
+### 12.4 What this does not do
+
+- **Routes only translate one object.** Pushing, rotating, teleporting, moving
+  obstacles and clicks are the model's to do in explicit steps.
+- **Movement knowledge is per level.** The fact layer restarts at each level,
+  so the moves must be re-observed (a few actions) before code can route.
+- **Goal attainment is one condition.** A goal that needs something done first
+  is weakened when its final condition holds without it; the model must
+  restate it with the precondition.
+- **Tickers are found per id over a 4-step window;** the tracker can swap ids
+  between a bar's spent and live parts after a refill, and the swapped id is
+  re-detected rather than corrected.
+- **Thinking is not capped.** A truncated answer is retried once with twice
+  the room and counted (`stats['truncated']`). vLLM's soft
+  `thinking_token_budget` can be passed with `--llm-extra`; it is untested.
+
+
+## 13. v5: object permanence, an object sheet, and the model's simulator searched by code (D-046)
+
+v4 (§12) asked the model before nearly every action and made it predict every
+change by object number; on five games (2026-10-29) that was ~1.3 calls per
+action, ~10k thinking tokens per call and no level. v5 (`src/arc3/v5/`) keeps
+v4's assumption store, router and checker and changes three things: code
+keeps the state of every object and shows the model one line per object; a
+small surprise no longer stops a plan; and the model can hand code a
+*program* — a simulator and a goal — that code validates and searches for the
+shortest path. Nothing here knows what a counter, key or door is (Guardrail 2);
+every classification is "behaves the same whatever the action" or similar.
+
+### 13.1 Object permanence
+
+Two changes, measured on all 25 public games (`docs/experiments/identity_2026-10-30/`):
+
+- **The tracker prefers same-coloured in-place overlap.** `perception/track.py`
+  prices a same-coloured pair that overlaps by containment
+  (`0.45 · (1 − overlap/min size) + 0.05`), so a bar that fills or empties is
+  the same object rather than a stranger of the same shape. In-place id swaps
+  fell from 96 to 49 of 60,102 same-colour overlapping pairs
+  (`scripts/eval_identity.py`, 80 scripted actions, seed 0); the oracle's
+  id-switch rate on exclusive sprites fell from 0.8% to 0.6%
+  (`scripts/eval_tracking.py`, 60 actions, seed 0).
+- **Deformation is not motion.** v3's diff calls any shift of the box corner
+  "moved", so a bar growing leftwards "moved (−1,+0)". `FactBook5` reports a
+  change whose old and new cells overlap and whose shape changed as
+  grew/shrank/reshaped with the sides that moved ("extended left"). On the v4
+  fact layer 1,269 of 2,478 reported moves were of this kind; on v5 none are
+  (that number is zero by construction — the metric is the rule).
+
+Splits and merges are events ("#5 split: #23 appeared out of it"), and the
+model can attach a name and a role to an id, which code shows wherever the id
+appears.
+
+### 13.2 Counters and movers
+
+`FactBook5.counters()`: an object that, on each of the last 3 steps, under at
+least two different actions, changed size by the same amount on the same side
+and did not translate. `movers()`: an object that translated the same way on
+each of those steps whatever the action. A counter leaves the object sheet
+for one INTERFACE line and is ignored by every prediction check; a mover stays
+on the sheet, flagged "MOVES ON ITS OWN". The distinction the user asked for —
+a counter must not capture things that move — is that a counter's change does
+not depend on the action: a growing snake extends where the action points, so
+its side changes and it is not a counter (`tests/test_v5_facts.py`).
+
+Audit (`scripts/eval_counters.py`, 40 scripted actions, seed 0): counters on
+9 of 25 games, every one a 1–2 cell bar on a frame edge (rows 0, 61, 63,
+column 63); no player candidate was ever classed as a counter; no autonomous
+mover appeared in that play.
+
+### 13.3 What the model sees
+
+Real ls20 after the four code probes and six more moves (seed 0, the
+`FactBook5.describe()` of §13.1's scripted play, abridged):
+
+```
+INTERFACE (changes the same way on every action, whatever the action - most likely a move counter or timer ...): #13 colour 11 at x23 y61 32x2, 64 cells now (84 at level start), -2 cells per action (retracted left)
+OBJECT SHEET (17 objects; background colour 4; x = column, y = row of the top-left corner):
+  #7 colour 12 at x49 y35 5x2 (10 cells) | ACTION4: moved (+5,+0) x4; ACTION1: moved (+0,-5) x3; ACTION3: moved (-5,+0) x1; ACTION2: moved (+0,+5) x1
+  #8 colour 9 at x49 y37 5x3 (15 cells) | ACTION4: moved (+5,+0) x4; ...
+  #1 colour 3 at x14 y8 40x42 (892 cells) | never changed
+  ...
+SAME SHAPE UP TO SCALE/ROTATION/REFLECTION: #3 ~ #10 (x2 smaller, rotated 270)
+CONTROLLED-LOOKING (moved differently by different actions): #7: ACTION1->(+0,-5), ACTION2->(+0,+5), ...
+ACTION-EFFECT TABLE (what each action did so far, counters left out):
+  ACTION4: tried 5, nothing happened 1 | #7 moved (+5,+0) x4; #8 moved (+5,+0) x4; ...
+```
+
+The same view on tn36 (eight random clicks) puts the growing bar on the
+INTERFACE line ("+1 cells per action (extended left)") — the object v4's
+model spent a level trying to "overlap with #0".
+
+The think prompt adds the store, the recent steps with verdicts, the small
+surprises since the last think, why the model is being asked, and the frame;
+the next prompt leaves out the frame and earlier-level notes. All
+instructions are in the system message, identical across calls, so a server
+with prefix caching reuses them. Prompts were ~4–6k tokens in the debug runs
+(v4: ~9.5k).
+
+### 13.4 The loop
+
+Per step (`V5Agent.act`): observe; judge the step (§13.5); then take, in
+order, a queued step; a pending cheap simulator fix (§13.6); code's own plan;
+and only then a model call. The first action of a game goes to **code
+probes**: each non-click action once, before any call.
+
+**Code's plan wins over the model's steps** (amended 2026-10-30). With a
+TRUSTED simulator, code searches it for the shortest path to `goal()`, and if
+that fails to the current subgoal (`sim.subgoal_test`: the same
+overlap/touch/at relation route.py checks, on simulated boxes), and that route
+replaces any explicit steps the model gave in the same answer
+(`stats['steps_overridden']`). Explicit steps run only when there is no
+trusted simulator or no route; a subgoal is walked by route.py only after
+them. A failed search no longer invalidates the simulator; it is shown to the
+model, and if the answer leaves code nothing to do, that is MAJOR. Before this
+change ls20 had a simulator trusted on 10/10 recorded steps and code walked
+the model's subgoal plan instead; no action came from a search.
+
+Calls come in three kinds. **think** (thinking on, full context including
+the frame) only at hard moments: the start of a level, a MAJOR surprise, a
+disproved goal, a simulator a cheap fix could not save, every 30 actions, and
+after 6 next calls in a row; each think record carries `why` (need /
+periodic / next_run). It edits the store, names objects, may write the
+simulator, and gives steps and/or a plan. **next** (thinking off, no frame):
+after a plan finished or a routine STOP (§13.5); it gives steps or a plan.
+**fix** (thinking off): the simulator's source and its error, answered with
+corrected code (§13.6). In debug run (d) on tn36 a think call took 70–300 s
+and 7–13k completion tokens, a next call 5 s and ~300.
+
+Why the change of tiers: in the 2026-10-30 run (invalid for other reasons,
+`docs/experiments/README.md`) 20 of the 21 good calls were think. Every first
+call was forced by the "soft" notes the code probes produce (ACTION1 then
+ACTION2 returns the player to its start square; the move counter appears as a
+new shape), and every later one by a MAJOR that was routine: a test move on
+the player that was simply blocked by a wall ("expected #7 moved (+0,+5), got:
+nothing changed there"), or a subgoal route.py could not route because the
+object had not been seen to move under two actions.
+
+**When the model cannot be reached the game stops.** The HTTP client retries
+connection and DNS failures for up to ten minutes (`outage_seconds`) and then
+raises `NetworkDown`; HTTP 5xx and read timeouts get 3 retries with backoff,
+and v5 asks again up to three failed calls in a row. Either way the agent
+sets `halted`, `eval_agent.py` stops before spending the action and marks the
+row `invalid`. The explorer still plays when there is no model at all, and
+the row says NOT CLEAN.
+
+### 13.5 Surprises
+
+- **MAJOR** — stops the plan and calls think: the outcome differed (level
+  complete, game over); the driven object (the controlled-looking object, the
+  plan's object, the simulator's tracked ids) did something *other* than
+  predicted (moved differently, changed); an object jumped back to its
+  level-start position (further than any displacement seen for that action);
+  a goal reached in the simulator without the level completing; a store goal
+  whose condition holds without a win; a small surprise seen twice (escalated
+  once per kind); an answer that left code nothing to do.
+- **STOP** — routine; stops the plan and the next call is a *next* call that
+  sees why: a step on the driven object that was simply blocked (every
+  failure on it is "nothing changed there"), and a subgoal route.py cannot
+  route.
+- **SIMULATOR WRONG** — a tracked object mispredicted during a simulator plan:
+  stops the plan and goes to a cheap fix first; MAJOR only if the fix fails.
+- **soft** — shown at the next call, of whichever tier, nothing dropped: a new
+  colour or shape (a counter's first appearance comes before it can be
+  classified), an object back on its start square by an ordinary move.
+- **MINOR** — logged and shown at the next call: any other wrong or
+  unpredicted detail.
+- A blocked step on a code-walked route is re-routed by code (the blocking
+  colour and position were just learned), up to 3 times per plan.
+
+### 13.6 The simulator as a program
+
+`v5/sim.py`. The model sends `{"lines": [...], "tracked": ["#7", "#8"],
+"goal_id": "A3"}`: Python defining `predict(state, action)` and `goal(state)`
+over v3's sandboxed `State` (§11.3), one string per line — one string with
+`\n` escapes arrived with every newline turned into a bare "n" in debug run
+(d). Code compiles it, replays it on every recorded step of the level and
+compares **only the tracked ids** (or everything but counters and movers if
+none are named); at ≥80% it is trusted. Then breadth-first search from the
+current state for the fewest actions that make `goal()` true (6,000 nodes,
+20 s), executed step by step and checked against the simulator's predicted
+state.
+
+**Cheap repair.** A simulator that does not compile, raises on replay, falls
+under 80%, or mispredicts a tracked object during a plan goes back in a *fix*
+call (thinking off, `prompts.fix_messages`: the object sheet, the numbered
+source and what is wrong), at most twice, before any think call. The sandbox
+offers `np`, `math` and `click_xy(action)` (the (x, y) of a click, else
+None); an `import` line fails to compile, and the prompt now says so in those
+words. In the 2026-10-30 run a tu93 SyntaxError (`'[' was never closed`) and
+a vc33 `import re` (to parse clicks) each cost a 2–4 minute think call to
+come back to.
+
+The first simulator the model wrote (ls20, debug run d, call 2) was, newlines
+restored:
+
+```python
+def predict(state, action):
+    p = state.get(7); f = state.get(8)
+    if not p or not f: return state
+    delta = {'ACTION1': (0,-5), 'ACTION2': (0,5), 'ACTION3': (-5,0), 'ACTION4': (5,0)}.get(action)
+    if delta is None: return state
+    dx, dy = delta
+    if state.free(p['x'] + dx, p['y'] + dy, 5, 5, passable=(3,), ignore=(7, 8)):
+        state.move(7, dx, dy); state.move(8, dx, dy)
+    return state
+```
+
+It validates 8/8 on real ls20 steps, and in it code finds 34 reachable player
+positions and a route across the maze (`tests/test_v5_sim_ls20.py`).
+
+### 13.7 What this does not do
+
+- **One simulator at a time.** Goals are a weighted population in the store;
+  simulators are not. A failed one goes back to the model with its
+  counterexamples.
+- **Untracked objects are frozen in the search.** A plan that depends on
+  something the simulator does not model fails at execution, as a surprise.
+- **Clicks are searched over object centres only** (at most 24).
+- **The classification window is 3 steps.** An object that changes the same
+  way three times by coincidence would be hidden; the audit found no such
+  case, but the audit is one seed of scripted play.
+- **A counter is hidden from the model's sheet.** If a game needs the player
+  to act on one, the model sees it only on the INTERFACE line.
+- **Thinking is not capped on the Kaggle path.** NIM development runs pass
+  Nemotron's `reasoning_budget=12000` (`scripts/run_v5_nim.sh`) because NIM
+  closes a request after ~340 s; that is an endpoint workaround, not a design
+  choice.
+
+---
+
+## 14. The submission track: the vendored Duck harness and our grafts (D-045, D-047, D-049)
+
+Four days before the deadline, our best agent (v1) scored ~2.4% offline RHAE.
+The public Milestone #2 notebooks scored ~28–31 on the leaderboard. We stopped
+treating our own agent as the submission and built the submission on the best
+public code instead (D-043, D-045). This section describes that machine. It is
+mostly someone else's, so this section says where its parts come from and
+which parts are ours.
+
+### 14.1 What is vendored, and from where
+
+`third_party/duck-franzen/` is Daniel Franzen's Milestone #2 winner (27.89
+public), vendored verbatim at commit `b55ec89` from a fork of
+`da-fr/arc-agi-3-solution` (Apache-2.0; `NOTICE.md` gives the upstream commit).
+It is a fork of Tufa Labs' Duck harness, the Milestone #1 winner. In outline:
+
+- **One LLM agent per game**, with a Python tool sandbox. The model reads the
+  frame as text, writes and runs Python against it, and chooses actions.
+- **Serving:** Qwen3.8-Flash-Next (Intel W4A16 AutoRound), with an INT4 MTP
+  draft model, under SGLang "Pennyroyal" 2.5.3 on the RTX Pro 6000. All of it
+  comes from dfranzen's public Kaggle inputs.
+- **Exact perception of its own:** segmentation, a Hungarian-matched frame
+  diff, animation frames, and a `gameplay_changed` rule that ignores edge-cell
+  counters.
+
+The notebook is
+`third_party/duck-franzen/kaggle/dfranzen/arc-agi-3-milestone-2-solution.ipynb`.
+Its cell 2 writes Franzen's 499 KB patch over Tufa's source bundle, and cell 4
+applies it.
+
+Two more third-party pieces are vendored, each with a `NOTICE.md`:
+
+- `third_party/solved-level-memory/`: lalalia9's solved-level memory and
+  longer timeouts (from rellik13's M85 idea). The author states a public score
+  of 31.46 for that notebook.
+- `third_party/adaptive-duck/`: the "Adaptive Duck" sandbox tools
+  (`route()`, `bounded_search()`, `check_model()`, `follow_plan()`,
+  `solve_toggle()`, and notes kept across history trimming). The author states
+  a public score of 31.21; its practice score was never measured.
+
+### 14.2 What is ours
+
+Everything of ours is a separate, generated, flag-gated layer, so that the
+baseline arm stays byte-for-byte Franzen's code:
+
+| piece | where | switched on by | origin of the idea |
+|---|---|---|---|
+| Scale-invariant shape hash: segmentation nodes gain `scale` and `scale_free_hash`, and the prompt documents them | `git diff b55ec89` of the vendored tree (`segmentation.py`, `prompts.py`, `python_tool_sandbox.py`) | `--graft --env ARC3_SCALE_HASH=1` | v4's ls20 forensics: the goal glyph is a 2×, rotated copy (D-044 item 3) |
+| Turn hints: a measured budget bar in the border bands, "board back at level start" (probably a lost life), and per-action effect counts | `kaggle/duck_grafts/turn_hints.py` | `--hints` plus `ARC3_HINT_BUDGET/LIFE/EFFECTS=1` | v4/v5 forensics: counters taken for goals, lost lives taken for progress (D-044 items 1 and 4); v5's action-effect table (D-046) |
+| Model-visible RESET | already in Franzen's code, left off by him | `--env EXPOSE_RESET=on` | B's ls20 transcript: the model spent 38 moves losing lives to force a restart (D-047) |
+| Notebook builder | `scripts/push_duck.py` | dry run by default; `--push` spends quota | — |
+| Offline runner against a hosted API (NIM), arms A and D | `kaggle/duck_grafts/local_run.py` | run with the harness's own venv | lets arms be compared without Kaggle quota |
+
+`push_duck.py` also pins Franzen's Python 3.12 Kaggle image. Kaggle's latest
+image is 3.13, and the Pennyroyal cp312 wheels do not install on it (smoke
+runs, 2026-11-01). For a smoke test it narrows the game list (`--games`) and
+the time per game (`--game-minutes`). Neither changes a competition rerun.
+
+### 14.3 What it measurably does
+
+The measurements are the Kaggle smoke runs of 2026-11-01 (ls20 + ft09,
+20 min per game, one pass each; `docs/experiments/README.md`):
+
+- **A** (`--memory`): mean 57.72. ft09 6/6, ls20 3/7.
+- **B** (A + scale hash): mean 59.92, with the same levels cleared.
+
+The difference is noise. These runs show that both notebooks run end to end
+on the pinned image, and nothing more. The A-vs-D comparison on NIM
+(`local_run.py`, four games, two rounds) had not finished on 2026-11-02 when
+this section was written.
+
+### 14.4 What this does not do
+
+- **It does not contain our thesis.** No hypothesis population, no
+  checked predictions, no internal planning over a learned model, unless the
+  model writes one in its sandbox (and the Adaptive Duck tools encourage
+  that). Our contribution is a few hints and one perception key. This is a
+  choice made under deadline (D-043, D-045). It does not show that the thesis
+  was wrong.
+- **None of our grafts has a measured effect.** Every comparison so far is
+  one pass on two to four games. lalalia9 measured changes that looked
+  neutral on public games costing 7–8 points on the hidden set (D-047).
+- **It is not developed on the model it runs.** Local runs use Nemotron-VL
+  through NIM. Kaggle runs Qwen3.8-Flash-Next under SGLang.
+- **It depends on four third-party Kaggle inputs from one user** (dfranzen)
+  staying public and unchanged.
+- **The licensing rests on declarations we could not fully verify.** Tufa's
+  repository has no LICENSE file, and the Apache-2.0 grant comes from
+  Franzen's repositories (D-045).
