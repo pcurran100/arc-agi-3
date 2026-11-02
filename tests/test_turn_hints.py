@@ -51,9 +51,47 @@ def test_walking_back_to_the_start_is_not_a_lost_life():
 
 
 def test_lost_life_is_reported():
-    es = entries([("LEFT", -1, 1, False), ("LEFT", -1, 1, False), ("LEFT", 0, 0, True)])
+    es = entries([("LEFT", -1, 1, False)] * 3 + [("LEFT", 0, 0, True)])
     start, trans = th._th_attempt(es)
-    assert th.th_life_line(start, trans).startswith("BOARD BACK AT LEVEL START")
+    assert th.th_life_line(start, trans).startswith("BOARD BACK AT LEVEL START: after your last action")
+
+
+def test_lost_life_inside_a_batch_is_reported():
+    # Local run 2026-11-02 (ls20): the model batched moves, lost a life mid-batch and moved on;
+    # only the last transition was checked, so none of four lost lives was reported.
+    es = entries([("LEFT", -1, 1, False)] * 3 + [("LEFT", 0, 0, True), ("RIGHT", 1, 1, False)])
+    start, trans = th._th_attempt(es)
+    assert th.th_life_line(start, trans) is None            # new=1: the last action only
+    line = th.th_life_line(start, trans, new=3)              # the three actions of the batch
+    assert line.startswith("BOARD BACK AT LEVEL START: 1 action before your last one (after LEFT)")
+
+
+def test_board_toggled_back_is_not_a_lost_life():
+    # vc33 (local run 2026-11-02): board pieces reach into the border band, so clicking a
+    # toggle and clicking it back restores the board AND moves the band toward its start
+    # counts, while the real budget bar keeps draining. The old test fired 35 times there.
+    def vframe(on, bar_left):
+        g = [[0] * W for _ in range(H)]
+        for y in range(4, 9):
+            g[y][1] = g[y][2] = 5 if on else 0             # a piece in the left band
+            g[y][6] = 5 if on else 0
+        for x in range(W):
+            g[H - 2][x] = 7 if x < bar_left else 4        # budget: 7 drains into 4
+        return F(grid=tuple(map(tuple, g)), level=1, step=0)
+
+    es = [F(action="RESET", frame=vframe(False, 14))]
+    for i in range(1, 9):
+        es.append(F(action="ACTION6", frame=vframe(i % 2 == 1, 14 - i)))
+    start, trans = th._th_attempt(es)
+    assert all(th.th_life_line(start, trans[:k], new=k) is None for k in range(2, len(trans) + 1))
+
+
+def test_hints_check_every_action_since_the_previous_turn(monkeypatch):
+    # th_install passes `new`: the number of entries since the previous turn message.
+    monkeypatch.setenv("ARC3_HINT_LIFE", "1")
+    es = entries([("LEFT", -1, 1, False)] * 3 + [("LEFT", 0, 0, True), ("RIGHT", 1, 1, False)])
+    assert any(x.startswith("BOARD BACK") for x in th.th_hints(es, new=3))
+    assert not any(x.startswith("BOARD BACK") for x in th.th_hints(es, new=1))
 
 
 def test_effects_count_board_changes_per_action():
@@ -68,3 +106,37 @@ def test_hints_are_off_unless_enabled(monkeypatch):
     assert th.th_hints(es) == []
     monkeypatch.setenv("ARC3_HINT_BUDGET", "1")
     assert len(th.th_hints(es)) == 1
+
+
+def test_install_passes_the_entries_new_since_the_previous_turn(monkeypatch):
+    # th_install against stand-ins for the harness modules: a turn message after a batch of
+    # three actions reports a life lost in the middle of it; a resumed turn on the same
+    # step repeats the same hints; the next step no longer reports it.
+    monkeypatch.setenv("ARC3_HINT_LIFE", "1")
+    state = {"entries": []}
+
+    class ToolAgent:
+        def analyze(self, state_path):
+            return self._build_user_prompt()
+
+        def _build_user_prompt(self):
+            return "turn"
+
+    ta = types.ModuleType("inference.agent.tool_agent")
+    ta.ToolAgent = ToolAgent
+    rs = types.ModuleType("inference.agent.runtime_state")
+    rs.load_runtime_state = lambda path: (None, state["entries"])
+    for name, mod in [("inference", types.ModuleType("inference")),
+                      ("inference.agent", types.ModuleType("inference.agent")),
+                      ("inference.agent.tool_agent", ta), ("inference.agent.runtime_state", rs)]:
+        monkeypatch.setitem(sys.modules, name, mod)
+    th.th_install()
+    agent = ToolAgent()
+    moves = [("LEFT", -1, 1, False)] * 3 + [("LEFT", 0, 0, True), ("RIGHT", 1, 1, False), ("LEFT", -1, 1, False)]
+    state["entries"] = entries(moves[:3])
+    assert "BOARD BACK" not in agent.analyze("p")
+    state["entries"] = entries(moves[:5])                # a batch of two: the life is lost inside it
+    assert "BOARD BACK AT LEVEL START: 1 action before your last one" in agent.analyze("p")
+    assert "BOARD BACK" in agent.analyze("p")            # resumed turn, same step
+    state["entries"] = entries(moves)
+    assert "BOARD BACK" not in agent.analyze("p")

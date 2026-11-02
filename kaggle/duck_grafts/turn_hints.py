@@ -109,23 +109,51 @@ def th_budget_line(trans):
             + "; ".join(sorted(parts)) + ". Check that a plan fits before running it.")
 
 
-def th_life_line(start, trans):
+def _th_refilled(series, after):
+    """True if a border-band colour that had been changing steadily in one direction (at least
+    MIN_STEPS changes, as a draining budget bar does) jumps back by at least half of that run.
+    A lost life refills the bar; board pieces that merely reach into the band oscillate."""
+    for colour in set(after).union(*series):
+        s = [c.get(colour, 0) for c in series]
+        d = [b - a for a, b in zip(s, s[1:]) if b != a]
+        if len(d) < MIN_STEPS:
+            continue
+        up = d[-1] > 0
+        run, total = 0, 0
+        for x in reversed(d):
+            if (x > 0) != up:
+                break
+            run, total = run + 1, total + x
+        jump = after.get(colour, 0) - s[-1]
+        if run >= MIN_STEPS and jump and (jump > 0) != up and abs(jump) * 2 >= abs(total):
+            return True
+    return False
+
+
+def th_life_line(start, trans, new=1):
+    """A lost life among the last `new` transitions (the actions since the previous turn
+    message): the board outside the bands is back at the level start AND a steadily changing
+    band colour (a budget bar) jumped back. Fixed 2026-11-02 after a local run: checking only
+    the last transition missed every life lost inside a batch of actions (ls20), and the old
+    test "the bands moved toward their start counts" fired on vc33 whenever two clicks toggled
+    the board back, because vc33's board pieces reach into the border band."""
     if len(trans) < 2:
         return None
-    action, before, after = trans[-1]
-    if len(after) != len(start) or len(before) != len(start):
-        return None
-    def band_gap(g):
-        a, b = _th_band_counts(g), _th_band_counts(start)
-        return sum(abs(a.get(k, 0) - b.get(k, 0)) for k in set(a) | set(b))
-
-    # Walking back onto the start square also restores the board; a lost life also restores
-    # the border bars (the budget refills), which an ordinary move never does.
-    if (_th_inner_diff(after, start) == 0 and _th_inner_diff(before, start) > 0
-            and band_gap(after) < band_gap(before)):
-        return ("BOARD BACK AT LEVEL START: after your last action the board (outside the border bars) "
-                "returned exactly to how this level began, and you did not RESET. Most likely a life was "
-                "lost or a budget ran out; progress on this attempt is gone. Do not read it as progress.")
+    n = len(trans)
+    bands = [_th_band_counts(trans[0][1])] + [_th_band_counts(t[2]) for t in trans]
+    for i in range(n - 1, max(1, n - max(1, new)) - 1, -1):
+        action, before, after = trans[i]
+        if len(after) != len(start) or len(before) != len(start):
+            continue
+        if (_th_inner_diff(after, start) == 0 and _th_inner_diff(before, start) > 0
+                and _th_refilled(bands[:i + 1], bands[i + 1])):
+            ago = n - 1 - i
+            when = ("after your last action" if ago == 0 else
+                    f"{ago} action{'s' if ago > 1 else ''} before your last one (after {_th_action_kind(action)})")
+            return (f"BOARD BACK AT LEVEL START: {when} the board (outside the border bars) returned "
+                    "exactly to how this level began and a bar in the border jumped back, and you did not "
+                    "RESET. Most likely a life was lost or a budget ran out; progress on this attempt is gone. "
+                    "Do not read it as progress.")
     return None
 
 
@@ -149,11 +177,12 @@ def th_effects_line(entries):
             + ", ".join(items) + ".")
 
 
-def th_hints(entries):
+def th_hints(entries, new=1):
+    """`new`: how many of the latest entries arrived since the previous turn message."""
     lines = []
     start, trans = _th_attempt(entries)
     if _th_on("ARC3_HINT_LIFE"):
-        lines.append(th_life_line(start, trans))
+        lines.append(th_life_line(start, trans, new))
     if _th_on("ARC3_HINT_BUDGET"):
         lines.append(th_budget_line(trans))
     if _th_on("ARC3_HINT_EFFECTS"):
@@ -179,7 +208,14 @@ def th_install():
             path = getattr(self, "_th_state_path", None)
             if path is not None:
                 _, entries = _load(path)
-                lines = th_hints(entries)
+                n = len(entries)
+                seen = getattr(self, "_th_seen", None)
+                if seen is not None and seen[0] == n:
+                    lines = seen[1]          # same step (a resumed turn): same hints as before
+                else:
+                    new = n - seen[0] if seen is not None and seen[0] < n else 1
+                    lines = th_hints(entries, new)
+                    self._th_seen = (n, lines)
                 if lines:
                     prompt += "\n\n" + "\n".join(lines)
         except Exception as exc:
