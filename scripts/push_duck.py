@@ -13,6 +13,8 @@ On top of that, optionally:
   against the vendoring commit, so the vendored tree stays the single source.
 - ``--memory`` adds lalalia9's solved-level memory and that notebook's longer
   timeouts (``third_party/solved-level-memory/NOTICE.md``).
+- ``--hints`` adds our turn hints (``kaggle/duck_grafts/turn_hints.py``, D-048);
+  each is switched on with ``--env ARC3_HINT_BUDGET=1`` and so on.
 - ``--env K=V`` sets environment variables in a first cell (e.g. the graft flag
   ``ARC3_SCALE_HASH=1``), so the same patched code runs A and B arms.
 - ``--games`` / ``--game-minutes`` shrink an interactive Save & Run to a smoke test.
@@ -53,6 +55,7 @@ FRANZEN_APPLY = ('subprocess.run(["git", "apply", "--include=ARC3-Inference/*", 
 #: the Pennyroyal cp312 wheels do not install (smoke runs 2026-11-01 failed on aiohttp==3.14.3).
 DOCKER_IMAGE = ("gcr.io/kaggle-private-byod/python@sha256:"
                 "57e612b484cf3df5026ee4dcc3cb176974b22b2bc0937fb1e16132a8be4cb13c")
+HINTS = ROOT / "kaggle" / "duck_grafts" / "turn_hints.py"
 MEMORY = ROOT / "third_party" / "solved-level-memory" / "memory_patch.py"
 #: (old, new) edits that, with MEMORY, turn Franzen's notebook into lalalia9's (see NOTICE.md).
 MEMORY_EDITS = [
@@ -116,6 +119,13 @@ def build(args: argparse.Namespace) -> dict:
         replace_once(cells[k], "bm.solver.max_runtime_s_per_game = 48*60",
                      MEMORY.read_text(encoding="utf-8") + "bm.solver.max_runtime_s_per_game = 48*60")
 
+    if getattr(args, "hints", False):
+        # Our turn hints (D-048): installed after the memory patch so both wrappers chain.
+        k = cell_index(cells, "# show config")
+        replace_once(cells[k], "bm.solver.max_runtime_s_per_game = 48*60",
+                     HINTS.read_text(encoding="utf-8") + "\nth_install()\n\n"
+                     + "bm.solver.max_runtime_s_per_game = 48*60")
+
     if args.games:
         games = [g.strip() for g in args.games.split(",") if g.strip()]
         j = cell_index(cells, OFFLINE_FILTER.strip())
@@ -145,6 +155,8 @@ def main() -> None:
     ap.add_argument("--graft", action="store_true", help="apply our harness changes too")
     ap.add_argument("--memory", action="store_true",
                     help="add lalalia9's solved-level memory (third_party/solved-level-memory)")
+    ap.add_argument("--hints", action="store_true",
+                    help="add our turn hints (kaggle/duck_grafts/turn_hints.py); enable each with --env")
     ap.add_argument("--env", action="append", default=[], metavar="K=V")
     ap.add_argument("--games", default="", help="comma-separated game-id prefixes (Save & Run)")
     ap.add_argument("--game-minutes", type=float, default=None,
