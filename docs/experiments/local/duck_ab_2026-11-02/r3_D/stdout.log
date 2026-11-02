@@ -1,0 +1,368 @@
+SOLVED_LEVEL_MEMORY_PATCH on
+TURN_HINTS on: {'ARC3_HINT_BUDGET': True, 'ARC3_HINT_LIFE': True, 'ARC3_HINT_EFFECTS': True}
+local_run arm=D games=['ls20-9607627b', 'ft09-0d8bbf25', 'vc33-5430563c', 'sb26-7fbdac44'] cap=30.0 min concurrency=2 model=nvidia/nemotron-3.5-super-vl-120b-a12b seed=0
+priority gate active: 10 concurrent streams
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.7s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.5s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.5s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.1s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.9s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.7s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.6s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.5s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.0s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.8s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.8s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.9s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.3s
+analyzer endpoint returned HTTP 429; retry 5/8 in 60.4s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.3s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.9s
+analyzer endpoint returned HTTP 429; retry 6/8 in 60.5s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.5s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.0s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.6s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.3s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.8s
+analyzer endpoint returned HTTP 429; retry 5/8 in 60.9s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 6/8 in 60.2s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.9s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.0s
+analyzer endpoint returned HTTP 429; retry 7/8 in 60.3s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.4s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.4s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.3s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.3s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.7s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.3s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.5s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.4s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.7s
+analyzer endpoint returned HTTP 429; retry 5/8 in 60.9s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.0s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.5s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.5s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.6s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.8s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.7s
+analyzer endpoint returned HTTP 429; retry 3/8 in 41.0s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.2s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.3s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.7s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.9s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.4s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.9s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.4s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.8s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.8s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.7s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.9s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.5s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.5s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.0s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.4s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.8s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.8s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.0s
+analyzer endpoint returned HTTP 429; retry 4/8 in 61.0s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.6s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.9s
+analyzer endpoint returned HTTP 429; retry 5/8 in 60.5s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.0s
+analyzer endpoint returned HTTP 429; retry 6/8 in 60.5s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.4s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 7/8 in 60.1s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.7s
+analyzer endpoint returned HTTP 429; retry 8/8 in 60.5s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.7s
+analyzer request failed at action 26: 429 Client Error: Too Many Requests for url: https://integrate.api.nvidia.com/v1/chat/completions | response: {"status":429,"title":"Too Many Requests"}
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.3s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.6s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.6s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.2s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.5s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.2s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.0s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.2s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.6s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.2s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.8s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.8s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.0s
+first analyzer request failed (HTTP 429); retrying for up to 3600s while the endpoint comes up, then falling back to 8 retries per request
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.8s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.0s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.0s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.2s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.2s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.2s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.4s
+analyzer endpoint returned HTTP 429; retry 5/8 in 60.9s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.2s
+analyzer endpoint returned HTTP 429; retry 2/8 in 21.0s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.8s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.4s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.3s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.8s
+analyzer endpoint returned HTTP 429; retry 1/8 in 11.0s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.4s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.3s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.4s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.4s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.3s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.8s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.4s
+analyzer endpoint returned HTTP 429; retry 5/8 in 61.0s
+analyzer endpoint returned HTTP 429; retry 4/8 in 61.0s
+analyzer endpoint returned HTTP 429; retry 6/8 in 60.4s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.0s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.5s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.5s
+analyzer endpoint returned HTTP 429; retry 7/8 in 60.4s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.2s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.9s
+analyzer endpoint returned HTTP 429; retry 8/8 in 60.7s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.9s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.5s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.9s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.9s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.5s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.3s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.4s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.6s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.9s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.6s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.2s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.0s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.2s
+analyzer endpoint returned HTTP 429; retry 5/8 in 60.3s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.5s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.4s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.6s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.2s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.2s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.6s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.1s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.4s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.2s
+analyzer endpoint returned HTTP 429; retry 3/8 in 41.0s
+analyzer endpoint returned HTTP 429; retry 1/8 in 11.0s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.3s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.2s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.4s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.1s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.6s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 11.0s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.2s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.6s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.8s
+analyzer endpoint returned HTTP 429; retry 2/8 in 21.0s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.1s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.0s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.5s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.6s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.2s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.6s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.8s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.8s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.9s
+analyzer endpoint returned HTTP 429; retry 3/8 in 41.0s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.7s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.9s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.7s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.5s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.9s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.4s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.1s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.5s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.8s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.2s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.4s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.6s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.9s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.2s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.6s
+analyzer endpoint returned HTTP 429; retry 2/8 in 20.6s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.8s
+analyzer endpoint returned HTTP 429; retry 3/8 in 40.0s
+analyzer endpoint returned HTTP 429; retry 4/8 in 60.1s
+analyzer endpoint returned HTTP 429; retry 1/8 in 10.3s
+analyzer endpoint returned HTTP 429; retry 5/8 in 60.2s
+analyzer endpoint returned HTTP 429; retry 6/8 in 60.6s
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r3_D in 2.64s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 04:32:34
+ended:     in progress
+mean score:    0.00
+median score:  0.00
+total actions: 11
+total tokens:  28230
+generated tokens/sec: 46.79 (job wallclock)
+total wallclock: 1040.7s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=5, tokens=18590
+  ls20-9607627b: score=0.00, levels=0.0/7, actions=6, tokens=9640
+  sb26-7fbdac44: score=0.00, levels=0.0/8, actions=0, tokens=0
+  vc33-5430563c: score=0.00, levels=0.0/7, actions=0, tokens=0
+
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r3_D in 2.22s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 04:32:34
+ended:     in progress
+mean score:    0.00
+median score:  0.00
+total actions: 33
+total tokens:  57141
+generated tokens/sec: 47.40 (job wallclock)
+total wallclock: 2306.3s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=8, tokens=23899
+  ls20-9607627b: score=0.00, levels=0.0/7, actions=25, tokens=33242
+  sb26-7fbdac44: score=0.00, levels=0.0/8, actions=0, tokens=0
+  vc33-5430563c: score=0.00, levels=0.0/7, actions=0, tokens=0
+
+[finished] ls20-9607627b state=gave_up level=0/7 score=0.00 actions=44 tokens=38111 per-level=44/22,0/123,0/73,0/84,0/96,0/192,0/186 note="tokens=46292"
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r3_D in 2.31s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 04:32:34
+ended:     in progress
+mean score:    0.00
+median score:  0.00
+total actions: 73
+total tokens:  91788
+generated tokens/sec: 50.77 (job wallclock)
+total wallclock: 3550.4s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=29, tokens=53677
+  ls20-9607627b: score=0.00, levels=0.0/7, actions=44, tokens=38111
+  sb26-7fbdac44: score=0.00, levels=0.0/8, actions=0, tokens=0
+  vc33-5430563c: score=0.00, levels=0.0/7, actions=0, tokens=0
+
+[finished] ft09-0d8bbf25 state=gave_up level=0/6 score=0.00 actions=29 tokens=53677 per-level=29/43,0/12,0/23,0/28,0/65,0/37 note="tokens=59072"
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r3_D in 2.88s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 04:32:34
+ended:     in progress
+mean score:    0.44
+median score:  0.00
+total actions: 88
+total tokens:  111410
+generated tokens/sec: 46.21 (job wallclock)
+total wallclock: 8180.2s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=29, tokens=53677
+  ls20-9607627b: score=0.00, levels=0.0/7, actions=44, tokens=38111
+  sb26-7fbdac44: score=0.00, levels=0.0/8, actions=5, tokens=6795
+  vc33-5430563c: score=1.75, levels=1.0/7, actions=10, tokens=12827
+
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r3_D in 2.28s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 04:32:34
+ended:     in progress
+mean score:    0.44
+median score:  0.00
+total actions: 122
+total tokens:  133187
+generated tokens/sec: 44.20 (job wallclock)
+total wallclock: 9604.1s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=29, tokens=53677
+  ls20-9607627b: score=0.00, levels=0.0/7, actions=44, tokens=38111
+  sb26-7fbdac44: score=0.00, levels=0.0/8, actions=16, tokens=17246
+  vc33-5430563c: score=1.75, levels=1.0/7, actions=33, tokens=24153
+
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r3_D in 4.83s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 04:32:34
+ended:     in progress
+mean score:    0.60
+median score:  0.33
+total actions: 157
+total tokens:  152374
+generated tokens/sec: 42.12 (job wallclock)
+total wallclock: 10544.3s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=29, tokens=53677
+  ls20-9607627b: score=0.00, levels=0.0/7, actions=44, tokens=38111
+  sb26-7fbdac44: score=0.66, levels=1.0/8, actions=37, tokens=29889
+  vc33-5430563c: score=1.75, levels=1.0/7, actions=47, tokens=30697
+
+[finished] vc33-5430563c state=gave_up level=1/7 score=1.75 actions=47 tokens=30697 per-level=10/7,37/18,0/44,0/61,0/131,0/34,0/152 note="tokens=31045"
+[finished] sb26-7fbdac44 state=gave_up level=1/8 score=0.66 actions=37 tokens=29889 per-level=37/18,0/28,0/18,0/19,0/31,0/23,0/58,0/18 note="tokens=46995"
+benchmark: regenerated diagnostics in C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r3_D in 5.09s
+benchmark: duck-local-D
+solver:    duck-harness
+games:     4
+passes:    1
+runs:      4 (won: 0)
+started:   2026-11-02 04:32:34
+ended:     2026-11-02 05:35:12
+duration:  1h 2m 38s
+mean score:    0.60
+median score:  0.33
+total actions: 157
+total tokens:  152374
+generated tokens/sec: 40.54 (job wallclock)
+total wallclock: 11034.9s
+
+per-game (mean across passes):
+  ft09-0d8bbf25: score=0.00, levels=0.0/6, actions=29, tokens=53677
+  ls20-9607627b: score=0.00, levels=0.0/7, actions=44, tokens=38111
+  sb26-7fbdac44: score=0.66, levels=1.0/8, actions=37, tokens=29889
+  vc33-5430563c: score=1.75, levels=1.0/7, actions=47, tokens=30697
+
+diagnostics: C:\Users\Patrick\Documents\Patrick\ARC-AGI-3\.claude\worktrees\agent-a446720b35bb765b0\runs\duck_ab\r3_D\diagnostics.html
+RESULT arm=D ls20-9607627b levels=0/7 score=0.00 actions=44 resets_model=1 hints={'effects': 21, 'budget': 17} gen_tokens=38111
+RESULT arm=D ft09-0d8bbf25 levels=0/6 score=0.00 actions=29 resets_model=0 hints={'effects': 18, 'budget': 8} gen_tokens=53677
+RESULT arm=D vc33-5430563c levels=1/7 score=1.75 actions=47 resets_model=0 hints={'effects': 30} gen_tokens=30697
+RESULT arm=D sb26-7fbdac44 levels=1/8 score=0.66 actions=37 resets_model=1 hints={'effects': 19} gen_tokens=29889
+MEAN arm=D 0.60

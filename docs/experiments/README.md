@@ -74,3 +74,91 @@ A vs B is within noise (same levels cleared); these runs show only that both not
 | `duck-f-11g` (F) | D without EXPOSE_RESET | 32.48 | 40 |
 
 Per-game noise is very large (tr87: A 3.5, D 71.4, F 2.5), so one run per arm cannot separate the arms with confidence; a replicate of D (`duck-h-11g`) and a hints-only arm (`duck-g-11g`) were queued to measure that. Two earlier control attempts (`duck-a-11g` v1, v2) failed at startup because the kernel, first created by a push Kaggle rejected (2-GPU-session limit), never mounted its datasets; pushing under a new slug fixed it.
+
+## Local A vs D on Nemotron via NIM (2026-11-02)
+
+**This is NOT the Kaggle model.** The Duck harness ran on a Windows ARM laptop against the
+hosted NVIDIA NIM endpoint, model `nvidia/nemotron-3.5-super-vl-120b-a12b`, not
+Qwen3.8-Flash-Next under SGLang. Absolute scores are far below Kaggle's and say nothing about
+the leaderboard; the only question was whether D beats A with the model held fixed.
+
+`docs/experiments/local/duck_ab_2026-11-02/` (`summary.json`, `benchmark.json` with every
+action, `stdout.log` per arm and round; transcripts stayed in the gitignored `runs/duck_ab/`).
+
+- **Arms:** A = Franzen + solved-level memory (`push_duck.py --memory`). D = A + turn hints
+  (budget, life, effects) + `EXPOSE_RESET=on` + `ARC3_SCALE_HASH=1`.
+- **Runner:** `kaggle/duck_grafts/local_run.py --arm A|D --games ... --minutes 30 --concurrency 2
+  --seed 0` (Franzen's env block with the endpoint swapped; changes marked LOCAL in the file).
+  Driven by `drive.sh` (rounds 1-2) and `drive3.sh` (round 3), both copied here. Table:
+  `python kaggle/duck_grafts/local_ab_table.py docs/experiments/local/duck_ab_2026-11-02`.
+- **Fairness:** the same 4 games (ls20, ft09, vc33, sb26), a 30 min cap per game, 2 games in
+  flight per arm, and both arms running at the same time, so both saw the same NIM load
+  (4 streams in total). Round 2 reversed the game order and the launch order. The seed is
+  sent, but concurrency makes sampling nondeterministic.
+- **Code:** rounds 1-2 ran runner ce9bf44 with the hints as of 588205c. Round 3 ran the fixed
+  hints, 287c377 (see below). So round 3's D is not the same arm as Kaggle's D.
+- **Setup notes (Windows):** uv venv at `third_party/duck-franzen/ARC3-Inference/.venv` (x64
+  CPython 3.12.12 under emulation). It was installed with `uv pip install -e` and does not
+  use the lock (arc-agi 0.9.9, arcengine 0.9.3). Three shims live in the runner, not in the
+  vendored tree:
+  - the 67 KB Python-tool sandbox bootstrap overflowed Windows' command-line limit, so it is
+    run from a file;
+  - the sandbox env is given `SYSTEMROOT`, and `os.killpg` is replaced;
+  - the runner re-runs itself under `-X utf8`, because a cp1252 crash in diagnostics.
+  NIM rejects the request field `priority`, but the harness never sends it.
+
+| round | game | A levels | A score | A actions | A model RESETs | D levels | D score | D actions | D model RESETs | D hint turns (budget/life/effects of prompts) | gen. tokens A / D (k) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| r1 | ls20 | 0/7 | 0.00 | 268 | 0 | 1/7 | 2.37 | 209 | 4 | 70/0/88 of 91 | 120 / 161 |
+| r1 | ft09 | 0/6 | 0.00 | 49 | 0 | 0/6 | 0.00 | 58 | 0 | 46/0/59 of 63 | 193 / 173 |
+| r1 | vc33 | 1/7 | 0.12 | 153 | 0 | 1/7 | 0.06 | 255 | 26 | 0/12/96 of 98 | 160 / 94 |
+| r1 | sb26 | 1/8 | 2.49 | 59 | 0 | 1/8 | 2.78 | 142 | 4 | 0/0/77 of 79 | 189 / 147 |
+| r1 | **mean** | | **0.65** | | | | **1.30** | | | | |
+| r2 | sb26 | 1/8 | 2.78 | 81 | 0 | 1/8 | 1.07 | 262 | 17 | 0/0/59 of 61 | 222 / 162 |
+| r2 | vc33 | 2/7 | 6.81 | 63 | 0 | 2/7 | 0.98 | 140 | 27 | 0/2/62 of 66 | 239 / 193 |
+| r2 | ft09 | 2/6 | 14.29 | 32 | 0 | 1/6 | 4.76 | 50 | 0 | 17/0/30 of 34 | 116 / 67 |
+| r2 | ls20 | 0/7 | 0.00 | 38 | 0 | 0/7 | 0.00 | 53 | 1 | 25/0/29 of 31 | 43 / 60 |
+| r2 | **mean** | | **5.97** | | | | **1.70** | | | | |
+| r3 | ls20 | 0/7 | 0.00 | 112 | 0 | 0/7 | 0.00 | 44 | 1 | 17/0/21 of 23 | 36 / 38 |
+| r3 | ft09 | 1/6 | 3.52 | 61 | 0 | 0/6 | 0.00 | 29 | 0 | 8/0/18 of 21 | 84 / 54 |
+| r3 | vc33 | 2/7 | 7.52 | 31 | 0 | 1/7 | 1.75 | 47 | 0 | 0/0/30 of 32 | 38 / 31 |
+| r3 | sb26 | 1/8 | 0.69 | 59 | 0 | 1/8 | 0.66 | 37 | 1 | 0/0/19 of 24 | 40 / 30 |
+| r3 | **mean** | | **2.93** | | | | **0.60** | | | | |
+
+A: mean over all game-runs 3.18 (n=12)
+
+D: mean over all game-runs 1.20 (n=12)
+
+Levels cleared in total: A 11, D 9 (out of 12 game-runs each). HTTP 429 throttling (counted
+in stdout) was 0/1 (A/D) in round 1, 81/97 in round 2 and 199/206 in round 3. The later
+rounds therefore ran far fewer turns per game, about equally in each arm.
+
+**Result: no evidence that D helps on Nemotron. A was ahead in 2 of 3 rounds.**
+- Mean over 12 game-runs: A 3.18, D 1.20.
+- Per-game spread is huge. ft09 A scored 0, 14.29 and 3.52 across the three rounds, so a
+  difference of this size is within noise at n=12.
+- **RESET:** the clearest mechanism is `EXPOSE_RESET`. D's model RESET 26 and 27 times on
+  vc33 and 17 times on sb26, often in loops of RESETs that the harness reported as no-ops.
+  Each RESET is a scored action, so D's action counts per level were higher (vc33 r2:
+  2 levels in 140 actions against A's 63).
+- **Kaggle:** the 11-game Kaggle runs (Qwen, 20 min) went the other way: control 28.88, D
+  36.73, and F (= D without RESET) 32.48. **This local run did not change our mind about
+  Kaggle**: a different model, 4 games and throttled turns. It does flag RESET as the
+  component to watch for misuse.
+
+**Bugs found in our hints and fixed in 287c377, with tests in `tests/test_turn_hints.py`.**
+Both bugs were in the Kaggle D arm that scored 36.73.
+1. *Lost-life line missed every life lost inside a batch.* It checked only the last
+   transition. On r1 ls20, D lost 4 lives mid-batch and was told about none of them. It now
+   checks every action since the previous turn message.
+2. *False lost-life line on vc33.* vc33's board pieces reach into the border band, so
+   clicking a toggle back restored the board and moved the band toward its start counts.
+   That fired 35 times on r1 vc33, and 12 of those lines reached the model, which answered
+   with RESETs. A life now also needs a band colour that was moving steadily (at least 3
+   steps one way) to jump back by at least half that run.
+
+Replaying the round-1 histories (both arms) with the fixed code: ls20 reports each real life
+lost, and vc33, ft09 and sb26 report none.
+
+**Limitation found, not fixed:** the budget line never fires on vc33. Its bar drains 1 or 2
+cells per click, so it never holds the same rate for 3 steps in a row.
