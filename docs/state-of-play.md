@@ -4,12 +4,15 @@
 currently doing.** Read this first every session. Update it before the session
 ends if anything below is stale.
 
-- **Last updated:** 2026-11-02 (deadline day), reconciled across branches on
-  `docs-status`. Everything below the **Archive** line is the state of
+- **Last updated:** 2026-11-03, after the deadline. Reconciled across
+  branches on `docs-status` (2 Nov), then brought up to date with the
+  submission (D-048). Everything below the **Archive** line is the state of
   play as it stood on 2026-10-16 (session 6), kept unedited because it records
   what we believed then.
-- **Deadline:** final submissions close **2 November 2026, 23:59 UTC**. A
-  competition rerun takes up to ~9 h.
+- **Submitted:** variant **D** at 17:52 UTC on 2 Nov (Kaggle submission
+  57917075), the only entry (one submission per day). Its rerun was still
+  PENDING at 00:27 UTC 3 Nov; the notebook is built to finish inside its 9 h
+  budget. **Papers are due 9 November.**
 - **Narrative of how we got here, and every idea tried, parked or rejected:**
   `docs/history.md`.
 
@@ -24,15 +27,16 @@ Duck harness, score ~28–31 on the leaderboard. So since 29 October the
 submission has been built on Daniel Franzen's vendored harness, with our
 findings as flag-gated grafts (D-043, D-045, D-047). On 2 November the user
 ruled out entering the plain public baseline, and reserved every submission
-for themselves (D-049). Variants are being compared offline against the
-baseline now.
+for themselves (D-049). Six variants were compared on 11 public games on
+Kaggle; the user entered D, which scored 36.73 against the baseline's 28.88
+in a single run each (D-048).
 
 ## Current status by line of work
 
 | line | branch | status | latest evidence |
 |---|---|---|---|
-| **Submission: Duck harness + grafts** | `duck-base` (active today) | candidate arms built; **nothing submitted**; the user approves every submission (D-049) | Kaggle smoke 2026-11-01, ls20 + ft09: A 57.72, B 59.92, which is noise (D-047). A-vs-D on NIM (`local_run.py`, 4 games × 2 rounds) **running since ~02:31 UTC 2 Nov, no result yet** |
-| Turn hints (budget bar, lost life, effect counts) | `duck-base` | built, checked on live ls20 frames; **D-048 not yet written** | none measured |
+| **Submission: Duck harness + grafts** | `duck-base` (active today) | **D submitted** 2 Nov 17:52 UTC, rerun pending (D-048) | Kaggle, 11 games × 20 min, one run each: A 28.88, D 36.73, E 31.63, F 32.48, G 35.61, H 24.07. Local on NIM (4 games × 3 rounds): A 3.18, D 1.20 |
+| Turn hints (budget bar, lost life, effect counts) | `duck-base` | in the entry (original version); life hint fixed afterwards in 287c377 (D-048) | every arm with the original hints cleared more levels than A (40–43 vs 38); the fixed version (H) measured worst |
 | Our agent, v5 | `v5-objects` (not merged) | research line; not a submission candidate (D-046) | 1 level / 4 valid games, Nemotron-VL on NIM, 0.43–0.75 calls per action |
 | Our agent, v4 + fixes | `v4-fixes` (merged into `v5-objects`) | superseded by v5 | 0 levels / 5 games (D-044) |
 | v1–v4 | `main` = `v4-submission` | frozen; v1 tagged `v1-graph` | v1 2.42% offline RHAE, 3 seeds × 25 games (D-034) |
@@ -46,8 +50,10 @@ baseline now.
 - **D** = A + all three turn hints + `EXPOSE_RESET=on` + scale hash
   (`local_run.py --arm D`). This stacks changes, against D-047's
   one-change-per-arm rule; see D-049.
-- **Adaptive Duck tools** (`--adaptive`), third party. Available, not yet
-  compared.
+- **E** = D + Adaptive Duck tools (`--adaptive`), third party.
+- **F** = D without RESET. **G** = A + the three hints only.
+  **H** = D with the fixed life hint (287c377).
+- **Entered: D**, as it ran in `duck-d-11g` v1 (original hints, e157b78).
 
 ## What we currently believe
 
@@ -66,19 +72,18 @@ baseline now.
 
 ## Open items, in priority order
 
-1. **Decide the entry.** Read the A-vs-D result (`runs/duck_ab/` in the
-   `duck-base` worktree). If D beats A outside noise, push it with
-   `push_duck.py` and that arm's flags (listed above) and submit **on the
-   user's go-ahead**, leaving the ~9 h rerun margin. If it does not, the
-   choice is between A and no entry, and it is the user's (D-049).
-2. **Write D-048** (turn hints) on `duck-base`, with the A-vs-D result as its
-   experiment.
-3. **Open-source the repository before private scores are released** (prize
-   eligibility, D-047). Check the rules page on the Apache-2.0 third-party
-   code (D-045). Our code is MIT-0 (D-041).
-4. **Merge the branches** so the code matches this record: `v5-objects` and
-   `duck-base` into `main`. This branch (`docs-status`) holds the reconciled
-   docs.
+1. **Read D's score** on the Submissions page once the rerun finishes. An
+   error there would most likely be a timeout.
+2. **Paper track, due 9 November.** Material: `docs/history.md`, D-034 to
+   D-049, and the measured negative results of the model-based thesis.
+3. **Open-sourcing:** the repository is public and holds the submitted code
+   (`duck-base`); merge it into `main` (PR #3). Optionally make the
+   `duck-d-11g` notebook public.
+4. **After the deadline, if work continues:** re-test the fixed life hint
+   (H's sb26 collapse), run the control replicate (J) that never ran, and
+   try the consensus ideas on their branches (`duck-consensus`,
+   `duck-smallmodel`; most promising: several samples of one model, checked
+   by code against recorded history).
 
 ## Known risks
 

@@ -4038,4 +4038,70 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 
 ---
 
-<!-- Next entry: D-050 (D-048 reserved for the turn hints on duck-base; D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->
+## D-048 — Turn hints for the Duck harness, and the entry: variant D
+
+- **Date:** 2026-11-02 (built 00:15–03:32 UTC; submitted 17:52 UTC)
+- **Status:** accepted; **variant D submitted** to ARC Prize 2026 ARC-AGI-3
+  (Kaggle submission 57917075, kernel `experiencebreakfast/duck-d-11g` v1,
+  status PENDING at 00:27 UTC 3 Nov). The only submission: Kaggle allowed
+  one per day, so the planned second entry (G) was not made.
+- **Context:** reading B's ls20 transcript (D-047) showed the model plan a
+  43-step route on a ~21-action budget bar, then spend 38 moves on purpose
+  exhausting lives to force a restart. Our own agents had measured exactly
+  these things (v5's counter classification, v4's lost-life forensics, v5's
+  action-effect table, D-044, D-046); Duck has none of them as code facts.
+- **Decision:** `kaggle/duck_grafts/turn_hints.py` (ours, MIT-0) appends up
+  to three lines to each turn message, computed from recorded frames only,
+  each behind its own flag: `ARC3_HINT_BUDGET` (border-band colour changing
+  by a constant amount per board-changing action, with actions left at that
+  rate), `ARC3_HINT_LIFE` (board back at its level start after an ordinary
+  action, with the border bars moving back), `ARC3_HINT_EFFECTS` (per
+  action, how often it changed the board this level). Installed by
+  `push_duck.py --hints` after the memory patch. Variant D = A + all three
+  hints + `EXPOSE_RESET=on` (Franzen's built-but-off model RESET) +
+  `ARC3_SCALE_HASH=1` (D-045).
+- **Experiment (Kaggle, 11 public games × 20 min, one pass, 11 concurrent,
+  Qwen3.8-Flash-Next; `docs/experiments/kaggle/duck_11g_2026-11-02/`):**
+
+  | arm | flags beyond `--memory` | mean | levels |
+  |---|---|---|---|
+  | A control (`duck-ctrl-11g`) | — | 28.88 | 38 |
+  | D (`duck-d-11g`) | hints (original) + RESET + scale hash | **36.73** | 41 |
+  | E (`duck-e-11g`) | D + `--adaptive` | 31.63 | 40 |
+  | F (`duck-f-11g`) | D without RESET | 32.48 | 40 |
+  | G (`duck-g-11g`) | hints (original) only | 35.61 | **43** |
+  | H (`duck-h-11g`) | D with the fixed hints (287c377) | 24.07 | 32 |
+
+  One run per arm; per-game noise is very large (tr87: 3.5 in A, 71.4 in D,
+  2.5 in F). Every arm with the original hints cleared more levels than A.
+  H's loss is concentrated in sb26 (100 in all five other arms, 27.8 in H,
+  with a third of the tokens); one run cannot tell a defect of the fix from
+  luck. The planned I (fixed hints, no RESET) and J (control replicate) never
+  ran: the local scheduler was stopped for low system memory at ~06:24 UTC.
+- **Experiment (local, Nemotron-3.5-Super-VL via NIM, 4 games × 3 rounds,
+  `docs/experiments/local/duck_ab_2026-11-02/`):** A 3.18, D 1.20 (11 vs 9
+  levels), under heavy NIM throttling in rounds 2–3. Found two bugs in the
+  life hint, both present in Kaggle's D: lives lost inside a batch were
+  missed, and vc33 (pieces in the border band) fired 35 false alarms, which
+  the model answered with RESETs. Fixed in 287c377 with tests; the weaker
+  model also looped on RESET (26–27 on vc33).
+- **Changed our mind?** Yes, about what to enter: the user chose D on the
+  Kaggle evidence. We did not expect the *fixed* hints to measure worst; that
+  is unexplained and is the first thing to re-test.
+- **Options rejected:**
+  - *Enter A* — rejected by the user (D-049).
+  - *Enter H (the fixed hints)* — cleaner code, worst measurement.
+  - *Enter G alone* — close to D on mean, best on levels, fewer changes; it
+    was to be the second entry, which the daily limit prevented.
+  - *More test rounds* — no time inside the rerun margin; Kaggle's queue
+    held runs for up to an hour.
+- **Consequences:** the entry ships the original life hint with its known
+  vc33 false alarms, because that is the version that was measured. It stacks
+  five changes, against D-047's one-change-per-arm rule.
+- **Revisit if:** the private score of D is below the public baseline
+  (~28–31) by more than noise; or a replicate shows H's sb26 collapse is
+  reproducible (then the fix has a defect).
+
+---
+
+<!-- Next entry: D-050 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->

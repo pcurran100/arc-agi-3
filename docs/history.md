@@ -257,7 +257,7 @@ On 2 November the user rejected A as an entry ("there is no point just being
 in line with the pack") and reserved every submission for themselves
 (D-049). The candidates under test on `duck-base`:
 
-- turn hints (D-048, in progress);
+- turn hints (D-048; entered in variant D);
 - the model-visible RESET;
 - the scale hash;
 - the Adaptive Duck tools.

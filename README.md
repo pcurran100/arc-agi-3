@@ -9,9 +9,9 @@ at evaluation, open source.
 | File | What it is |
 |---|---|
 | `CLAUDE.md` | Project instructions, loaded automatically every session. Contains the documentation protocol. |
-| `docs/state-of-play.md` | Current status, beliefs, open items and risks (as of 2 Nov 2026). Older state is kept below its Archive line. |
+| `docs/state-of-play.md` | Current status, beliefs, open items and risks (as of 3 Nov 2026). Older state is kept below its Archive line. |
 | `docs/history.md` | **How we got here**: each phase, the ideas tried and dropped, the ideas parked, the options rejected, and the lessons. |
-| `docs/decision-log.md` | Append-only record of every decision (D-001 to D-049; D-033 and D-048 are reserved), including what was rejected. The copy at the repo root is an old snapshot. |
+| `docs/decision-log.md` | Append-only record of every decision (D-001 to D-049; D-033 is reserved), including what was rejected. The copy at the repo root is an old snapshot. |
 | `docs/architecture.md` | How the system is actually built, with worked examples and explicit non-goals. §14 covers the submission harness. |
 | `docs/experiments/` | Every run: `README.md` indexes them with the exact command; `scoreboard.md` holds the RHAE table for our own agents. |
 | `docs/design-thesis.md` | The argument the project rests on, and what would falsify it. |
@@ -34,16 +34,16 @@ Deterministic code is its senses and its referee. It computes every fact about
 the frames, checks every prediction, and plans routes. Actions are spent to
 test hypotheses or to win.
 
-## Where things stand (2 November 2026, deadline day)
+## Where things stand (3 November 2026, after the deadline)
 
 **Our own agent never beat the goal-free v1 explorer on score.** The public
 Milestone #2 notebooks score ~28–31 on the leaderboard. Ours scored ~2. So the
 submission is built on Daniel Franzen's vendored Duck harness, the Milestone #2
 winner, with our findings added as flag-gated grafts (D-043, D-045, D-047).
-**Nothing has been submitted yet.** The user ruled out entering the plain
-public baseline: only a variant that improves on it goes in, and only on the
-user's go-ahead (D-049). Variants are being compared against that baseline
-offline.
+**Entered: variant D**, submitted 2 Nov 17:52 UTC (D-048). The user ruled out
+entering the plain public baseline (D-049); of six variants compared on 11
+public games on Kaggle, D scored highest (36.73 against the baseline's 28.88,
+one run each, so within a wide noise band).
 
 ### Our agent, five versions
 
@@ -62,10 +62,11 @@ next.
 
 | Arm | What it is | Evidence |
 |---|---|---|
-| **A** | Franzen's notebook + lalalia9's solved-level memory (`push_duck.py --memory`). The author states a public score of 31.46. | Kaggle smoke, ls20 + ft09: 57.72. **Reference arm, not to be entered alone** (D-049). |
+| **A** | Franzen's notebook + lalalia9's solved-level memory (`push_duck.py --memory`). The author states a public score of 31.46. | Kaggle smoke, ls20 + ft09: 57.72. 11 games: **28.88**, 38 levels. Reference arm, not entered (D-049). |
 | **B** | A + our scale-invariant shape hash (`--graft --env ARC3_SCALE_HASH=1`). | Same smoke: 59.92, which is noise (D-047). |
-| **C** | A + Franzen's model-visible RESET (`--env EXPOSE_RESET=on`). | Not run. |
-| **D** | A + our turn hints (budget bar, lost-life detection, effect counts) + RESET + scale hash. | A-vs-D comparison on NIM (`kaggle/duck_grafts/local_run.py`) running on 2 Nov. No result yet. |
+| **C** | A + Franzen's model-visible RESET (`--env EXPOSE_RESET=on`). | Smoke, ls20 + ft09: 57.85; helped ls20 level 2, restarted needlessly on ft09. |
+| **D** | A + our turn hints (budget bar, lost-life detection, effect counts) + RESET + scale hash. | 11 games: **36.73**, 41 levels. **Entered** (D-048). Local on NIM: A 3.18, D 1.20 (weaker model, throttled). |
+| **E / F / G / H** | D + Adaptive Duck tools / D without RESET / A + hints only / D with the fixed life hint. | 11 games: 31.63 / 32.48 / 35.61 (43 levels) / 24.07 (D-048). |
 
 What each graft is, and what none of it does, is in `docs/architecture.md`
 §14. The third-party code is credited in `third_party/*/NOTICE.md`.
@@ -122,7 +123,7 @@ one place:
 | `main` | v1–v4 (D-042) and the README of 29 Oct. |
 | `v4-fixes` | D-044: the v4 forensic fixes and subgoal walker. Merged into `v5-objects`. |
 | `v5-objects` | v5 (`src/arc3/v5/`, D-046), its runs and architecture §13. |
-| `duck-base` | The submission track: vendored harness, grafts, `push_duck.py`, `local_run.py` (D-045, D-047, D-048 wip). |
+| `duck-base` | The submission track: vendored harness, grafts, `push_duck.py`, `local_run.py` (D-045, D-047, D-048). The submitted entry is variant D. |
 | `docs-status` | This reconciled documentation: every branch's decisions, runs and architecture in one record (2 Nov). |
 
 ## Layout
