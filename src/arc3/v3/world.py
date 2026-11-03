@@ -194,6 +194,14 @@ def strip_fences(code: str) -> str:
     return m.group(1) if m else (code or "")
 
 
+def click_xy(action) -> Optional[tuple]:
+    """(x, y) of a "CLICK(x,y)" action string, else None. Provided to model code:
+    in the 2026-10-30 v5 run a vc33 simulator imported ``re`` to parse clicks and
+    did not compile."""
+    m = re.fullmatch(r"\s*CLICK\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*", str(action))
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
 @dataclass
 class WorldModel:
     """`predict` and `goal` compiled from the LLM's code, run in the sandbox."""
@@ -210,7 +218,8 @@ class WorldModel:
         if re.search(r"^\s*(import|from)\s", src, re.M) or "__" in src:
             wm.error = "imports and dunder access are not allowed (np and math are provided)"
             return wm
-        ns: dict[str, Any] = {"__builtins__": _SAFE_BUILTINS, "np": np, "math": math}
+        ns: dict[str, Any] = {"__builtins__": _SAFE_BUILTINS, "np": np, "math": math,
+                              "click_xy": click_xy}
         try:
             exec(compile(src, "<hypothesis>", "exec"), ns)
         except Exception as exc:

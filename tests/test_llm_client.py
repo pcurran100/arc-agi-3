@@ -157,3 +157,44 @@ def test_http_backend_retries_server_errors():
     llm = OpenAIChatLLM(base_url=f"http://127.0.0.1:{srv.server_port}", backoff=0.01)
     assert llm.complete(MSG) == "ok" and len(hits) == 2
     srv.server_close()
+
+
+def test_http_backend_waits_out_a_lost_network_then_raises_network_down():
+    """2026-10-30: DNS failures were retried 3 times in 35 s, then the game was
+    handed to the explorer. Now connection failures are retried for
+    ``outage_seconds`` and then raise NetworkDown for the caller to stop on."""
+    import socket
+    from arc3.llm import NetworkDown
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()                                   # nothing listens: connection refused
+    slept = []
+    llm = OpenAIChatLLM(base_url=f"http://127.0.0.1:{port}", outage_seconds=1.0, timeout=0.5)
+    llm._sleep = lambda t: (slept.append(t), __import__("time").sleep(0.05))
+    with pytest.raises(NetworkDown):
+        llm.complete(MSG)
+    assert llm.outages >= 1 and len(slept) == llm.outages
+
+
+def test_http_backend_recovers_when_the_network_comes_back():
+    import socket
+    import urllib.request
+    srv = _serve_once({"choices": [{"finish_reason": "stop", "message": {"content": "ok"}}]}, {})
+    real = urllib.request.urlopen
+    fails = [ConnectionResetError(10054, "reset"), OSError(11001, "getaddrinfo failed")]
+
+    def flaky(*a, **k):
+        if fails:
+            raise fails.pop(0)
+        return real(*a, **k)
+
+    llm = OpenAIChatLLM(base_url=f"http://127.0.0.1:{srv.server_port}", outage_seconds=60)
+    llm._sleep = lambda t: None
+    urllib.request.urlopen = flaky
+    try:
+        assert llm.complete(MSG) == "ok"
+    finally:
+        urllib.request.urlopen = real
+        srv.server_close()
+    assert llm.outages == 2

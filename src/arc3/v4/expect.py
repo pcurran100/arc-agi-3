@@ -35,7 +35,10 @@ on every step whose action matches, without asking the model.
   "moved (+4, 0)". Absolute targets would need the model to do coordinate
   arithmetic it is bad at, and changes are what the fact layer measures.
 - *No partial credit.* An expectation holds or it does not; the verdict lists
-  every failed item, so the model sees exactly which part was wrong.
+  every failed item, so the model sees exactly which part was wrong. A change
+  outside the named targets under ``rest: "unchanged"`` makes it wrong too
+  (until D-044 it was scored "as predicted, but also", which counted wrong
+  beliefs - "the player will not move", and it moved - as successes).
 - *No counting of cells inside an object.* grew/shrank says which way, not by how
   much; the fact text gives the sizes.
 """
@@ -182,9 +185,11 @@ def _targets(item: Item, step: Step) -> Optional[set[int]]:
     return None
 
 
-def check(exp: Expectation, step: Step, outcome: str) -> Verdict:
+def check(exp: Expectation, step: Step, outcome: str, ignore: frozenset = frozenset()) -> Verdict:
     """Check ``exp`` against what ``step`` did. ``outcome`` is what the game reported
-    after the step: continue, level_complete or game_over."""
+    after the step: continue, level_complete or game_over. ``ignore`` holds ids of
+    objects that change on every action whatever it is (the fact layer's
+    tickers): a ``rest: "unchanged"`` claim is not broken by them (D-044)."""
     failures: list[str] = []
     by_id = {c.id: c for c in step.changes}
     covered: set[int] = set()
@@ -210,7 +215,8 @@ def check(exp: Expectation, step: Step, outcome: str) -> Verdict:
         failures.append(f"expected {it.describe()}, got: {got}")
     unpredicted: list[str] = []
     if exp.rest == "unchanged":
-        unpredicted = [c.describe() for i, c in sorted(by_id.items()) if i not in covered][:6]
+        unpredicted = [c.describe() for i, c in sorted(by_id.items())
+                       if i not in covered and i not in ignore][:6]
     if outcome != exp.outcome:
         failures.append(f"expected outcome {exp.outcome}, got {outcome}")
     return Verdict(ok=not failures and not unpredicted, failures=failures, unpredicted=unpredicted)

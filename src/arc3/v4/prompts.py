@@ -27,9 +27,10 @@ from typing import Optional
 
 from .expect import EXPECT_SCHEMA
 from .render import image_part, legend
-from .store import KINDS, RULE_SCHEMA, SCOPES
+from .store import ATTAIN_SCHEMA, KINDS, RULE_SCHEMA, SCOPES
 
-PROMPT_VERSION = "v4-4"
+PROMPT_VERSION = "v4-6"
+MAX_SUBGOALS = 4
 MAX_STEPS = 6
 
 SYSTEM = f"""\
@@ -47,12 +48,22 @@ You work in a loop with exact code:
   exactly against the next frame. A correct prediction is evidence for the
   assumptions behind it; a wrong one is a SURPRISE that you must explain.
 - Code measures facts exactly (objects with stable ids, what changed on every
-  step); trust those over your reading of the image.
+  step, objects that change on every action whatever the action, shapes that
+  are copies of each other up to scale or rotation); trust those over your
+  reading of the image.
+- Code can also WALK: name an object you control and a target, and code
+  computes the shortest route with the moves it has seen work, then checks
+  every step of it. Plan in subgoals ("first bring #7 onto #5, then onto #3")
+  and let code find the moves.
 
 Good play: keep several candidate explanations alive while the evidence is thin
 and design actions that tell them apart; learn what actions do before betting
-actions on a guess about the goal; once the rules are clear, go straight for the
-goal. Levels of one game usually share rules but CAN DIFFER: objects may look
+actions on a guess about the goal. Keep two or more GOAL hypotheses, each with
+the condition that should complete the level, and TEST them: the cheapest
+action that would show a goal hypothesis wrong is worth taking early. When a
+goal's condition is met and the level does not complete, that goal is wrong or
+incomplete - revise it (maybe something must be done first) or drop it. Once a
+goal is likely, go straight for it. Levels of one game usually share rules but CAN DIFFER: objects may look
 different, new objects may appear, things that were still may start moving.
 Assumptions carried from an earlier level are hypotheses until this level
 confirms them.
@@ -86,13 +97,21 @@ current positions every turn, so never store a snapshot of the current state.
 Prefer revising an existing assumption to adding a near-duplicate, and retire
 assumptions that a newer one replaces. Keep the store short enough to read.
 Keep competing goal assumptions side by side rather than picking one too early.
+Give every goal assumption an "attain" condition when you can: the object that
+must get there, the target ("#id" or "x,y") and the relation (overlap, touch or
+at). Code checks it: if the condition holds and the level does not complete,
+the goal loses confidence. Goals gain confidence only when a level completes;
+correct predictions about moves support only ontology and dynamics.
 Do not retire an assumption on one contradiction if a condition could explain
 it; revise it to state the condition instead.
+Plans and intentions ("next I will go left") are not assumptions: they belong in
+the act call, never in the store.
 """
 
 ACT_TASK = f"""\
 TASK: CHOOSE WHAT TO DO NEXT.
-Think it through, then return 1 to {MAX_STEPS} steps. Each step is an action
+Think it through, then return up to {MAX_STEPS} steps (none if you give a
+plan, below). Each step is an action
 ("ACTION1".."ACTION7" or "CLICK(x,y)") and an exact expectation of what it will
 do. Use only the AVAILABLE ACTIONS. An action you have never tried is always
 uncertain. While you are unsure what will happen, return ONE step and make its
@@ -106,7 +125,18 @@ similar one appears, or when a region is redrawn in another colour, so prefer
 "colour N" for things that grow, shrink or recolour; "change" is moved/recoloured/grew/shrank/reshaped/appeared/
 vanished/none; dx, dy for moves and colour for recolours or new objects, null
 when you do not know); "rest" is "unchanged" if nothing else will change, else
-"any"; "outcome" is continue, level_complete or game_over.
+"any" (objects listed as changing on every action never count against
+"unchanged"); "outcome" is continue, level_complete or game_over.
+
+Instead of (or after) explicit steps you may give a "plan": up to
+{MAX_SUBGOALS} subgoals done in order. Each names an object you control
+("object": "#7"), a target ("to": "#3" or "x,y"), a relation (overlap, touch or
+at), what you expect on arrival ("on_arrival", an expectation as above; put
+"level_complete" there when you think arriving wins), and the goal id it
+serves. Code walks each subgoal with the moves it has seen work, checks every
+step, and calls you back when the plan is done, a step surprises it, or no
+route exists. Use a plan whenever you know where to go; use steps to try
+things out.
 """
 
 OP_SCHEMA = {
@@ -121,9 +151,12 @@ OP_SCHEMA = {
         "scope": {"type": "string", "enum": list(SCOPES)},
         "confidence": {"type": "number"},
         "rule": RULE_SCHEMA,
+        "attain": ATTAIN_SCHEMA,
         "note": {"type": "string", "maxLength": 200},
     },
-    "required": ["op", "id", "statement", "note"],
+    # "attain" required but nullable (D-044): the first v4-5 run on NIM wrote three
+    # goal hypotheses and gave none of them a checkable condition.
+    "required": ["op", "id", "statement", "note", "attain"],
 }
 
 UPDATE_SCHEMA = {
@@ -141,16 +174,27 @@ ACT_SCHEMA = {
     "type": "object",
     "properties": {
         "steps": {
-            "type": "array", "minItems": 1, "maxItems": MAX_STEPS,
+            "type": "array", "minItems": 0, "maxItems": MAX_STEPS,
             "items": {"type": "object",
                       "properties": {"action": {"type": "string", "maxLength": 16},
                                      "expect": EXPECT_SCHEMA},
                       "required": ["action", "expect"]},
         },
+        "plan": {
+            "type": "array", "maxItems": MAX_SUBGOALS,
+            "items": {"type": "object",
+                      "properties": {"object": {"type": "string", "maxLength": 8},
+                                     "to": {"type": "string", "maxLength": 12},
+                                     "relation": {"type": "string",
+                                                  "enum": ["overlap", "touch", "at"]},
+                                     "on_arrival": EXPECT_SCHEMA,
+                                     "goal": {"type": "string", "maxLength": 8}},
+                      "required": ["object", "to", "relation", "on_arrival", "goal"]},
+        },
         "purpose": {"type": "string", "maxLength": 300},
         "tests": {"type": "array", "items": {"type": "string", "maxLength": 8}, "maxItems": 8},
     },
-    "required": ["steps", "purpose", "tests"],
+    "required": ["steps", "plan", "purpose", "tests"],
 }
 
 @dataclass
@@ -169,16 +213,21 @@ class Context:
     event: str = ""                 # what triggered this call
     last_reasoning: str = ""        # tail of the previous act call's thinking
     image: Optional[dict] = None    # an image_url content part
+    plan: str = ""                  # subgoals still to walk
 
 
 def _body(c: Context) -> str:
+    # D-044: "16 actions on this level ... a human needed about 22" was read on
+    # ls20 as a budget ("1 action left"), and the model burned actions to
+    # "finish" it. No baseline here, and the count says there is no limit.
     lv = f"level {c.level + 1}" + (f" of {c.total_levels}" if c.total_levels else "")
-    base = (f"; a human needed about {c.human_baseline} actions for this level"
-            if c.human_baseline else "")
     parts = [
-        f"STATUS: {lv}; {c.actions_on_level} actions on this level, {c.actions_total} in total"
-        f"{base}.\nAVAILABLE ACTIONS: {', '.join(c.available)}",
+        f"STATUS: {lv}; actions used so far on this level: {c.actions_on_level} (there is "
+        f"no fixed limit; every action lowers the score, so fewer is better)."
+        f"\nAVAILABLE ACTIONS: {', '.join(c.available)}",
     ]
+    if c.plan:
+        parts.append("CURRENT PLAN (being walked by code):\n" + c.plan)
     if c.level_notes:
         parts.append("EARLIER LEVELS:\n" + "\n".join(c.level_notes))
     parts.append("ASSUMPTION STORE:\n" + c.store)

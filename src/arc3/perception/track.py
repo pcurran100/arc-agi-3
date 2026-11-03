@@ -126,6 +126,14 @@ def _pair_cost(a: Component, b: Component) -> float:
             # Deformation is real (growing, shrinking, merging), so it is priced
             # rather than forbidden - but it must cost more than a clean move.
             base = 0.5 + 0.5 * (1.0 - iou) * (1.0 - size_ratio)
+            if a.dominant_colour == b.dominant_colour and overlap:
+                # Object permanence (D-046): a same-coloured component that covers
+                # most of the smaller one's cells is that object grown, shrunk or
+                # reshaped in place - a bar that fills, a line that extends. Priced
+                # by containment, so it beats a same-shaped stranger elsewhere
+                # (the ls20 bar swapped ids with its spent part on a refill).
+                containment = overlap / min(a.size, b.size)
+                base = min(base, 0.45 * (1.0 - containment) + 0.05)
 
     dx = b.centroid[0] - a.centroid[0]
     dy = b.centroid[1] - a.centroid[1]
