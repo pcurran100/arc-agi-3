@@ -20,6 +20,15 @@ Message = dict
 LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
 
 
+class NetworkDown(RuntimeError):
+    """The server could not be reached for ``outage_seconds`` (connection refused
+    or reset, DNS failure). Not the model's fault and not a bad answer: the
+    caller should stop rather than play on without a model. On 2026-10-30 a DNS
+    outage after 3-6 calls per game handed 65-74 of 80 actions per game to the
+    explorer and made a five-game v5 run worthless (docs/experiments/README.md).
+    """
+
+
 class Truncated(RuntimeError):
     """The server stopped at ``max_tokens`` (``finish_reason == "length"``).
 
@@ -115,6 +124,10 @@ class OpenAIChatLLM:
     #: tier answered 28 of 77 calls with HTTP 500 on 2026-10-19.
     retries: int = 3
     backoff: float = 5.0
+    #: How long a connection or DNS failure is retried before
+    #: :class:`NetworkDown`. Counted from the first failure of a call.
+    outage_seconds: float = 600.0
+    outages: int = field(default=0, repr=False)
 
     def __post_init__(self) -> None:
         host = urlparse(self.base_url).hostname or ""
@@ -164,20 +177,43 @@ class OpenAIChatLLM:
         return msg["content"] or ""
 
     def _send(self, req) -> dict:
+        """POST with two kinds of retry. HTTP 429/5xx and read timeouts: ``retries``
+        times with exponential backoff (the server is up but busy). Connection
+        and DNS failures (``URLError`` without an HTTP code, ``ConnectionError``,
+        other ``OSError``): back off and keep trying for up to ``outage_seconds``
+        in total, then raise :class:`NetworkDown`."""
         import socket
         import urllib.error
-        for attempt in range(self.retries + 1):
+        attempt, outage_t0, wait = 0, None, self.backoff
+        while True:
             try:
                 with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                     return json.loads(resp.read().decode("utf-8"))
             except urllib.error.HTTPError as e:
-                if e.code not in (429, 500, 502, 503, 504) or attempt == self.retries:
+                if e.code not in (429, 500, 502, 503, 504) or attempt >= self.retries:
                     raise
-            except (TimeoutError, socket.timeout, urllib.error.URLError):
-                if attempt == self.retries:
+                outage_t0 = None
+            except (TimeoutError, socket.timeout) as e:
+                if attempt >= self.retries:
                     raise
-            time.sleep(self.backoff * (2 ** attempt))
-        raise RuntimeError("unreachable")
+                outage_t0 = None
+            except (urllib.error.URLError, ConnectionError, OSError) as e:
+                # URLError wraps every failure to connect or send, a connect
+                # timeout included (a read timeout is a bare TimeoutError, above).
+                now = time.monotonic()
+                outage_t0 = outage_t0 if outage_t0 is not None else now
+                if now - outage_t0 >= self.outage_seconds:
+                    raise NetworkDown(f"no connection for {now - outage_t0:.0f}s: "
+                                      f"{type(e).__name__}: {e}"[:300]) from e
+                self.outages += 1
+                self._sleep(min(wait, 60.0, max(0.0, self.outage_seconds - (now - outage_t0))))
+                wait = min(wait * 2, 60.0)
+                continue
+            self._sleep(self.backoff * (2 ** attempt))
+            attempt += 1
+
+    def _sleep(self, s: float) -> None:
+        time.sleep(s)
 
     def ready(self) -> bool:
         """Is the server up? llama-server answers ``/health`` once loaded."""
@@ -218,8 +254,23 @@ class RecordingLLM:
 
     def complete(self, messages, *, max_tokens=512, temperature=0.0, seed=0, schema=None) -> str:
         t0 = time.time()
-        out = self.inner.complete(messages, max_tokens=max_tokens,
-                                  temperature=temperature, seed=seed, schema=schema)
+        try:
+            out = self.inner.complete(messages, max_tokens=max_tokens,
+                                      temperature=temperature, seed=seed, schema=schema)
+        except Exception as exc:
+            # A truncated or failed call costs as much time as a good one and was
+            # invisible in the log (v5 debug run, 2026-10-30): record it, without
+            # a response, so replay never serves it.
+            rec = {"key": None, "backend": self.inner.name, "max_tokens": max_tokens,
+                   "seed": seed, "error": f"{type(exc).__name__}: {exc}"[:300],
+                   "seconds": round(time.time() - t0, 3)}
+            last = getattr(self.inner, "last", None)
+            if last and isinstance(exc, Truncated):
+                rec["usage"] = last.get("usage")
+                rec["reasoning_tail"] = (last.get("reasoning") or "")[-4000:]
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            raise
         dt = time.time() - t0
         self.n_calls += 1
         self.seconds += dt
@@ -269,6 +320,8 @@ class ReplayLLM:
             for line in self.path.read_text(encoding="utf-8").splitlines():
                 if line.strip():
                     rec = json.loads(line)
+                    if rec.get("key") is None or "response" not in rec:
+                        continue          # a failed or truncated call, logged for the record
                     self._table[rec["key"]] = rec["response"]
                     self._extra[rec["key"]] = {k: rec[k] for k in ("finish_reason", "reasoning")
                                                if k in rec}

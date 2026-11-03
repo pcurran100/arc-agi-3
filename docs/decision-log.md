@@ -3520,4 +3520,259 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 
 ---
 
-<!-- Next entry: D-043 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->
+## D-044 — v4 fixes from the ls20 forensics, and subgoals that code walks
+
+- **Date:** 2026-10-29
+- **Status:** accepted (branch `v4-fixes`). Amends D-042: the human baseline
+  leaves the prompt, goals are credited only by level progress, images are off
+  by default, and the act call may return subgoals.
+- **Context:** A forensic read of the two live v4 runs on ls20 (2026-10-19,
+  NIM Nemotron-VL, 0/7 levels both times) found that most of the failure was
+  in our code, not the model:
+  1. The STATUS line "16 actions on this level … a human needed about 22"
+     was read as a budget. The model wrote "1 action left" and burned about
+     10 actions to "finish" it.
+  2. Every true prediction credited every assumption named in `tests`, goals
+     included, and nothing ever lowered a goal. The goal "advance the bar"
+     reached 0.91 on five supports, each of which was "the bar ticked as
+     predicted". Five failed `level_complete` predictions changed nothing.
+  3. The goal was guessed from colour at t0. The real mechanic links a 2×,
+     rotated copy of a glyph to a target, but SAME SHAPE matched only
+     identical shapes, so the link was invisible.
+  4. A lost life (player back at its start, bar refilled, a life square
+     greyed) was read as "capturing a target".
+  5. Occlusion: a mover covering floor cells was reported as "#1 reshaped" on
+     every move. The model built a rule on it and retired a correct one.
+     7 of 21 wrong predictions were about walls, which were never learned.
+  6. The checker scored "the player will not move", when it then moved, as
+     "OK BUT ALSO". 38 of the 51 "correct" predictions were pushes into a wall
+     while the bar ticked.
+  The user also asked (2026-10-29) for a goal → ordered subgoals → computed
+  route layer as the core of the framework, for thinking never to be
+  hard-capped, and for any run where the fallback explorer acted to be
+  reported as not clean.
+- **Decision:**
+  - *Prompt.* The STATUS line now reads "actions used so far: N (there is no
+    fixed limit; every action lowers the score, so fewer is better)" and
+    carries no baseline. Prompt `v4-6`.
+  - *Evidence by kind* (`store.py`). A correct prediction supports only
+    ontology and dynamics assumptions. A goal gains confidence only when the
+    level completes as it predicted. A goal loses confidence when a
+    `level_complete` prediction naming it fails, or when its `attain`
+    condition ("#7 overlaps #3", checked by code on every step) holds without
+    the level completing, once per arrival. `attain` is required (nullable) on
+    every store op. Rules on kind `other` are discarded. At most 24 live
+    assumptions are shown in full, and goal hypotheses are listed by
+    normalised weight.
+  - *Fact layer* (`v4/facts.py`, `FactBook4`, subclassing v3's so that v3's
+    recorded calls still replay):
+    - occlusion changes are dropped;
+    - tickers (changed on each of the last 4 steps under ≥ 2 actions) are
+      listed separately, and a step on which only tickers changed is a
+      **no-op**;
+    - per-step notes: back at the level-start position, restored to the
+      level-start state, a new colour or shape;
+    - shapes equal up to integer scale and the 8 symmetries;
+    - colours entered by moves that happened versus colours in the way of
+      moves that did not, plus the exact (position, action) pairs that were
+      refused;
+    - what each known move of the most controlled-looking object would enter;
+    - an object that moves the same way under every action is no longer a
+      player candidate (a bar shrinking from the left was).
+  - *Checker.* Under `rest: unchanged`, an unpredicted change makes the
+    prediction **wrong**, except changes to tickers. Accuracy is also
+    reported on steps where more than the tickers changed ("real").
+  - *Subgoals* (`v4/route.py`). The act call may return a plan of up to 4
+    subgoals `{object, to, relation, on_arrival, goal}`. Code routes to each
+    by BFS over the object group's positions, using the measured displacement
+    per action, avoiding blocking colours and refused (position, action)
+    pairs, with the previous level's moves as a prior. Every step is checked;
+    the last step carries the arrival expectation. The model is called back
+    when the plan ends, a step surprises, or no route exists.
+  - *Call tapering.* The periodic update (every 10 actions) is skipped while
+    the last 5 predictions all held. Any surprise, no-op, novelty, return to
+    start, new level or game over still forces an update.
+  - *Thinking* is not capped: a truncated answer is retried once with twice
+    the room and counted. The soft `thinking_token_budget` can be passed via
+    `--llm-extra`; it is untested.
+  - *Reporting.* `describe()` says CLEAN or NOT CLEAN (n explorer steps).
+    `eval_agent.py` rows carry `accuracy` and `explorer_steps`. `--jobs N`
+    plays games in parallel.
+  - *Images* are off by default (D-042 had them on). The exact grid stays in
+    the text, and there is no measurement that the image helps.
+- **Options rejected:**
+  - *A model-declared ticker list* (the original plan). Code detects tickers
+    from evidence, which costs the model nothing and cannot be forgotten.
+  - *Fixing the tracker's id swap after a bar refill.* It is not cheap
+    (identity is a global assignment, D-014). Tickers are re-detected per id
+    within 4 steps instead, recorded as a limitation in architecture §12.4.
+  - *Colour-only blocking.* On real ls20 a move was refused with
+    floor-coloured cells ahead, and the router proposed the same move
+    repeatedly. Refused (position, action) pairs are remembered as well.
+  - *A planner over the model's own world-model code (v3).* v3 never got a
+    model good enough to plan with. The router needs only what the fact layer
+    measures, and the model only says where to go.
+  - *Hard caps on thinking* — the user's call, and v3 lost 34 of 45 answers
+    to them (D-040).
+  - *Keeping "OK BUT ALSO" as a success.* It is what inflated the 2026-10-19
+    accuracy figure.
+- **Mechanics check (no LLM):** `scripts/oracle_v4_ls20.py "#5" "#3" 60`,
+  seed 0, real ls20. A scripted model tries the four moves, then plans
+  "overlap #5, then overlap #3 expecting level_complete". The walker **clears
+  level 1 after 22 actions (human baseline 22)** with 7 act calls; 18/19
+  "real" predictions held. Without the refused-move memory the same check
+  looped on a refused ACTION1 until the step counter ran out and a life was
+  lost. The walker works when the subgoals are right; whether a model names
+  the right subgoals is the experiment below.
+- **Experiment — negative result.**
+  - *Question:* with the fixes and subgoals (prompt `v4-6`), does v4 clear
+    levels on a fixed mixed set, with honest prediction accuracy and fewer
+    calls per action?
+  - *Setup:* games ls20, tu93 and re86 (movement) and vc33 and tn36 (click),
+    seed 0, 80-action cap, 5 games in parallel (`--jobs 5`). NIM
+    `nvidia/nemotron-3.5-super-vl-120b-a12b`, thinking on, no reasoning budget,
+    text only (`v4:image=0`). Run by `runs/nim_eval.sh new …`, which wraps
+    `scripts/eval_agent.py` with those flags, at commit c517377. Call logs are
+    in `docs/experiments/nim/v4fix_set5_2026-10-29/`.
+  - *Result:* **0 levels on all 5 games.**
+
+    | game | actions | calls | predictions ok / wrong | notes |
+    |---|---|---|---|---|
+    | ls20 | 57 | 59 | 28 / 26 | — |
+    | re86 | 75 | 46 | 52 / 18 | NOT CLEAN: 5 explorer steps after 2 failed calls (its own summary line counts 52 calls) |
+    | tn36 | 76 | 105 | 23 / 52 | NOT CLEAN: 4 explorer steps; real accuracy 0.31 |
+    | tu93 | 52 | 100 | 1 / 35 | NOT CLEAN: 16 explorer steps |
+    | vc33 | 65 | 110 | 7 / 50 | — |
+
+    About 4.5M completion tokens in all; the median call was ~10k completion
+    tokens (~84 s). Per-game figures come from the call logs, except the
+    re86 and tn36 explorer counts, which come from the run's own summary
+    lines.
+  - *The run wrote no `eval_s0.json`.* `eval_agent.py` writes it only after
+    every game returns. Only re86 and tn36 printed a final line before the
+    process ended, so the RHAE is 0 by the level counts, not from the file.
+    Why the process ended before ls20, tu93 and vc33 finished is unknown.
+  - *Observed failure modes:*
+    - tn36 treated the step counter (#14) as a puzzle piece ("get #14 to
+      overlap #0").
+    - The model repeated trivial actions: tn36 toggled #10 six times
+      (t65–t70); vc33 clicked (10,10) again and again with only the ticker
+      changing.
+    - Many vc33 WRONG verdicts named the wrong id for the ticker while the
+      real effect was predicted correctly. The strict checker counts those as
+      wrong, so "real" accuracy understates the model there.
+    - On the positive side, goals now carried `attain` conditions and the
+      model returned plans. But it usually also gave the same route as
+      explicit steps, and on click games plans cannot be routed.
+  - *Throttling:* the first act call of every game waited ~54 minutes
+    (3,250–3,330 s), because a second run was sharing the free key (below).
+  - *Changed our mind?* About the claim that v4 is close: yes, it is not.
+    The forensic fixes made the record honest (the 2026-10-19 "51 ok" was
+    mostly wall-pushing; tn36 here is 23 ok / 52 wrong under the strict
+    checker). The walker clears ls20 level 1 at the human baseline when the
+    subgoals are right (mechanics check above). But Nemotron-VL, with this
+    prompt, did not name right subgoals in 50–76 actions on any game, and it
+    spent 46–110 calls doing so. About the design: not yet. Five games, one
+    seed, one model; the bottleneck measured here is goal and subgoal
+    choice, which none of these fixes addressed directly.
+  - *Aborted comparison:* old v4 (prompt `v4-4`, commit 128e75f) was started
+    on the same set at the same time. With 10 concurrent thinking-on requests
+    on one free NIM key, it stopped writing after 19:31 and the v4fix run
+    recorded nothing for 1.5 h. It was killed at ~20:25.
+    `docs/experiments/nim/v4old_set5_ABORTED_2026-10-29/` holds its first 2–5
+    calls per game: **aborted, not a result.** There is no old-vs-new
+    comparison on this set.
+- **Consequences:** more of the game's structure is computed and shown, so
+  prompts are longer. The router is a strong tool for translation games and
+  useless for click games, which still cost a call per decision. Plans let
+  the model commit to long routes cheaply, so a wrong subgoal also costs
+  actions cheaply. The arrival check and the goal tests are what stop that
+  from compounding.
+- **Revisit if:**
+  - on the fixed set, act calls still outnumber actions/3 on movement games
+    (subgoals are not being used);
+  - goal tests fire and the model does not revise (the evidence is ignored);
+  - "real" accuracy stays below 50% after a level's first 20 actions;
+  - Qwen on Kaggle does not produce plans or `attain` conditions that
+    Nemotron does.
+
+---
+
+## D-046 — v5: object permanence, an object sheet, tolerant checking, and the model's simulator searched by code
+
+- **Date:** 2026-10-30 (built), 2026-10-31 (clean run). Written up by the main
+  session: the builder agent's draft was lost when it stalled.
+- **Status:** accepted as the direction for our own agent; **not** a submission
+  candidate by 2 Nov (see Consequences).
+- **Context:** v4 after the D-044 fixes scored 0 levels on five games at ~1.3
+  calls per action and ~10k thinking tokens per call. Reading its logs showed
+  the loop rewarded predictable actions, not progress: every slip in an exact
+  per-object prediction dropped the plan and cost two thinking calls; the move
+  counter kept being taken for a puzzle piece (tn36, as ls20 before); object
+  ids swapped when bars filled. The user asked for object permanence, a
+  counter rule that cannot capture objects that move, less bookkeeping for the
+  model, and goal -> subgoals -> code-computed routes, ideally as a program the
+  model writes and code runs; and for calls that are smaller where they can be.
+- **Decision:** `src/arc3/v5/` (architecture section 13):
+  - identity prefers same-coloured in-place overlap; deformation is reported
+    as grew/shrank/reshaped, not motion; splits and merges are events;
+  - counters (constant size change on the same side, no translation, under
+    >= 2 actions) leave the object list for an INTERFACE line; things that
+    translate on their own stay on the sheet, flagged;
+  - an object sheet replaces the event log; code keeps an action-effect table;
+  - surprises are MAJOR (interrupt) or MINOR (logged, plan kept);
+  - the model writes `step(state, action)` and a goal as Python; code replays
+    it on the recorded history (TRUSTED only if it reproduces it), searches
+    it for the shortest route, and that route beats the model's explicit steps;
+    a broken simulator gets up to two cheap repair calls (thinking off);
+  - call tiers: `think` (thinking on) at hard moments only, `next` (thinking
+    off) for routine continuations, `fix` for simulator repair;
+  - a lost network halts the game and marks the run INVALID after a 10-minute
+    wait, instead of letting the v1 explorer play blind.
+- **Options rejected:**
+  - *A system-prompt line about counters alone* — v4's model had a code fact
+    saying the object changes on every action and reasoned past it; removing
+    the counter from the object list is stronger.
+  - *A counter rule of "changes on every step"* — captures objects that move
+    on their own; the rule requires no translation and an action-independent
+    change.
+  - *Demanding a perfect simulator before using it (v3)* — v3 never trusted
+    one on real games; v5 accepts simulators that cover only the tracked
+    objects and replays them before use.
+  - *Hard caps on thinking* — rejected by the user (truncation loses the
+    conclusion). A soft `reasoning_budget` of 12000 is used on NIM only, for
+    development speed; Kaggle is uncapped.
+  - *Images* — off; no measured benefit, and the model has the exact grid.
+- **Experiment (clean run):** `nim/v5_set5b_2026-10-31/`, command in
+  `docs/experiments/README.md`, commit a8476a7, seed 0, 80 actions, five
+  games, Nemotron-3.5-Super-VL on NIM.
+  - **1 level on 4 valid games** (vc33 level 1 at action 34, human baseline
+    7, level score 4.2%); ls20, re86, tn36 0. tu93 is **INVALID**: the network
+    was down for ~3 h mid-run and the halt worked as designed.
+  - Valid games: 34–60 calls for 80 actions (**0.43–0.75 calls per action**;
+    v4: ~1.3); ~180–270k completion tokens per game (v4: ~0.9–1.0M); 26–40
+    minutes per game (v4: ~3.5 h). Tiers: think 13–19, next 10–17, fix 4–25.
+  - The simulator is now used: actions planned by simulator search ls20 28,
+    re86 21, vc33 11, tn36 0; simulator mispredictions on those steps 1, 5, 2.
+    Simulators written 2–12 per game; trusted 0–5. ls20 completed 9 subgoals.
+  - Explorer steps 4–8 per valid game (from probes and failed calls), so no
+    valid game is clean.
+  - Prediction accuracy on informative steps 45–72%.
+- **Changed our mind?** Partly. The cost problem is largely solved: v5 is
+  2–3x cheaper per action than v4 and the thinking/no-thinking split works.
+  The simulator-as-program idea is viable in the narrow sense that the model
+  writes simulators that replay history and code plans with them. But
+  progress is still near zero: one level in 320 actions. The failure has
+  moved from "cannot act efficiently" to "does not find the goal": routes
+  failed 10–15 times per game and plans were dropped 8–13 times.
+- **Consequences:** five games, one seed, the development model; nothing on
+  Kaggle. With two days to the deadline this does not compete with the public
+  Milestone #2 harness (D-045, ~28%); its value is as a record and as grafts
+  (object permanence, counter rule, simulator search) onto that harness.
+- **Revisit if:** a run on the full 25 games with Qwen on Kaggle clears levels
+  on several games; or the goal-finding failure is diagnosed to something
+  fixable in the prompt or the object sheet.
+
+---
+
+<!-- Next entry: D-045 (D-043 reserved by the main session, D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->

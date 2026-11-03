@@ -1,26 +1,30 @@
-"""The v4 controller: predict -> act -> check -> update assumptions (D-042).
+"""The v4 controller: predict -> act -> check -> update assumptions (D-042, D-044).
 
 Per step, deterministically:
 
-1. The fact layer observes the new frame (v3's FactBook: tracked objects and
-   exact typed changes).
+1. The fact layer observes the new frame (``FactBook4``: v3's tracked objects
+   and typed changes, without occlusion artefacts, with tickers, returns to the
+   level start, novelty and passability).
 2. Every assumption with a machine-checkable rule for the action just taken is
-   checked (store.observe); the expectation the model attached to that action is
-   checked (expect.check). A correct prediction supports the assumptions the
-   model said it tested. A wrong one is a **surprise**: the rest of the queued
-   sequence is dropped and an update is due.
-3. If actions are queued, the next one is taken.
+   checked (store.observe); the expectation attached to that action is checked
+   (expect.check). A correct prediction supports the ontology and dynamics
+   assumptions it named. A wrong one is a **surprise**: the queued steps and the
+   plan are dropped and an update is due. Goal assumptions are tested by code:
+   a goal whose ``attain`` condition holds without the level completing, or a
+   failed ``level_complete`` prediction, weakens the goals involved.
+3. If actions are queued, the next one is taken; if a plan has subgoals left,
+   code routes to the next one (route.py) and queues the route.
 4. Otherwise the model is asked:
-   - **update** — if anything surprising happened, at the start of a level, after
-     a game over, or every ``update_every`` actions in any case (so beliefs
-     formed while acting are written down);
-   - **act** — always: one action, or up to six when the model is confident,
-     each with an expectation.
+   - **update** — after a surprise, a no-op, a novelty, at a level start, after a
+     game over, and every ``update_every`` actions unless the last
+     ``TRUSTED_RUN`` predictions all held and nothing new appeared;
+   - **act** — steps to take, each with an expectation, and/or a plan of
+     subgoals for code to walk.
 
-So the model decides every action while it is learning (each surprise brings
-it straight back), and runs short checked sequences once its predictions hold.
 Without a model (none configured, call budget spent, or a call that fails) the
-step goes to v1's graph explorer, which is kept in sync on every step.
+step goes to v1's graph explorer, which is kept in sync on every step; every
+such step is counted in ``stats['explore_steps']`` so a run that used it is
+visibly not a clean run of the model.
 
 Across levels the store is carried: every assumption is marked *carried* and
 level-scoped ones lose confidence; code describes how the new level differs
@@ -28,12 +32,12 @@ from the last (colours, shapes, object count, actions) for the update call.
 
 **What this does not do.**
 
-- *No world-model code and no planner.* v3 asked the model for a simulator and
-  planned against it; here the model plans in its head and code only checks.
-  Long, exact plans (a 40-step maze route) are the obvious casualty; the
-  verified simulator of v3 is the candidate to bring back as a tool for them.
+- *No world-model code.* Routes use only measured displacements and colours
+  that blocked; anything subtler (pushing, keys, state) is the model's to plan
+  in steps or subgoals.
 - *No search over rival action choices.* One act call, one choice.
-- *Expectations are about changes, not positions* (expect.py).
+- *Expectations are about changes, not positions* (expect.py); subgoals are the
+  only place positions enter, and code, not the model, does the arithmetic.
 """
 
 from __future__ import annotations
@@ -46,18 +50,21 @@ from ..agent import GraphAgent
 from ..llm import LLM, Truncated
 from ..scene import make_scene
 from ..types import CLICK, RESET, Action, GameState, Observation
-from ..v3.facts import FactBook, Step, action_name
+from ..v3.facts import Step, action_name
 from ..v3.prompts import parse_json
 from ..v3.world import parse_action
-from .expect import Expectation, check
+from .expect import Expectation, Item, check
+from .facts import FactBook4
 from .prompts import (ACT_SCHEMA, MAX_STEPS, PROMPT_VERSION, UPDATE_SCHEMA, Context,
                       act_messages, update_messages, with_image)
+from .route import Subgoal, reached, route
 from .store import AssumptionStore
 
 HISTORY = 14              # recent steps shown to the model
 REASONING_TAIL = 4000     # characters of the last act call's thinking passed to update
 EVENT_LINES = 30
 MAX_LIVE = 25            # live assumptions before the update call is asked to consolidate
+TRUSTED_RUN = 5          # predictions in a row that must hold before a periodic update is skipped
 
 
 @dataclass
@@ -67,19 +74,21 @@ class V4Agent:
     baselines: Optional[tuple] = None
     total_levels: Optional[int] = None
     temperature: float = 0.6
-    image: bool = True
+    image: bool = False               # D-044: text only by default; the exact grid is in the text
     max_calls: int = 800              # per game
-    update_every: int = 10            # actions without an update before one is forced
+    update_every: int = 10            # actions without an update before one is due
     update_tokens: int = 16000        # thinking included
     act_tokens: int = 16000
     deadline: float = 0.0             # epoch seconds after which the model is not called
     graph: GraphAgent = field(default=None)  # type: ignore[assignment]
-    fb: FactBook = field(default_factory=FactBook)
+    fb: FactBook4 = field(default_factory=FactBook4)
     store: AssumptionStore = field(default_factory=AssumptionStore)
     level: int = 0
     level_actions: int = 0
     total_actions: int = 0
-    queue: list = field(default_factory=list)       # [(Action, Expectation, tests)]
+    queue: list = field(default_factory=list)       # [(Action, Expectation, tests, tag)]
+    plan: list = field(default_factory=list)        # [Subgoal] still to walk
+    plan_tests: list = field(default_factory=list)
     history: list = field(default_factory=list)
     level_notes: list = field(default_factory=list)
     events: list = field(default_factory=list)      # since the last update
@@ -89,11 +98,13 @@ class V4Agent:
     calls: list = field(default_factory=list)
     stats: dict = field(default_factory=dict)
     _last_action: Optional[Action] = None
-    _pending: Optional[tuple] = None                # (Expectation, tests) for the last action
+    _pending: Optional[tuple] = None                # (Expectation, tests, tag) for the last action
     _level_start: Optional[dict] = None
     _prev_level_start: Optional[dict] = None
     _credited: set = field(default_factory=set)     # ids credited for the current decision
     _available: tuple = ()
+    _recent: list = field(default_factory=list)     # True/False per judged prediction
+    _attained: set = field(default_factory=set)     # goal ids whose condition currently holds
 
     def __post_init__(self) -> None:
         if self.graph is None:
@@ -128,7 +139,7 @@ class V4Agent:
                 self._level_start = self._snapshot(obs)
 
         if obs.state == GameState.GAME_OVER:
-            self.queue = []
+            self._drop_plan()
             self._event(f"GAME OVER after {self.level_actions} actions on this level; "
                         "RESET restarts the level.")
             self.need_update = True
@@ -136,11 +147,15 @@ class V4Agent:
         if obs.state == GameState.WIN or frame is None:
             return self._emit(Action.simple(RESET), None)
 
+        if not self.queue and self.plan:
+            self._walk(obs)
         if not self.queue:
             self._decide(obs)
+            if not self.queue and self.plan:
+                self._walk(obs)
         if self.queue:
-            a, exp, tests = self.queue.pop(0)
-            return self._emit(a, (exp, tests))
+            a, exp, tests, tag = self.queue.pop(0)
+            return self._emit(a, (exp, tests, tag))
         self._bump("explore_steps")
         return self._emit(graph_choice, None)
 
@@ -154,6 +169,45 @@ class V4Agent:
             self.since_update += 1
         return a
 
+    def _drop_plan(self) -> None:
+        if self.plan:
+            self._event("The rest of the plan was dropped: "
+                        + "; ".join(sg.describe() for sg in self.plan))
+        self.queue, self.plan = [], []
+
+    # -- walking subgoals ---------------------------------------------------------------
+
+    def _walk(self, obs: Observation) -> None:
+        """Route to the next subgoal and queue the route. Code only, no call."""
+        while self.plan:
+            sg = self.plan[0]
+            self.fb.focus = sg.obj
+            path, why = route(self.fb, sg, [n for n in self._available_names(obs)
+                                            if n.startswith("ACTION")])
+            if path is None:
+                self._bump("routes_failed")
+                self._event(f"NO ROUTE for subgoal '{sg.describe()}': {why}.")
+                self._drop_plan()
+                self.need_update = True
+                return
+            if not path:
+                self._event(f"Subgoal '{sg.describe()}' already holds; moving to the next.")
+                self.plan.pop(0)
+                continue
+            self._bump("routes")
+            tests = list(dict.fromkeys(([sg.goal] if sg.goal else []) + self.plan_tests))
+            for k, (a, dx, dy) in enumerate(path):
+                exp = Expectation((Item(f"#{sg.obj}", "moved", dx, dy),), "any", "continue")
+                tag = None
+                if k == len(path) - 1:
+                    arr = sg.on_arrival
+                    exp = Expectation(exp.items + arr.items, arr.rest if arr.items else "any",
+                                      arr.outcome)
+                    tag = "arrive"
+                self.queue.append((Action.simple(int(a[6:])), exp, tests, tag))
+            self._bump("plan_steps", len(path))
+            return
+
     # -- checking ----------------------------------------------------------------------
 
     def _judge(self, step: Step, outcome: str) -> None:
@@ -166,50 +220,100 @@ class V4Agent:
             self._event("RULE FAILED: " + note)
             self.need_update = True
             self._bump("rule_failures")
+        for note in self.fb.notes.get(step.t, []):
+            self._event(f"t{step.t} {step.action}: {note}")
+            self.need_update = True
+        novel = getattr(step, "novel", False)
+        noop = self.fb.is_noop(step)
+        if noop:
+            self._bump("noop_actions")
+        self._check_goals(step, outcome)
         if self._pending is None:
             self._line(f"t{step.t} {step.action} | (explorer, no prediction) | {actual}")
             if step.changes:
                 self._event(f"t{step.t} {step.action} (explorer step): {actual}")
             return
-        exp, tests = self._pending
+        exp, tests, tag = self._pending
         self._pending = None
-        v = check(exp, step, outcome)
+        tk = frozenset(self.fb.tickers())
+        v = check(exp, step, outcome, ignore=tk)
+        real = "" if noop else "_real"   # steps where more than the tickers changed
         if v.ok and exp.informative:
             self._bump("predictions_ok")
+            if real:
+                self._bump("predictions_ok_real")
+            self._recent = (self._recent + [True])[-TRUSTED_RUN:]
             # Credit each named assumption once per decision, not once per step:
             # a six-step sequence is one test of the beliefs behind it.
             fresh = [i for i in tests if i not in self._credited]
             self._credited |= set(fresh)
             self.store.supported_by_prediction(fresh, f"t{step.t}")
             self._line(f"t{step.t} {step.action} | {exp.describe()} | {actual} | OK")
+            if noop:
+                self._event(f"t{step.t} {step.action} was a NO-OP (only the every-action "
+                            "changers changed), as you predicted.")
+            if tag == "arrive" and self.plan:
+                done = self.plan.pop(0)
+                self._bump("subgoals_done")
+                self._event(f"SUBGOAL DONE at t{step.t}: {done.describe()} - as predicted.")
+                if not self.plan:
+                    self.need_update = True
+            if novel:
+                self._drop_plan()
             return
         if not exp.informative:
             self._bump("predictions_none")
             self._line(f"t{step.t} {step.action} | (no prediction) | {actual}")
             self._event(f"t{step.t} {step.action}: you made no prediction; it did: {actual}")
-        elif not v.failures:
-            # Everything named happened, plus changes the model did not mention
-            # (seen on ls20: a bar that shrinks on every move, left out of every
-            # expectation). Worth recording, not worth abandoning the sequence:
-            # the next update sees it.
-            self._bump("predictions_partial")
-            self._credited |= set(tests)
-            self._line(f"t{step.t} {step.action} | {exp.describe()} | {actual} | "
-                       f"OK BUT ALSO: {'; '.join(v.unpredicted)}")
-            self._event(f"t{step.t} {step.action}: as predicted, but also unpredicted: "
-                        f"{'; '.join(v.unpredicted)}.")
-            self.need_update = True
-            return
         else:
             self._bump("predictions_wrong")
+            if real:
+                self._bump("predictions_wrong_real")
+            self._recent = (self._recent + [False])[-TRUSTED_RUN:]
             self._line(f"t{step.t} {step.action} | {exp.describe()} | {actual} | WRONG")
             self._event(f"SURPRISE at t{step.t} {step.action}: {v.describe()}. "
                         f"You had predicted: {exp.describe()}. Assumptions this relied on: "
                         f"{', '.join(tests) or 'none named'}.")
+            if exp.outcome == "level_complete" and outcome != "level_complete":
+                hit = self.store.goals_failed(tests, f"t{step.t}",
+                                              "predicted the level would complete; it did not")
+                if hit:
+                    self._event(f"Goal(s) {', '.join(hit)} lost confidence: the level did not "
+                                "complete when they said it would.")
             if self.queue:
                 self._event(f"The remaining {len(self.queue)} queued steps were dropped.")
-        self.queue = []
+        if noop:
+            self._event(f"t{step.t} {step.action} was a NO-OP: nothing changed except the "
+                        "objects that change on every action.")
+        self._drop_plan()
         self.need_update = True
+
+    def _check_goals(self, step: Step, outcome: str) -> None:
+        """A goal's attain condition holding without the level completing is
+        evidence against it (soft), once per arrival."""
+        for g in self.store.goals():
+            if not g.attain:
+                continue
+            sg = Subgoal.parse(g.attain)
+            if sg is None:
+                continue
+            try:
+                ok = reached(self.fb, sg)
+            except (KeyError, ValueError):
+                ok = False
+            if not ok:
+                self._attained.discard(g.id)
+                continue
+            if g.id in self._attained or outcome == "level_complete":
+                continue
+            self._attained.add(g.id)
+            self.store.goals_failed([g.id], f"t{step.t}",
+                                    "its condition held and the level did not complete")
+            self._bump("goal_tests_failed")
+            self._event(f"GOAL TEST at t{step.t}: {g.id}'s condition ({g.attain['object']} "
+                        f"{g.attain['relation']} {g.attain['to']}) holds and the level did NOT "
+                        f"complete - {g.id} is wrong or needs something first.")
+            self.need_update = True
 
     def _line(self, s: str) -> None:
         self.history = [*self.history, s][-HISTORY:]
@@ -221,11 +325,20 @@ class V4Agent:
             return False
         return not (self.deadline and time.time() > self.deadline)
 
+    def _trusted(self) -> bool:
+        return len(self._recent) >= TRUSTED_RUN and all(self._recent)
+
     def _decide(self, obs: Observation) -> None:
         if not self._model_available():
             return
-        if self.need_update or self.since_update >= self.update_every:
+        if self.need_update:
             self._update(obs)
+        elif self.since_update >= self.update_every:
+            if self._trusted():
+                self._bump("updates_skipped")
+                self.since_update = 0
+            else:
+                self._update(obs)
         if self._model_available():
             self._act(obs)
 
@@ -249,7 +362,8 @@ class V4Agent:
             grid=make_scene(self.fb.grid).grid_text(), history=list(self.history),
             level_notes=list(self.level_notes),
             event="\n".join(self.events) if with_events else "",
-            last_reasoning=self.last_reasoning[-REASONING_TAIL:] if with_reasoning else "")
+            last_reasoning=self.last_reasoning[-REASONING_TAIL:] if with_reasoning else "",
+            plan="\n".join(f"{k + 1}. {sg.describe()}" for k, sg in enumerate(self.plan)))
         if self.image and self.fb.grid is not None:
             with_image(c, self.fb.grid)
         return c
@@ -315,14 +429,22 @@ class V4Agent:
             if a is None:
                 bad.append(str(s.get("action", ""))[:20])
                 break  # later steps assumed this one happened
-            q.append((a, Expectation.parse(s.get("expect")), tests))
+            q.append((a, Expectation.parse(s.get("expect")), tests, None))
         if bad:
             self._event(f"Your action {bad[0]!r} is not available or not understood; "
                         f"available: {', '.join(self._available_names(obs))}.")
             self.need_update = self.need_update or not q
         self.queue = q
+        raw = [d for d in (data.get("plan") or []) if isinstance(d, dict)]
+        self.plan = [sg for sg in (Subgoal.parse(d) for d in raw) if sg]
+        if len(self.plan) < len(raw):
+            self._event(f"{len(raw) - len(self.plan)} subgoal(s) were not understood: 'object' "
+                        "must be '#id' and 'to' '#id' or 'x,y'.")
+            self.need_update = True
+        self.plan_tests = tests
         self._credited = set()
         self.calls[-1]["steps"] = len(q)
+        self.calls[-1]["subgoals"] = len(self.plan)
         self.calls[-1]["purpose"] = str(data.get("purpose", ""))[:200]
         self._bump("llm_steps", len(q))
 
@@ -350,11 +472,13 @@ class V4Agent:
     def _finish_level(self, obs: Observation) -> None:
         won_with = action_name(self._last_action) if self._last_action else "?"
         if self._pending is not None:
-            exp, tests = self._pending
+            exp, tests, _ = self._pending
             if exp.outcome == "level_complete":
                 self._bump("predictions_ok")
+                self._bump("predictions_ok_real")
                 self.store.supported_by_prediction(
                     [i for i in tests if i not in self._credited], f"L{self.level + 1} win")
+                self.store.goals_won(tests, f"L{self.level + 1} win")
                 verdict = "you predicted it"
             else:
                 verdict = "you did NOT predict it (you expected: " + exp.describe() + ")"
@@ -372,8 +496,10 @@ class V4Agent:
         self._bump("levels")
         self.level = obs.levels_completed
         self.level_actions = 0
-        self.fb = FactBook()
-        self._last_action, self.queue, self.history = None, [], []
+        pcs = self.fb.player_candidates()
+        self.fb = FactBook4(prior_moves=dict(pcs[0]["moves"]) if pcs else {})
+        self._last_action, self.queue, self.plan, self.history = None, [], [], []
+        self._recent, self._attained = [], set()
         self.store.new_level(self.level)
         self.need_update = True
 
@@ -395,6 +521,20 @@ class V4Agent:
                          + ".")
         self._event(" ".join(lines))
 
+    def accuracy(self) -> dict:
+        """Prediction accuracy, overall and on steps where more than the
+        every-action changers changed (D-044: on ls20, 38 of 51 'correct'
+        predictions were walking into a wall while a bar ticked)."""
+        s = self.stats
+        ok, bad = s.get("predictions_ok", 0), s.get("predictions_wrong", 0)
+        okr, badr = s.get("predictions_ok_real", 0), s.get("predictions_wrong_real", 0)
+        return {"all": round(ok / (ok + bad), 3) if ok + bad else None,
+                "real": round(okr / (okr + badr), 3) if okr + badr else None,
+                "n_real": okr + badr}
+
     def describe(self) -> str:
+        clean = "CLEAN" if not self.stats.get("explore_steps") else \
+            f"NOT CLEAN ({self.stats['explore_steps']} explorer steps)"
         return (f"level {self.level}, calls {len(self.calls)}, assumptions {len(self.store.live())}, "
+                f"{clean}, acc {self.accuracy()}, "
                 + ", ".join(f"{k}={v}" for k, v in sorted(self.stats.items())))

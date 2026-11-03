@@ -20,6 +20,9 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# This checkout's src and tests first: the venv's editable install points at the
+# main checkout, so a worktree's tests would otherwise import main's code.
+pythonpath = ["src", "tests"]
 addopts = "-q"
 markers = [
     "engine: test requires the local arc-agi engine and downloaded environment_files",
