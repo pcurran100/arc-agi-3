@@ -1,0 +1,177 @@
+{
+ "games": [
+  {
+   "game_id": "ls20-9607627b",
+   "state": "gave_up",
+   "levels_completed": 0,
+   "number_of_levels": 7,
+   "final_score": 0.0,
+   "actions": 44,
+   "actions_per_level": [
+    44,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "base_actions_per_level": [
+    22,
+    123,
+    73,
+    84,
+    96,
+    192,
+    186
+   ],
+   "resets_total": 1,
+   "resets_auto": 0,
+   "resets_model": 1,
+   "undos": 0,
+   "generated_tokens": 38111,
+   "uncached_input_tokens": 0,
+   "wallclock_s": 1801.8439999999828,
+   "turn_prompts": 23,
+   "hint_turns": {
+    "effects": 21,
+    "budget": 17
+   },
+   "solver_note": "tokens=46292"
+  },
+  {
+   "game_id": "ft09-0d8bbf25",
+   "state": "gave_up",
+   "levels_completed": 0,
+   "number_of_levels": 6,
+   "final_score": 0.0,
+   "actions": 29,
+   "actions_per_level": [
+    29,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "base_actions_per_level": [
+    43,
+    12,
+    23,
+    28,
+    65,
+    37
+   ],
+   "resets_total": 0,
+   "resets_auto": 0,
+   "resets_model": 0,
+   "undos": 0,
+   "generated_tokens": 53677,
+   "uncached_input_tokens": 0,
+   "wallclock_s": 1854.6570000000065,
+   "turn_prompts": 21,
+   "hint_turns": {
+    "effects": 18,
+    "budget": 8
+   },
+   "solver_note": "tokens=59072"
+  },
+  {
+   "game_id": "vc33-5430563c",
+   "state": "gave_up",
+   "levels_completed": 1,
+   "number_of_levels": 7,
+   "final_score": 1.7499999999999998,
+   "actions": 47,
+   "actions_per_level": [
+    10,
+    37,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "base_actions_per_level": [
+    7,
+    18,
+    44,
+    61,
+    131,
+    34,
+    152
+   ],
+   "resets_total": 0,
+   "resets_auto": 0,
+   "resets_model": 0,
+   "undos": 0,
+   "generated_tokens": 30697,
+   "uncached_input_tokens": 0,
+   "wallclock_s": 3620.8899999999558,
+   "turn_prompts": 32,
+   "hint_turns": {
+    "effects": 30
+   },
+   "solver_note": "tokens=31045"
+  },
+  {
+   "game_id": "sb26-7fbdac44",
+   "state": "gave_up",
+   "levels_completed": 1,
+   "number_of_levels": 8,
+   "final_score": 0.6574141709276845,
+   "actions": 37,
+   "actions_per_level": [
+    37,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "base_actions_per_level": [
+    18,
+    28,
+    18,
+    19,
+    31,
+    23,
+    58,
+    18
+   ],
+   "resets_total": 1,
+   "resets_auto": 0,
+   "resets_model": 1,
+   "undos": 4,
+   "generated_tokens": 29889,
+   "uncached_input_tokens": 0,
+   "wallclock_s": 3757.5310000000172,
+   "turn_prompts": 24,
+   "hint_turns": {
+    "effects": 19
+   },
+   "solver_note": "tokens=46995"
+  }
+ ],
+ "mean_score": 0.601853542731921,
+ "wall_s": 3763.2949550151825,
+ "hint_examples": {
+  "ls20": "posed; raw numeric color IDs are not available.\nKeep tool output compact: use `current_frame.segmentation` as the primary view, and `current_frame.ascii` only for a small specific region; never print full boards.\nFor the most recent change, compare `previous_frame` to `current_frame`, or `last_transition.before_frame` to `last_transition.after_frame`; `history[-1].frame` is the current frame, not the previous one.\nUse Python to inspect the evidence from the newest history, and search or score candidate actions or short sequences against the current goal as you currently understand it.\nFocus on what changed most recently in `history`, update the target environment change if needed, and separate gameplay-object changes from HUD-only changes.\nWhen ready, call `action(actions)` from inside the `python` tool with the best valid action or ordered batch selected by your code. If your code has found a reliable short sequence, prefer batching it in one call.\nYou may call `action(actions)` more than once in one Python snippet if your search or control loop needs it.\nWhen calling `python`, emit exactly the tool-call format shown elsewhere in this prompt for this model. Use only that format; do not add markdown fences, prose wrappers, or alternate tool-call syntax. Do not quote or place tool-call markup inside explanatory text; when you decide to call the tool, emit the tool call itself.\n\nACTION EFFECTS this level (times the board changed outside the border bars / times used): RIGHT 1/1.",
+  "ft09": " output compact: use `current_frame.segmentation` as the primary view, and `current_frame.ascii` only for a small specific region; never print full boards.\nFor the most recent change, compare `previous_frame` to `current_frame`, or `last_transition.before_frame` to `last_transition.after_frame`; `history[-1].frame` is the current frame, not the previous one.\nUse Python to inspect the evidence from the newest history, and search or score candidate actions or short sequences against the current goal as you currently understand it.\nFocus on what changed most recently in `history`, update the target environment change if needed, and separate gameplay-object changes from HUD-only changes.\nWhen ready, call `action(actions)` from inside the `python` tool with the best valid action or ordered batch selected by your code. If your code has found a reliable short sequence, prefer batching it in one call.\nYou may call `action(actions)` more than once in one Python snippet if your search or control loop needs it.\nWhen calling `python`, emit exactly the tool-call format shown elsewhere in this prompt for this model. Use only that format; do not add markdown fences, prose wrappers, or alternate tool-call syntax. Do not quote or place tool-call markup inside explanatory text; when you decide to call the tool, emit the tool call itself.\nIf you use MOUSE, include integer row and col arguments.\n\nACTION EFFECTS this level (times the board changed outside the border bars / times used): MOUSE 0/1.",
+  "vc33": " output compact: use `current_frame.segmentation` as the primary view, and `current_frame.ascii` only for a small specific region; never print full boards.\nFor the most recent change, compare `previous_frame` to `current_frame`, or `last_transition.before_frame` to `last_transition.after_frame`; `history[-1].frame` is the current frame, not the previous one.\nUse Python to inspect the evidence from the newest history, and search or score candidate actions or short sequences against the current goal as you currently understand it.\nFocus on what changed most recently in `history`, update the target environment change if needed, and separate gameplay-object changes from HUD-only changes.\nWhen ready, call `action(actions)` from inside the `python` tool with the best valid action or ordered batch selected by your code. If your code has found a reliable short sequence, prefer batching it in one call.\nYou may call `action(actions)` more than once in one Python snippet if your search or control loop needs it.\nWhen calling `python`, emit exactly the tool-call format shown elsewhere in this prompt for this model. Use only that format; do not add markdown fences, prose wrappers, or alternate tool-call syntax. Do not quote or place tool-call markup inside explanatory text; when you decide to call the tool, emit the tool call itself.\nIf you use MOUSE, include integer row and col arguments.\n\nACTION EFFECTS this level (times the board changed outside the border bars / times used): MOUSE 0/1.",
+  "sb26": " output compact: use `current_frame.segmentation` as the primary view, and `current_frame.ascii` only for a small specific region; never print full boards.\nFor the most recent change, compare `previous_frame` to `current_frame`, or `last_transition.before_frame` to `last_transition.after_frame`; `history[-1].frame` is the current frame, not the previous one.\nUse Python to inspect the evidence from the newest history, and search or score candidate actions or short sequences against the current goal as you currently understand it.\nFocus on what changed most recently in `history`, update the target environment change if needed, and separate gameplay-object changes from HUD-only changes.\nWhen ready, call `action(actions)` from inside the `python` tool with the best valid action or ordered batch selected by your code. If your code has found a reliable short sequence, prefer batching it in one call.\nYou may call `action(actions)` more than once in one Python snippet if your search or control loop needs it.\nWhen calling `python`, emit exactly the tool-call format shown elsewhere in this prompt for this model. Use only that format; do not add markdown fences, prose wrappers, or alternate tool-call syntax. Do not quote or place tool-call markup inside explanatory text; when you decide to call the tool, emit the tool call itself.\nIf you use MOUSE, include integer row and col arguments.\n\nACTION EFFECTS this level (times the board changed outside the border bars / times used): MOUSE 1/1."
+ },
+ "arm": "D",
+ "model": "nvidia/nemotron-3.5-super-vl-120b-a12b",
+ "minutes_cap": 30.0,
+ "seed": 0,
+ "concurrency": 2,
+ "games_order": [
+  "ls20-9607627b",
+  "ft09-0d8bbf25",
+  "vc33-5430563c",
+  "sb26-7fbdac44"
+ ]
+}

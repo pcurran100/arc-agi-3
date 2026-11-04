@@ -3520,12 +3520,56 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 
 ---
 
+## D-043 — Split the last four days into two tracks: fix our own agent (A), and build on the public Milestone #2 harness (B)
+
+- **Date:** 2026-10-29 (decided). Written 2026-11-02 by the documentation
+  session from D-044, D-045 and the commit history. The number was reserved on
+  29 October and the entry was never written; this is that entry, late, not a
+  rewrite.
+- **Status:** accepted. Track B won the submission (D-047); track A continued
+  as the research line (D-044, D-046).
+- **Context:** Four days before the deadline the best measured score was v1's
+  ~2.4% offline RHAE (D-034), and no LLM version had beaten it. v4's two live
+  ls20 runs had cleared 0 of 7 levels (D-042). The three Milestone #2 winners
+  scored 27.89, 23.84 and 22.53 on the public leaderboard, all with Tufa Labs'
+  Duck harness and Qwen3.8-Flash-Next on our GPU, and their notebooks were
+  public. The user asked for one line of work to clone the best public solution
+  and build on it with what we had learned, while our own agent was fixed in
+  parallel.
+- **Decision:** two tracks in separate worktrees, run at the same time:
+  - **Track A**: fix v4 from a forensic read of its ls20 runs, on branch
+    `v4-fixes` (D-044). It continued as v5 on `v5-objects` (D-046).
+  - **Track B**: vendor Daniel Franzen's Milestone #2 harness and add our
+    changes as separate, flag-gated grafts, on branch `duck-base` (D-045).
+  - Submit whichever is stronger on measured evidence. Findings from A
+    (counters, lost lives, scale-invariant shapes) are candidate grafts for B.
+- **Options rejected:**
+  - *Track A only* — no version of our agent had beaten the goal-free v1, and
+    four days is not long enough to close a ~25-point gap to the public
+    baseline.
+  - *Track B only* — it would abandon the research record. The grafts B needed
+    came from A's forensics: the ls20 read is where the scale-hash idea came
+    from.
+  - *Re-implementing the Duck approach inside v4* — rejected in D-045. Three
+    teams tuned it over months.
+- **Consequences:**
+  - The record split across three branches (`v4-fixes`, `v5-objects`,
+    `duck-base`). Each wrote decision-log entries the others could not see.
+    Branch `docs-status` reconciled them on 2026-11-02.
+  - Both tracks shared one free NIM key. The concurrency limit that throttled
+    the runs was found that way (D-044's aborted comparison).
+- **Revisit if:** track A clears levels on several games with Qwen on Kaggle.
+  It is then a submission candidate again (D-046 states the same condition).
+
+---
+
 ## D-044 — v4 fixes from the ls20 forensics, and subgoals that code walks
 
 - **Date:** 2026-10-29
 - **Status:** accepted (branch `v4-fixes`). Amends D-042: the human baseline
   leaves the prompt, goals are credited only by level progress, images are off
   by default, and the act call may return subgoals.
+  Ported to this branch on 2026-11-02 from `v4-fixes` (entry text unchanged).
 - **Context:** A forensic read of the two live v4 runs on ls20 (2026-10-19,
   NIM Nemotron-VL, 0/7 levels both times) found that most of the failure was
   in our code, not the model:
@@ -3698,12 +3742,133 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 
 ---
 
+## D-045 — Track B: build on the Milestone #2 winner's Duck harness, not on our own agent
+
+- **Date:** 2026-10-29
+- **Status:** accepted (track B, branch `duck-base`). It runs in parallel with
+  track A (D-044), which fixes our v4. The main session's D-043 records the
+  split.
+- **Context:** Four days before the deadline our best measured score was ~2.4%
+  offline RHAE (v1, D-034). No LLM version had beaten v1. The three
+  Milestone #2 winners scored 27.89, 23.84 and 22.53 on the public
+  leaderboard, and all three ran Tufa Labs' Duck harness with
+  Qwen3.8-Flash-Next on our exact GPU, with their notebooks public. The user
+  asked for one track to clone the best public solution and build on it with
+  what we have learned.
+- **Survey:**
+  - **Best public code: Daniel Franzen's M2 winner (27.89).** His
+    `da-fr/arc-agi-3-solution` is Apache-2.0. The fork
+    `tonghuikang/daniel-franzen-arc-agi-3` at `f472820` (Apache-2.0) adds
+    copies of all three M2 notebooks and a serving comparison.
+  - **Higher scores without code.** A third-party snapshot put Tufa at ~56 in
+    October. Tufa's public `duck-harness` repo was last pushed on 2026-07-01
+    (the M1 version), so their newer harness is not public. I found no other
+    public solution above the M2 entries; a GitHub search for `arc-agi-3` on
+    2026-10-29 turned up only low-star repositories.
+- **Decision:**
+  - Vendor Franzen's harness verbatim under `third_party/duck-franzen/`, with
+    its LICENSE and a NOTICE giving the upstream commit (commit `b55ec89`).
+  - Submit through his own notebook, using his public Kaggle inputs (SGLang
+    Pennyroyal 2.5.3 wheelhouse, Intel W4A16 AutoRound target, albucino INT4
+    MTP drafter, Tufa's source bundle).
+  - Add our changes as a *second* patch, applied after his, generated by
+    `git diff` against the vendoring commit. `scripts/push_duck.py` builds the
+    notebook: dry run by default, `--graft`, `--env`, and `--games` /
+    `--game-minutes` for smoke tests.
+- **Licence:**
+  - The base is Apache-2.0, which allows redistribution beside our MIT-0 code
+    as long as its LICENSE is kept, and it is.
+  - The only rule I could verify (arcprize.org, ARC-AGI-3 page) says "All code
+    and methods must be open sourced to be eligible for prizes". It names no
+    licence.
+  - The CC0/MIT-0 wording in D-041 is still unverified; the Kaggle rules page
+    did not render for me.
+  - Tufa's own `duck-harness` repo has **no LICENSE file**, so the Apache-2.0
+    grant over their code rests on Franzen's declaration, and on Kaggle's
+    terms for public notebooks (Apache-2.0, an assumption I have not verified).
+  - **The user should confirm on the rules page before relying on this for a
+    prize.**
+- **Verified:**
+  - The vendored top-level `ARC3-Inference/` equals Tufa's bundle plus
+    Franzen's patch: all 16 patched files match the patch's post-image blob
+    hashes. So our graft patch applies to the tree Kaggle builds; `git apply
+    --check -R` passes for it.
+  - The notebook is self-contained. Cell 2 writes his 499 KB patch, cell 4
+    applies it, and the Save & Run path plays the 10 demo games not in his
+    exclusion list, at 25 min per game.
+- **Graft 1, implemented behind `ARC3_SCALE_HASH=1` (off by default):**
+  - *What:* scale-invariant shape identity. Segmentation nodes gain `scale`
+    (the largest k for which the object is an exact k× upscale) and
+    `scale_free_hash` (colour-free, canonical over rotation and integer
+    scale). The prompt documents the keys only when the flag is on. The
+    sandbox runs with an empty environment, so the flag is frozen into the
+    spliced source on the host.
+  - *Why first:* the forensic read of our v4 ls20 run (2026-10-29) found the
+    goal link invisible to exact-shape matching. The key display is the goal
+    glyph at 2× and rotated. Franzen's segmentation already handles rotation
+    but not scale.
+  - *Evidence (`tests/test_duck_graft.py`, `fixtures/ls20.jsonl.gz` frame 0):*
+    with the graft, object 4 (colour 9, 5 px, rows 11–13, cols 35–37, inside
+    the goal box) shares a `scale_free_hash` with object 13 (colour 9, 20 px,
+    scale 2, rows 55–60, cols 3–8, the key display). Single cells also match
+    2×2 squares, which is trivial but harmless; the test ignores matches of
+    2 px or fewer.
+  - *Not known:* whether the model uses the keys, and whether it helps.
+    Nothing has run end to end.
+- **Not done, and why:**
+  - **No local run.** Installing the harness's dependencies (`uv sync`) was
+    refused by the session's permission classifier as code from an external
+    source, so the planned NIM run on 2–3 games did not happen. The user can
+    allow it; the harness's OpenAI-compatible client should take NIM's
+    endpoint via `LOCAL_ANALYZER_BASE_URL`, `LOCAL_ANALYZER_MODEL_ID` and
+    `LOCAL_ANALYZER_API_KEY` (untested).
+  - **No Kaggle push** (quota; the user approves runs).
+- **Options rejected:**
+  - *lordhansolo's vLLM-nightly build (23.84)* — scores lower, and its serving
+    configuration sits inside a dataset bundle rather than the notebook.
+  - *sirikilohit's (22.53)* — lower score, and a 50-cell notebook with stale
+    configuration (COMPARISON.md §2).
+  - *Tufa's M1 duck-harness alone* — older and weaker than Franzen's fork of
+    it, and no LICENSE file.
+  - *Re-implementing the Duck approach inside our v4* — four days are not
+    enough to re-derive what three teams tuned over months. Vendoring keeps
+    the known-good baseline exact, and our changes stay a separable patch.
+  - *Folding our grafts into Franzen's patch* — that would lose the clean
+    A/B baseline and blur provenance. Our patch is separate, generated, and
+    flag-gated.
+  - *Grafts ranked below the scale hash:*
+    - Return-to-start / life-loss events: medium value; touches the 7k-line
+      `tool_agent.py` with no way to test it here.
+    - Code-checked predictions, and goal-as-population with attainment tests:
+      high potential, but they change the harness's control flow. That is not
+      something to do blind four days out.
+    - Ticker/counter detection: the harness already has it (the
+      `gameplay_changed` edge-cell rule).
+    - Exact object facts and change lists: already there (segmentation,
+      Hungarian-matched frame diff, animation frames).
+- **Consequences:**
+  - We depend on four third-party Kaggle inputs from one user (dfranzen)
+    staying public and unchanged.
+  - Every harness change is a diff against `b55ec89`.
+  - The baseline arm is exactly Franzen's notebook (`push_duck.py` with no
+    `--graft`), so it doubles as a reproduction check of his 27.89.
+- **Revisit if:**
+  - the baseline smoke run fails to start or scores far below his public run
+    (stack drift since 4 October);
+  - the rules page requires CC0/MIT-0 for all code, which Apache-2.0 is not;
+  - a stronger public solution appears (e.g. Tufa's later harness);
+  - the scale-hash arm shows no difference over several games (then drop it
+    and try the life-loss graft).
+
+---
+
 ## D-046 — v5: object permanence, an object sheet, tolerant checking, and the model's simulator searched by code
 
 - **Date:** 2026-10-30 (built), 2026-10-31 (clean run). Written up by the main
   session: the builder agent's draft was lost when it stalled.
 - **Status:** accepted as the direction for our own agent; **not** a submission
   candidate by 2 Nov (see Consequences).
+  Ported to this branch on 2026-11-02 from `v5-objects` (entry text unchanged).
 - **Context:** v4 after the D-044 fixes scored 0 levels on five games at ~1.3
   calls per action and ~10k thinking tokens per call. Reading its logs showed
   the loop rewarded predictable actions, not progress: every slip in an exact
@@ -3775,4 +3940,168 @@ Same evaluation, seeds 1 and 2 (`agent_v1_seed{1,2}.*`):
 
 ---
 
-<!-- Next entry: D-045 (D-043 reserved by the main session, D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->
+## D-047 — Final submission: two Franzen-based notebooks, the safe one and one carrying a single change of ours
+
+- **Date:** 2026-11-01
+- **Status:** accepted; **amended by D-049** (2026-11-02: arm A is not to be submitted on its own). Submission itself awaits the user's approval
+- **Context:** Submissions close 2 Nov 2026. The leaderboard (Kaggle API,
+  1 Nov) is led by private entries at 40–76; the best public notebooks are
+  Franzen's Milestone #2 solution and small variants at ~28–31. Our own agent
+  (v5, D-046) cleared 1 level in ~320 actions on five public games. The rules
+  (arcprize.org/competitions/2026) require our code under CC0/MIT-0 and allow
+  third-party code under an open-source licence such as Apache-2.0. Kaggle
+  scores the better of two selected final submissions.
+- **Decision:** submit **A** = Franzen + lalalia9's solved-level memory and
+  longer timeouts (`push_duck.py --memory`; functionally identical to the
+  public notebook scored 31.46), and as the second entry one variant of A with
+  a single change: **B** (+ scale-invariant shape matching, D-045) or **C**
+  (+ `EXPOSE_RESET=on`), whichever smoke-tests cleanly and is preferred. C
+  targets a failure read in B's ls20 transcript: on level 2 the model planned
+  a route longer than its move budget, then spent 38 moves on purpose
+  exhausting lives to force a restart; the harness has a model RESET (one
+  action) that Franzen built but left off.
+- **Smoke evidence (ls20 + ft09, 20 min each, one run per arm):** A 57.72,
+  B 59.92 (both ft09 6/6, ls20 3/7). The difference is within noise: B beat A
+  on ls20 levels 1 and 3 and lost on level 2 by 71 actions.
+- **Options rejected:**
+  - *Submit our own agent (v5)* — ~0% on public games against ~30% for the base.
+  - *Stack several of our changes into one notebook* — lalalia9 measured
+    changes that looked neutral on public games costing 7–8 points on the
+    hidden set; one change per arm keeps each arm interpretable.
+  - *Franzen exactly as published* — dominated by A on the evidence published
+    (31.46 vs ~28, same code plus memory), though that is also within noise.
+  - *Pushing to Kaggle's latest image* — Python 3.13 breaks the server
+    install (smoke runs 2026-11-01); the notebooks pin Franzen's image.
+- **Consequences:** the submission depends on dfranzen's public Kaggle inputs
+  staying available; the second arm's value is untested beyond two games.
+  Prize eligibility requires open-sourcing this repository before private
+  scores are released.
+- **Revisit if:** the private leaderboard shows the second arm below A by more
+  than run-to-run noise (then its change hurts on the hidden set).
+
+---
+
+## D-049 — No baseline-only entry: submit only a variant that improves on the public Duck baseline, and only with the user present
+
+- **Date:** 2026-11-02
+- **Status:** accepted (the user's direction). Amends D-047: arm A is no
+  longer to be submitted for its own sake. Written up by the documentation
+  session from the user's statements and the `duck-base` commits. D-048 is
+  reserved for the turn hints, which are still in progress on `duck-base`.
+- **Context:** D-047 planned two entries: A (Franzen's notebook plus
+  lalalia9's solved-level memory, ~31 on the public leaderboard) as the safe
+  one, and one variant carrying a single change of ours. On deadline day the
+  user rejected submitting A: "there is no point just being in line with the
+  pack, we need improvement". The user also said nothing is to be submitted
+  without them ("nothing without me"), even if waiting risks missing the
+  deadline.
+- **Decision:**
+  - A stays the **reference arm** in every comparison. It is not an entry in
+    its own right.
+  - An entry is a variant that shows an improvement over A. The candidates
+    being prepared on `duck-base`:
+    - our turn hints (`kaggle/duck_grafts/turn_hints.py`, D-048 wip): a
+      measured budget bar, lost-life detection and per-action effect counts;
+    - `EXPOSE_RESET=on`, Franzen's own model RESET, which he left off (D-047's
+      arm C);
+    - the scale-invariant shape hash (D-045, arm B);
+    - the public Adaptive Duck tools (`push_duck.py --adaptive`, third party,
+      stated public score 31.21, practice score unmeasured).
+  - `kaggle/duck_grafts/local_run.py` runs the harness offline against the NIM
+    endpoint, so arms can be compared without Kaggle quota. **Arm D** is A plus
+    all three turn hints, `EXPOSE_RESET=on` and `ARC3_SCALE_HASH=1`. A two-round
+    A-vs-D comparison (ls20, ft09, vc33, sb26; 30 min per game; seed 0;
+    `runs/duck_ab/drive.sh` in the `duck-base` worktree) started at about
+    02:31 UTC on 2 Nov. **It had produced no result when this was written.**
+  - `kaggle competitions submit` is run only on an explicit go-ahead from the
+    user in the current session.
+- **Options rejected:**
+  - *Submit A as the safe entry* (D-047) — rejected by the user: matching the
+    public notebooks adds nothing.
+  - *Submit without the user present if the deadline is close* — ruled out by
+    the user.
+  - *D-047's one-change-per-arm rule* — not kept: arm D stacks five changes.
+    The record does not say why. D-047's reason for the rule still stands:
+    lalalia9 measured changes that looked neutral on public games costing 7–8
+    points on the hidden set. A four-game NIM comparison on a different model
+    from the Kaggle one does not answer that risk.
+- **Consequences:**
+  - If no variant beats A in time, there may be no entry. That is the user's
+    choice to make.
+  - A competition rerun takes up to ~9 h, so the go-ahead has to come early
+    enough for it to finish.
+  - Local comparisons run on Nemotron-VL through NIM, not on Qwen3.8-Flash-Next
+    under SGLang as on Kaggle. A gain there is evidence, not proof.
+- **Revisit if:** arm D does not beat A on the local comparison. Then try one
+  change per arm. If none helps, the choice is between A and no entry, and it
+  is the user's.
+
+---
+
+## D-048 — Turn hints for the Duck harness, and the entry: variant D
+
+- **Date:** 2026-11-02 (built 00:15–03:32 UTC; submitted 17:52 UTC)
+- **Status:** accepted; **variant D submitted** to ARC Prize 2026 ARC-AGI-3
+  (Kaggle submission 57917075, kernel `experiencebreakfast/duck-d-11g` v1,
+  status PENDING at 00:27 UTC 3 Nov). The only submission: Kaggle allowed
+  one per day, so the planned second entry (G) was not made.
+- **Context:** reading B's ls20 transcript (D-047) showed the model plan a
+  43-step route on a ~21-action budget bar, then spend 38 moves on purpose
+  exhausting lives to force a restart. Our own agents had measured exactly
+  these things (v5's counter classification, v4's lost-life forensics, v5's
+  action-effect table, D-044, D-046); Duck has none of them as code facts.
+- **Decision:** `kaggle/duck_grafts/turn_hints.py` (ours, MIT-0) appends up
+  to three lines to each turn message, computed from recorded frames only,
+  each behind its own flag: `ARC3_HINT_BUDGET` (border-band colour changing
+  by a constant amount per board-changing action, with actions left at that
+  rate), `ARC3_HINT_LIFE` (board back at its level start after an ordinary
+  action, with the border bars moving back), `ARC3_HINT_EFFECTS` (per
+  action, how often it changed the board this level). Installed by
+  `push_duck.py --hints` after the memory patch. Variant D = A + all three
+  hints + `EXPOSE_RESET=on` (Franzen's built-but-off model RESET) +
+  `ARC3_SCALE_HASH=1` (D-045).
+- **Experiment (Kaggle, 11 public games × 20 min, one pass, 11 concurrent,
+  Qwen3.8-Flash-Next; `docs/experiments/kaggle/duck_11g_2026-11-02/`):**
+
+  | arm | flags beyond `--memory` | mean | levels |
+  |---|---|---|---|
+  | A control (`duck-ctrl-11g`) | — | 28.88 | 38 |
+  | D (`duck-d-11g`) | hints (original) + RESET + scale hash | **36.73** | 41 |
+  | E (`duck-e-11g`) | D + `--adaptive` | 31.63 | 40 |
+  | F (`duck-f-11g`) | D without RESET | 32.48 | 40 |
+  | G (`duck-g-11g`) | hints (original) only | 35.61 | **43** |
+  | H (`duck-h-11g`) | D with the fixed hints (287c377) | 24.07 | 32 |
+
+  One run per arm; per-game noise is very large (tr87: 3.5 in A, 71.4 in D,
+  2.5 in F). Every arm with the original hints cleared more levels than A.
+  H's loss is concentrated in sb26 (100 in all five other arms, 27.8 in H,
+  with a third of the tokens); one run cannot tell a defect of the fix from
+  luck. The planned I (fixed hints, no RESET) and J (control replicate) never
+  ran: the local scheduler was stopped for low system memory at ~06:24 UTC.
+- **Experiment (local, Nemotron-3.5-Super-VL via NIM, 4 games × 3 rounds,
+  `docs/experiments/local/duck_ab_2026-11-02/`):** A 3.18, D 1.20 (11 vs 9
+  levels), under heavy NIM throttling in rounds 2–3. Found two bugs in the
+  life hint, both present in Kaggle's D: lives lost inside a batch were
+  missed, and vc33 (pieces in the border band) fired 35 false alarms, which
+  the model answered with RESETs. Fixed in 287c377 with tests; the weaker
+  model also looped on RESET (26–27 on vc33).
+- **Changed our mind?** Yes, about what to enter: the user chose D on the
+  Kaggle evidence. We did not expect the *fixed* hints to measure worst; that
+  is unexplained and is the first thing to re-test.
+- **Options rejected:**
+  - *Enter A* — rejected by the user (D-049).
+  - *Enter H (the fixed hints)* — cleaner code, worst measurement.
+  - *Enter G alone* — close to D on mean, best on levels, fewer changes; it
+    was to be the second entry, which the daily limit prevented.
+  - *More test rounds* — no time inside the rerun margin; Kaggle's queue
+    held runs for up to an hour.
+- **Consequences:** the entry ships the original life hint with its known
+  vc33 false alarms, because that is the version that was measured. It stacks
+  five changes, against D-047's one-change-per-arm rule.
+- **Revisit if:** the private score of D is below the public baseline
+  (~28–31) by more than noise; or a replicate shows H's sb26 collapse is
+  reproducible (then the fix has a defect).
+
+---
+
+<!-- Next entry: D-050 (D-033 reserved, see D-034). Copy the template from CLAUDE.md. -->

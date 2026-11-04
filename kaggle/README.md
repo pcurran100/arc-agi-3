@@ -1,6 +1,11 @@
 # Submitting to Kaggle
 
-The submission is one notebook whose agent cell is generated from this
+> **The competition submission is no longer built here (D-045, D-047, D-049).**
+> It is Daniel Franzen's vendored Duck harness plus our grafts, built by
+> `scripts/push_duck.py` on branch `duck-base` (see `docs/architecture.md`
+> §14). This file covers our own agents (v1–v3) and is kept for them.
+
+For our own agents, the submission is one notebook whose agent cell is generated from this
 repository. Nothing in it needs the internet at evaluation.
 
 ## Build

@@ -1,9 +1,18 @@
 # Architecture: what is built, how it works, and what it does not do
 
-- **Last updated:** 2026-09-24, session 4
-- **Scope:** the perception layer (§1-§6), dynamics induction (§7) and
-  exploration (§8). Goal proposal and the planner still do not exist, and
-  nothing yet plays *to win* — §8 plays to make things happen.
+- **Last updated:** 2026-11-02. §1–§8 date from sessions 1–4 (2026-09-24) and
+  describe the perception, dynamics and exploration layers, which have not
+  changed since. §9–§13 were added as each agent version landed. §14 is new.
+- **Scope:** the perception layer (§1–§6), dynamics induction (§7),
+  exploration (§8), the v1 agent loop (§9), and the four LLM-driven versions:
+  v2 (§10), v3 (§11), v4 (§12) and v5 (§13). §14 describes the machine we
+  actually submit, which is **not our agent**: Daniel Franzen's vendored Duck
+  harness with flag-gated grafts of ours (D-045, D-047, D-049).
+- **Where the code is:** §1–§12 (before D-044) describe code on `main` and
+  every branch after it. §12's D-044 parts and §13 describe code on
+  `v5-objects`, which has not been merged. §14 describes code on `duck-base`.
+  This document was reconciled across those branches on 2026-11-02, on branch
+  `docs-status`.
 - **Companion documents:** `design-thesis.md` argues *why* we are building this
   kind of agent. `benchmark.md` records what the environment actually does.
   `state-of-play.md` is the short status snapshot. `decision-log.md` is the
@@ -1501,3 +1510,95 @@ positions and a route across the maze (`tests/test_v5_sim_ls20.py`).
   Nemotron's `reasoning_budget=12000` (`scripts/run_v5_nim.sh`) because NIM
   closes a request after ~340 s; that is an endpoint workaround, not a design
   choice.
+
+---
+
+## 14. The submission track: the vendored Duck harness and our grafts (D-045, D-047, D-049)
+
+Four days before the deadline, our best agent (v1) scored ~2.4% offline RHAE.
+The public Milestone #2 notebooks scored ~28–31 on the leaderboard. We stopped
+treating our own agent as the submission and built the submission on the best
+public code instead (D-043, D-045). This section describes that machine. It is
+mostly someone else's, so this section says where its parts come from and
+which parts are ours.
+
+### 14.1 What is vendored, and from where
+
+`third_party/duck-franzen/` is Daniel Franzen's Milestone #2 winner (27.89
+public), vendored verbatim at commit `b55ec89` from a fork of
+`da-fr/arc-agi-3-solution` (Apache-2.0; `NOTICE.md` gives the upstream commit).
+It is a fork of Tufa Labs' Duck harness, the Milestone #1 winner. In outline:
+
+- **One LLM agent per game**, with a Python tool sandbox. The model reads the
+  frame as text, writes and runs Python against it, and chooses actions.
+- **Serving:** Qwen3.8-Flash-Next (Intel W4A16 AutoRound), with an INT4 MTP
+  draft model, under SGLang "Pennyroyal" 2.5.3 on the RTX Pro 6000. All of it
+  comes from dfranzen's public Kaggle inputs.
+- **Exact perception of its own:** segmentation, a Hungarian-matched frame
+  diff, animation frames, and a `gameplay_changed` rule that ignores edge-cell
+  counters.
+
+The notebook is
+`third_party/duck-franzen/kaggle/dfranzen/arc-agi-3-milestone-2-solution.ipynb`.
+Its cell 2 writes Franzen's 499 KB patch over Tufa's source bundle, and cell 4
+applies it.
+
+Two more third-party pieces are vendored, each with a `NOTICE.md`:
+
+- `third_party/solved-level-memory/`: lalalia9's solved-level memory and
+  longer timeouts (from rellik13's M85 idea). The author states a public score
+  of 31.46 for that notebook.
+- `third_party/adaptive-duck/`: the "Adaptive Duck" sandbox tools
+  (`route()`, `bounded_search()`, `check_model()`, `follow_plan()`,
+  `solve_toggle()`, and notes kept across history trimming). The author states
+  a public score of 31.21; its practice score was never measured.
+
+### 14.2 What is ours
+
+Everything of ours is a separate, generated, flag-gated layer, so that the
+baseline arm stays byte-for-byte Franzen's code:
+
+| piece | where | switched on by | origin of the idea |
+|---|---|---|---|
+| Scale-invariant shape hash: segmentation nodes gain `scale` and `scale_free_hash`, and the prompt documents them | `git diff b55ec89` of the vendored tree (`segmentation.py`, `prompts.py`, `python_tool_sandbox.py`) | `--graft --env ARC3_SCALE_HASH=1` | v4's ls20 forensics: the goal glyph is a 2×, rotated copy (D-044 item 3) |
+| Turn hints: a measured budget bar in the border bands, "board back at level start" (probably a lost life), and per-action effect counts | `kaggle/duck_grafts/turn_hints.py` | `--hints` plus `ARC3_HINT_BUDGET/LIFE/EFFECTS=1` | v4/v5 forensics: counters taken for goals, lost lives taken for progress (D-044 items 1 and 4); v5's action-effect table (D-046) |
+| Model-visible RESET | already in Franzen's code, left off by him | `--env EXPOSE_RESET=on` | B's ls20 transcript: the model spent 38 moves losing lives to force a restart (D-047) |
+| Notebook builder | `scripts/push_duck.py` | dry run by default; `--push` spends quota | — |
+| Offline runner against a hosted API (NIM), arms A and D | `kaggle/duck_grafts/local_run.py` | run with the harness's own venv | lets arms be compared without Kaggle quota |
+
+`push_duck.py` also pins Franzen's Python 3.12 Kaggle image. Kaggle's latest
+image is 3.13, and the Pennyroyal cp312 wheels do not install on it (smoke
+runs, 2026-11-01). For a smoke test it narrows the game list (`--games`) and
+the time per game (`--game-minutes`). Neither changes a competition rerun.
+
+### 14.3 What it measurably does
+
+The measurements are the Kaggle smoke runs of 2026-11-01 (ls20 + ft09,
+20 min per game, one pass each; `docs/experiments/README.md`):
+
+- **A** (`--memory`): mean 57.72. ft09 6/6, ls20 3/7.
+- **B** (A + scale hash): mean 59.92, with the same levels cleared.
+
+The difference is noise. These runs show that both notebooks run end to end
+on the pinned image, and nothing more. The A-vs-D comparison on NIM
+(`local_run.py`, four games, two rounds) had not finished on 2026-11-02 when
+this section was written.
+
+### 14.4 What this does not do
+
+- **It does not contain our thesis.** No hypothesis population, no
+  checked predictions, no internal planning over a learned model, unless the
+  model writes one in its sandbox (and the Adaptive Duck tools encourage
+  that). Our contribution is a few hints and one perception key. This is a
+  choice made under deadline (D-043, D-045). It does not show that the thesis
+  was wrong.
+- **None of our grafts has a measured effect.** Every comparison so far is
+  one pass on two to four games. lalalia9 measured changes that looked
+  neutral on public games costing 7–8 points on the hidden set (D-047).
+- **It is not developed on the model it runs.** Local runs use Nemotron-VL
+  through NIM. Kaggle runs Qwen3.8-Flash-Next under SGLang.
+- **It depends on four third-party Kaggle inputs from one user** (dfranzen)
+  staying public and unchanged.
+- **The licensing rests on declarations we could not fully verify.** Tufa's
+  repository has no LICENSE file, and the Apache-2.0 grant comes from
+  Franzen's repositories (D-045).

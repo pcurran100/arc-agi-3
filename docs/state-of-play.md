@@ -4,53 +4,109 @@
 currently doing.** Read this first every session. Update it before the session
 ends if anything below is stale.
 
-- **Last updated:** 2026-10-16, session 6
-- **Session 6 (D-040): the 27B model now serves on Kaggle, and v3 has real
-  data.** Three serving blockers fixed: web-imported notebooks lose their
-  inputs (runs are now pushed by `scripts/push_kaggle.py`), Kaggle's image is
-  Python 3.13 (vLLM now runs under a standalone CPython 3.12), and FlashInfer's
-  JIT FP8 kernel fails on the RTX Pro 6000 (disabled). First real run (ls20 +
-  tn36, seed 0): **45 calls, score identical to v1**, because 34 answers were
-  unparseable: truncated after very long `thoughts`, or degenerate
-  whitespace. One tn36 world model verified at 100%. Fixes for the lost
-  answers are committed and **not yet run on Kaggle; that run is next**.
-  ~17 days to 2 Nov. No LICENSE yet; the rules reportedly require CC0/MIT-0.
-- **Status:** **there is an agent, a score and a Kaggle submission (D-034).**
-  `GraphAgent` plays all 25 games end to end: **~2.4% mean offline RHAE over
-  three seeds** (3.46% on the lucky seed 0), 9–10 levels of 183. That is
-  statistically tied with the explore driver (2.07%). **The induced dynamics
-  model, used as a one-step action filter, cuts the score by two thirds**
-  (3.46% → 1.18%), so it ships switched off. The agent has no goal; its score
-  is where blind exploration happens to look first. Earlier status, still true:
-  the D-002 go/no-go was a weak pass (D-025), perception is built and audited.
-- **v3 built (D-039, branch `v2-llm`): the LLM is the reasoner in the loop.**
-  It forms hypotheses (goal, player, action effects, static objects, roles)
-  as an executable world model; exact code computes the facts (tracked
-  objects, groups, co-motion, transformations), verifies every prediction
-  and plans the shortest path in the model. Synthetic two-level game with a
-  scripted model: **41 actions, 2 calls, vs 364 for blind v1**. On real ls20
-  data a correct world model predicts 18/18 steps. The real-LLM loop runs end
-  to end (3B on CPU: schema-valid answers, wrong models, correctly not
-  trusted). **Next: the Kaggle benchmark with Qwen3.6-27B** (`bench_rtx6000`,
-  now v3 by default). `CLAUDE.md`'s thesis was rewritten to match (user
-  approved). v2 below is superseded as the direction.
-- **v2 in progress (D-035, branch `v2-llm`; v1 frozen as tag `v1-graph`).** An
-  LLM proposes goal hypotheses as code; a weighted population tests them
-  against visited states and wins; their values steer best-first search over
-  v1's state graph. Built and tested: with a correct scripted hypothesis a
-  synthetic two-level game falls from unsolved-in-600 to **61 actions**. With
-  a real 3B model on CPU the plumbing works but its hypotheses are shallow
-  colour counts (vc33: identical to v1). Packaged for Kaggle on the Milestone
-  #1 winner's stack (vLLM + attached model on the RTX 6000); **the Kaggle GPU
-  run is the next step and needs the user** (no Kaggle credentials here).
-- **Days to Milestone #2 (30 Sep):** **3** — a submission is built
-  (`kaggle/README.md`); uploading it, making the notebook public and choosing
-  a licence are the user's steps
-- **Days to final submission (2 Nov):** **36**. Available time goes **up** from
-  October, not down (corrected 2026-09-25; the Timeline section below had it
-  backwards)
+- **Last updated:** 2026-11-03, after the deadline. Reconciled across
+  branches on `docs-status` (2 Nov), then brought up to date with the
+  submission (D-048). Everything below the **Archive** line is the state of
+  play as it stood on 2026-10-16 (session 6), kept unedited because it records
+  what we believed then.
+- **Submitted:** variant **D** at 17:52 UTC on 2 Nov (Kaggle submission
+  57917075), the only entry (one submission per day). Its rerun was still
+  PENDING at 00:27 UTC 3 Nov; the notebook is built to finish inside its 9 h
+  budget. **Papers are due 9 November.**
+- **Narrative of how we got here, and every idea tried, parked or rejected:**
+  `docs/history.md`.
 
 ---
+
+## Where we are
+
+Our own agent never beat the goal-free v1 explorer (~2.4% offline RHAE), across
+four LLM-driven rebuilds (v2–v5). The best of them, v5, cleared 1 level on four
+valid games (D-046). The public Milestone #2 notebooks, built on Tufa Labs'
+Duck harness, score ~28–31 on the leaderboard. So since 29 October the
+submission has been built on Daniel Franzen's vendored harness, with our
+findings as flag-gated grafts (D-043, D-045, D-047). On 2 November the user
+ruled out entering the plain public baseline, and reserved every submission
+for themselves (D-049). Six variants were compared on 11 public games on
+Kaggle; the user entered D, which scored 36.73 against the baseline's 28.88
+in a single run each (D-048).
+
+## Current status by line of work
+
+| line | branch | status | latest evidence |
+|---|---|---|---|
+| **Submission: Duck harness + grafts** | `duck-base` (active today) | **D submitted** 2 Nov 17:52 UTC, rerun pending (D-048) | Kaggle, 11 games × 20 min, one run each: A 28.88, D 36.73, E 31.63, F 32.48, G 35.61, H 24.07. Local on NIM (4 games × 3 rounds): A 3.18, D 1.20 |
+| Turn hints (budget bar, lost life, effect counts) | `duck-base` | in the entry (original version); life hint fixed afterwards in 287c377 (D-048) | every arm with the original hints cleared more levels than A (40–43 vs 38); the fixed version (H) measured worst |
+| Our agent, v5 | `v5-objects` (not merged) | research line; not a submission candidate (D-046) | 1 level / 4 valid games, Nemotron-VL on NIM, 0.43–0.75 calls per action |
+| Our agent, v4 + fixes | `v4-fixes` (merged into `v5-objects`) | superseded by v5 | 0 levels / 5 games (D-044) |
+| v1–v4 | `main` = `v4-submission` | frozen; v1 tagged `v1-graph` | v1 2.42% offline RHAE, 3 seeds × 25 games (D-034) |
+
+**Submission arms** (`scripts/push_duck.py`; architecture §14):
+
+- **A** = Franzen + lalalia9's solved-level memory (`--memory`). The
+  reference. Not to be entered on its own (D-049).
+- **B** = A + scale-invariant shape hash (`--graft --env ARC3_SCALE_HASH=1`).
+- **C** = A + `EXPOSE_RESET=on`.
+- **D** = A + all three turn hints + `EXPOSE_RESET=on` + scale hash
+  (`local_run.py --arm D`). This stacks changes, against D-047's
+  one-change-per-arm rule; see D-049.
+- **E** = D + Adaptive Duck tools (`--adaptive`), third party.
+- **F** = D without RESET. **G** = A + the three hints only.
+  **H** = D with the fixed life hint (287c377).
+- **Entered: D**, as it ran in `duck-d-11g` v1 (original hints, e157b78).
+
+## What we currently believe
+
+1. **The goal is the bottleneck, in every version.** Dynamics is learnable,
+   both by induction (D-025) and by an LLM with checked predictions (D-042,
+   D-046). Finding what wins is what fails (`history.md`, lesson 2).
+2. **Cost is solvable.** v5's tiered calls and code-searched simulators cut
+   calls per action from ~1.3 to 0.43–0.75 (D-046).
+3. **Most early "model failures" were our code**: truncation (D-040), and
+   the six forensic findings of D-044.
+4. **The model matters a lot.** Franzen reports large gains from each model
+   upgrade. We never benchmarked ours (D-037 was never run).
+5. **The thesis is not refuted, only unproven.** The submission does not test
+   it (architecture §14.4). Its strongest form, a verified world model planned
+   against, was never run with a strong model on Kaggle.
+
+## Open items, in priority order
+
+1. **Read D's score** on the Submissions page once the rerun finishes. An
+   error there would most likely be a timeout.
+2. **Paper track, due 9 November.** Material: `docs/history.md`, D-034 to
+   D-049, and the measured negative results of the model-based thesis.
+3. **Open-sourcing:** the repository is public and holds the submitted code
+   (`duck-base`); merge it into `main` (PR #3). Optionally make the
+   `duck-d-11g` notebook public.
+4. **After the deadline, if work continues:** re-test the fixed life hint
+   (H's sb26 collapse), run the control replicate (J) that never ran, and
+   try the consensus ideas on their branches (`duck-consensus`,
+   `duck-smallmodel`; most promising: several samples of one model, checked
+   by code against recorded history).
+
+## Known risks
+
+| risk | why it matters | status |
+|---|---|---|
+| Grafts that look neutral on public games cost points on the hidden set | lalalia9 measured 7–8 points (D-047) | open; arm D stacks five changes |
+| Development model ≠ Kaggle model | NIM Nemotron-VL locally, Qwen3.8-Flash-Next on Kaggle | accepted; a local gain is evidence, not proof |
+| Third-party Kaggle inputs disappear | the submission depends on four dfranzen inputs | accepted (D-045) |
+| Licence eligibility | Tufa's repository has no LICENSE file; the rules ask that our code be CC0/MIT-0 | open; the user should check the rules page (D-045, D-047) |
+| Every number is on public games | the public games are also our development set | standing |
+
+---
+
+# Archive: state of play as of 2026-10-16 (session 6)
+
+*Kept as it was written. The "bet in three sentences" below predates D-039:
+the LLM is no longer limited to proposing goals. The objectives table predates
+v4, v5 and the Duck track. For what superseded each part, see `history.md`.*
+
+- **Session 6 status (D-040):** the 27B model served on Kaggle; v3's first
+  real run scored identical to v1, with 34 of 45 answers unparseable.
+- **Status then:** v1 `GraphAgent` ~2.4% offline RHAE (D-034); v3 built
+  (D-039); v2 superseded.
 
 ## The bet, in three sentences
 
